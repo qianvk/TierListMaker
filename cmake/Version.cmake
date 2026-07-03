@@ -1,0 +1,16 @@
+find_package(Git QUIET)
+set(TLM_GIT_COMMIT "unknown")
+if(Git_FOUND)
+    execute_process(
+        COMMAND "${GIT_EXECUTABLE}" rev-parse --short HEAD
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        RESULT_VARIABLE TLM_GIT_RESULT
+        OUTPUT_VARIABLE TLM_GIT_OUTPUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+    )
+    if(TLM_GIT_RESULT EQUAL 0 AND NOT TLM_GIT_OUTPUT STREQUAL "")
+        set(TLM_GIT_COMMIT "${TLM_GIT_OUTPUT}")
+    endif()
+endif()
+

@@ -1,0 +1,63 @@
+# Build output
+build*/
+cmake-build-*/
+out/
+dist/
+install/
+*.app/
+*.dSYM/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# CMake/user-local configuration
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+compile_commands.json
+cmake_install.cmake
+CTestTestfile.cmake
+Testing/
+
+# Qt Creator and IDE state
+*.user
+*.autosave
+.qtcreator/
+.idea/
+.vscode/
+
+# Generated Qt files
+*_autogen/
+moc_*.cpp
+qrc_*.cpp
+ui_*.h
+*.qm
+
+# Local app data and user projects
+*.tlmproject
+*.tlmproject.assets/
+assets/
+thumbnails/
+logs/
+crash/
+*.log
+*.crash
+
+# Packages and signing/private material
+*.pkg
+*.dmg
+*.msix
+*.AppImage
+*.p12
+*.mobileprovision
+*.cer
+*.key
+*.pem
+.env
+.env.*
+
+# OS noise
+.DS_Store
+Thumbs.db
+

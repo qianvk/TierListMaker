@@ -1,0 +1,12 @@
+{
+  "windowBackground": "#f5f6f8",
+  "sidebarBackground": "#eceff3",
+  "contentBackground": "#ffffff",
+  "separator": "#d8dce2",
+  "primaryText": "#1f2328",
+  "secondaryText": "#69707a",
+  "accent": "#2f80ed",
+  "selection": "#dcecff",
+  "tierRowBackground": "#f7f8fa"
+}
+

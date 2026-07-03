@@ -1,0 +1,20 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file alias="edit.svg">icons/edit.svg</file>
+        <file alias="folder.svg">icons/folder.svg</file>
+        <file alias="preferences.svg">icons/preferences.svg</file>
+        <file alias="plus.svg">icons/plus.svg</file>
+        <file alias="trash.svg">icons/trash.svg</file>
+        <file alias="import.svg">icons/import.svg</file>
+        <file alias="export.svg">icons/export.svg</file>
+        <file alias="save.svg">icons/save.svg</file>
+        <file alias="reset.svg">icons/reset.svg</file>
+        <file alias="focus.svg">icons/focus.svg</file>
+        <file alias="image.svg">icons/image.svg</file>
+        <file alias="sidebar.svg">icons/sidebar.svg</file>
+    </qresource>
+    <qresource prefix="/themes">
+        <file>themes/light.json</file>
+        <file>themes/dark.json</file>
+    </qresource>
+</RCC>

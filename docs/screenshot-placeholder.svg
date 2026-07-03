@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="720" viewBox="0 0 1200 720">
+  <rect width="1200" height="720" rx="26" fill="#f4f6f8"/>
+  <rect x="24" y="24" width="1152" height="672" rx="22" fill="#ffffff" stroke="#d9dee6"/>
+  <rect x="24" y="24" width="220" height="672" rx="22" fill="#edf1f6"/>
+  <rect x="46" y="72" width="156" height="34" rx="9" fill="#dcecff"/>
+  <rect x="46" y="122" width="132" height="22" rx="7" fill="#d5dae3"/>
+  <rect x="284" y="76" width="370" height="28" rx="8" fill="#d5dae3"/>
+  <g transform="translate(284 132)">
+    <rect width="84" height="84" rx="12" fill="#ff7b7b"/>
+    <rect x="98" width="760" height="84" rx="12" fill="#f1f4f7"/>
+    <rect y="98" width="84" height="84" rx="12" fill="#ffc36b"/>
+    <rect x="98" y="98" width="760" height="84" rx="12" fill="#f1f4f7"/>
+    <rect y="196" width="84" height="84" rx="12" fill="#ffe17d"/>
+    <rect x="98" y="196" width="760" height="84" rx="12" fill="#f1f4f7"/>
+    <rect y="294" width="84" height="84" rx="12" fill="#8bdc8b"/>
+    <rect x="98" y="294" width="760" height="84" rx="12" fill="#f1f4f7"/>
+    <rect y="392" width="84" height="84" rx="12" fill="#82b7ff"/>
+    <rect x="98" y="392" width="760" height="84" rx="12" fill="#f1f4f7"/>
+  </g>
+  <text x="326" y="588" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, sans-serif" font-size="28" fill="#69707a">Screenshot placeholder</text>
+</svg>

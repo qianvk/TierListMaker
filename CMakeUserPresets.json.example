@@ -1,0 +1,13 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "local-qt",
+      "inherits": "default",
+      "displayName": "Local Qt",
+      "cacheVariables": {
+        "CMAKE_PREFIX_PATH": "/path/to/Qt/6.x.x/platform"
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+include(GNUInstallDirs)
+
+install(TARGETS TierListMaker
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+

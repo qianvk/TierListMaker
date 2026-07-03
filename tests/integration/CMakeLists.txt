@@ -1,0 +1,10 @@
+function(add_tlm_integration_test target source)
+    qt_add_executable(${target} ${source})
+    target_link_libraries(${target} PRIVATE tierlistmaker_core Qt6::Test)
+    target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src")
+    add_test(NAME ${target} COMMAND ${target})
+endfunction()
+
+add_tlm_integration_test(tst_ProjectSaveOpen tst_ProjectSaveOpen.cpp)
+add_tlm_integration_test(tst_ImageImport tst_ImageImport.cpp)
+add_tlm_integration_test(tst_ProjectSaveAsFlow tst_ProjectSaveAsFlow.cpp)

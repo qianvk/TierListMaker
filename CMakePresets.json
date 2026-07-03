@@ -1,0 +1,76 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "default",
+      "displayName": "Default Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/default",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PREFIX_PATH": "$env{HOME}/Qt/6.10.1/macos",
+        "TLM_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/release",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "$env{HOME}/Qt/6.10.1/macos",
+        "TLM_BUILD_TESTS": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      }
+    },
+    {
+      "name": "release",
+      "configurePreset": "release",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      }
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "default",
+      "configurePreset": "default",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    }
+  ]
+}
