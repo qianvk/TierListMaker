@@ -5,7 +5,7 @@
 
 #include <QApplication>
 #include <QFontMetrics>
-#include <QLinearGradient>
+#include <QImageReader>
 #include <QPainter>
 #include <QPainterPath>
 
@@ -218,6 +218,44 @@ QRect TierListDelegate::imageRectForId(const QModelIndex& index, const QRect& ro
     return {};
 }
 
+QPixmap TierListDelegate::pixmapForImageId(const QString& imageId) const {
+    const TierImage* image = m_project ? m_project->imageById(imageId) : nullptr;
+    return image ? pixmapForImage(*image) : QPixmap();
+}
+
+QPixmap TierListDelegate::fullPixmapForImageId(const QString& imageId) const {
+    const TierImage* image = m_project ? m_project->imageById(imageId) : nullptr;
+    if (!image || !m_assetManager || !m_project) {
+        return pixmapForImageId(imageId);
+    }
+
+    QImageReader reader(m_assetManager->resolvedImagePath(*m_project, *image));
+    reader.setAutoTransform(true);
+    // Mission Control hover only needs a high-quality display source; capped decoding keeps frames smooth.
+    const QSize sourceSize = reader.size();
+    if (sourceSize.isValid()) {
+        reader.setScaledSize(sourceSize.scaled(QSize(768, 768), Qt::KeepAspectRatio));
+    }
+    const QImage fullImage = reader.read();
+    return fullImage.isNull() ? pixmapForImage(*image) : QPixmap::fromImage(fullImage);
+}
+
+QSize TierListDelegate::sourceSizeForImageId(const QString& imageId) const {
+    const TierImage* image = m_project ? m_project->imageById(imageId) : nullptr;
+    if (!image || !m_assetManager || !m_project) {
+        return {};
+    }
+
+    QImageReader reader(m_assetManager->resolvedImagePath(*m_project, *image));
+    reader.setAutoTransform(true);
+    const QSize size = reader.size();
+    if (size.isValid()) {
+        return size;
+    }
+    const QPixmap pixmap = pixmapForImage(*image);
+    return pixmap.size();
+}
+
 int TierListDelegate::insertionIndexForPosition(const QModelIndex& index, const QRect& rowRect,
                                                 const QPoint& point) const {
     return insertionIndexForPosition(index, rowRect, point,
@@ -276,6 +314,7 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
             paintOption.rect.translate(0, qRound(offset));
         }
     }
+    const qreal missionProgress = view ? view->missionTransitionProgress() : 0.0;
 
     painter->save();
     painter->setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing |
@@ -297,15 +336,18 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     painter->setClipPath(rowClipPath(rowRect, firstRow, lastRow));
     QColor labelColor = rowColor.isValid() ? rowColor : QColor(QStringLiteral("#d9dee7"));
     labelColor.setAlphaF(labelAlpha);
-    painter->fillRect(labelRect(rowRect), labelColor);
+    const int currentLabelWidth = labelWidth();
+    const int labelSlide = qRound((currentLabelWidth + 2) * missionProgress);
+    const QRect labelPaintRect = labelRect(rowRect).translated(-labelSlide, 0);
+    painter->fillRect(labelPaintRect, labelColor);
     QColor contentBackground = option.palette.color(QPalette::AlternateBase);
     if (!contentBackground.isValid()) {
         contentBackground = kContentBackground;
     }
     contentBackground.setAlphaF(materialAlpha);
-    const int currentLabelWidth = labelWidth();
-    painter->fillRect(QRect(rowRect.left() + currentLabelWidth, rowRect.top(),
-                            qMax(0, rowRect.width() - currentLabelWidth), rowRect.height()),
+    const int animatedSplitX = rowRect.left() + qRound(currentLabelWidth * (1.0 - missionProgress));
+    painter->fillRect(QRect(animatedSplitX, rowRect.top(),
+                            qMax(0, rowRect.right() - animatedSplitX + 1), rowRect.height()),
                       contentBackground);
 
     QFont labelFont = option.font;
@@ -315,27 +357,28 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     QColor textColor = kTextColor;
     textColor.setAlphaF(1.0F);
     painter->setPen(textColor);
-    painter->drawText(labelRect(rowRect).adjusted(5, 5, -5, -5), Qt::AlignCenter,
+    painter->drawText(labelPaintRect.adjusted(5, 5, -5, -5), Qt::AlignCenter,
                       painter->fontMetrics().elidedText(index.data(TierListModel::LabelRole).toString(),
                                                         Qt::ElideRight, currentLabelWidth - 10));
 
     painter->setClipping(false);
     painter->setRenderHint(QPainter::Antialiasing, false);
     QColor gridLine = kGridLine;
-    gridLine.setAlphaF(gridAlpha);
+    gridLine.setAlphaF(gridAlpha * static_cast<float>(1.0 - missionProgress));
     painter->setPen(QPen(gridLine, 1));
-    painter->drawLine(rowRect.left() + currentLabelWidth, rowRect.top(),
-                      rowRect.left() + currentLabelWidth, rowRect.bottom());
+    painter->drawLine(animatedSplitX, rowRect.top(), animatedSplitX, rowRect.bottom());
     if (!lastRow) {
         painter->drawLine(rowRect.left(), rowRect.bottom(), rowRect.right(), rowRect.bottom());
     }
     painter->setRenderHint(QPainter::Antialiasing, true);
 
+    if (missionProgress > 0.001) {
+        painter->restore();
+        return;
+    }
+
     const QStringList imageIds = imagesVisible(m_project) ? imageIdsForIndex(index) : QStringList();
     const QVector<QRect> rects = tileRects(index, rowRect);
-    QFont imageFont = option.font;
-    imageFont.setPointSize(qMax(8, imageFont.pointSize() - 2));
-
     struct PaintTile {
         const TierImage* image{nullptr};
         QRect baseRect;
@@ -393,21 +436,6 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
             painter->drawPixmap(drawBounds, pixmap, centeredCropSourceRect(pixmap, drawBounds.size().toSize()));
         }
         painter->restore();
-
-        if (imageRect.height() > 34 && !image->displayName.isEmpty()) {
-            const QRectF bannerRect =
-                imageRect.adjusted(0, imageRect.height() - qMax<qreal>(18.0, imageRect.height() / 4.0),
-                                   0, 0);
-            QLinearGradient gradient(bannerRect.topLeft(), bannerRect.bottomLeft());
-            gradient.setColorAt(0.0, QColor(0, 0, 0, 0));
-            gradient.setColorAt(1.0, QColor(0, 0, 0, 150));
-            painter->fillRect(bannerRect, gradient);
-            painter->setFont(imageFont);
-            painter->setPen(Qt::white);
-            painter->drawText(bannerRect.adjusted(5, 0, -5, -2), Qt::AlignLeft | Qt::AlignBottom,
-                              painter->fontMetrics().elidedText(image->displayName, Qt::ElideRight,
-                                                                qRound(bannerRect.width()) - 10));
-        }
 
         painter->setRenderHint(QPainter::Antialiasing, false);
         painter->setPen(QPen(selected ? option.palette.highlight().color() : QColor(0, 0, 0, 42),

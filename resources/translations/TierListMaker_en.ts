@@ -207,7 +207,7 @@
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="195"/>
-        <location filename="../../src/pages/EditPage.cpp" line="885"/>
+        <location filename="../../src/pages/EditPage.cpp" line="891"/>
         <source>TierListMaker Projects (*.tlmproject)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -329,59 +329,59 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="884"/>
+        <location filename="../../src/pages/EditPage.cpp" line="890"/>
         <source>Save Project</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="990"/>
+        <location filename="../../src/pages/EditPage.cpp" line="996"/>
         <source>Edit Tier</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1001"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1007"/>
         <source>Tier Color</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1011"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1017"/>
         <source>Label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1012"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1018"/>
         <source>Color</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1015"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1021"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1029"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1032"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1035"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1038"/>
         <source>Delete Row</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1029"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1035"/>
         <source>At least one row is required.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1033"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1039"/>
         <source>Delete this row and move its images to the pool?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1088"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1096"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1094"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1102"/>
         <source>Save Failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1102"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1108"/>
         <source>Recent Projects</source>
         <translation type="unfinished"></translation>
     </message>
@@ -713,31 +713,31 @@ https://github.com/qianvk/TierListMaker</source>
 <context>
     <name>tlm::RootWidget</name>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="148"/>
-        <location filename="../../src/window/RootWidget.cpp" line="169"/>
-        <location filename="../../src/window/RootWidget.cpp" line="224"/>
-        <location filename="../../src/window/RootWidget.cpp" line="327"/>
-        <location filename="../../src/window/RootWidget.cpp" line="451"/>
+        <location filename="../../src/window/RootWidget.cpp" line="157"/>
+        <location filename="../../src/window/RootWidget.cpp" line="178"/>
+        <location filename="../../src/window/RootWidget.cpp" line="233"/>
+        <location filename="../../src/window/RootWidget.cpp" line="336"/>
+        <location filename="../../src/window/RootWidget.cpp" line="460"/>
         <source>Collapse sidebar</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="154"/>
-        <location filename="../../src/window/RootWidget.cpp" line="223"/>
-        <location filename="../../src/window/RootWidget.cpp" line="327"/>
-        <location filename="../../src/window/RootWidget.cpp" line="451"/>
+        <location filename="../../src/window/RootWidget.cpp" line="163"/>
+        <location filename="../../src/window/RootWidget.cpp" line="232"/>
+        <location filename="../../src/window/RootWidget.cpp" line="336"/>
+        <location filename="../../src/window/RootWidget.cpp" line="460"/>
         <source>Show sidebar</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="227"/>
-        <location filename="../../src/window/RootWidget.cpp" line="265"/>
-        <location filename="../../src/window/RootWidget.cpp" line="607"/>
+        <location filename="../../src/window/RootWidget.cpp" line="236"/>
+        <location filename="../../src/window/RootWidget.cpp" line="274"/>
+        <location filename="../../src/window/RootWidget.cpp" line="617"/>
         <source>Preferences</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="602"/>
+        <location filename="../../src/window/RootWidget.cpp" line="612"/>
         <source>Projects</source>
         <translation type="unfinished"></translation>
     </message>
@@ -787,6 +787,14 @@ https://github.com/qianvk/TierListMaker</source>
     <message>
         <location filename="../../src/export/TierListExporter.cpp" line="160"/>
         <source>Could not write the export file.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>tlm::TierListView</name>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2209"/>
+        <source>No images in tier list</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

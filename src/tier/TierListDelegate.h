@@ -4,7 +4,9 @@
 #include "assets/ThumbnailCache.h"
 #include "tier/TierProject.h"
 
+#include <QPixmap>
 #include <QRect>
+#include <QSize>
 #include <QStyledItemDelegate>
 #include <QVector>
 
@@ -20,6 +22,7 @@ public:
     void setContext(const TierProject* project, const AssetManager* assetManager,
                     ThumbnailCache* thumbnailCache, QString selectedImageId);
 
+    const TierProject* project() const { return m_project; }
     int labelWidth() const;
     static int minimumLabelWidth();
     static int outerRadius();
@@ -34,6 +37,9 @@ public:
     QRect tileImageRect(const QRect& tileRect) const;
     QString imageIdAt(const QModelIndex& index, const QRect& rowRect, const QPoint& point) const;
     QRect imageRectForId(const QModelIndex& index, const QRect& rowRect, const QString& imageId) const;
+    QPixmap pixmapForImageId(const QString& imageId) const;
+    QPixmap fullPixmapForImageId(const QString& imageId) const;
+    QSize sourceSizeForImageId(const QString& imageId) const;
     int insertionIndexForPosition(const QModelIndex& index, const QRect& rowRect,
                                   const QPoint& point) const;
     int insertionIndexForPosition(const QModelIndex& index, const QRect& rowRect,

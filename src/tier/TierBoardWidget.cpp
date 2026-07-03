@@ -64,4 +64,20 @@ QRect TierBoardWidget::imageSourceRect(const QString& imageId) const {
     return m_view ? m_view->imageSourceRect(imageId) : QRect();
 }
 
+void TierBoardWidget::toggleMissionControlMode() {
+    if (m_view) {
+        m_view->toggleMissionControlActive();
+    }
+}
+
+void TierBoardWidget::setMissionControlMode(bool active) {
+    if (m_view) {
+        m_view->setMissionControlActive(active);
+    }
+}
+
+bool TierBoardWidget::isMissionControlModeActive() const {
+    return m_view && m_view->isMissionControlActive();
+}
+
 } // namespace tlm

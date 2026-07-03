@@ -5,6 +5,9 @@
 #include <QHash>
 #include <QPointF>
 #include <QPixmap>
+#include <QRectF>
+#include <QStringList>
+#include <QVector>
 
 class QDragEnterEvent;
 class QDragLeaveEvent;
@@ -29,6 +32,12 @@ class TierListView : public QListView {
     Q_OBJECT
 
 public:
+    struct MissionTile {
+        QString imageId;
+        QRectF rect;
+        QSize sourceSize;
+    };
+
     explicit TierListView(QWidget* parent = nullptr);
 
     void refreshLayoutMetrics();
@@ -41,6 +50,8 @@ public:
     QRect imageSourceRect(const QString& imageId) const;
     qreal dockScaleForImage(const QModelIndex& index, const QRect& tileRect, const QString& imageId) const;
     QPointF dockOffsetForImage(const QModelIndex& index, const QRect& tileRect, const QString& imageId) const;
+    bool isMissionControlActive() const { return m_missionControlActive; }
+    qreal missionTransitionProgress() const { return m_missionTransitionProgress; }
 
 signals:
     void imageDropped(const QString& imageId, const QString& rowId, int index);
@@ -48,6 +59,10 @@ signals:
     void imagePreviewRequested(const QString& imageId, const QRect& sourceRect);
     void rowEditRequested(const QString& rowId);
     void rowMovedToIndex(const QString& rowId, int destinationIndex);
+
+public slots:
+    void setMissionControlActive(bool active);
+    void toggleMissionControlActive();
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -106,6 +121,21 @@ private:
     void updateDockHover(const QPoint& viewportPoint);
     void animateDockHover(qreal targetProgress);
     void stopDockHoverAnimation();
+    void animateMissionTransition(qreal targetProgress);
+    void stopMissionTransitionAnimation();
+    void updateMissionHover(const QPoint& viewportPoint);
+    void animateMissionHover(qreal targetProgress);
+    void stopMissionHoverAnimation();
+    void invalidateMissionControlLayout() const;
+    void ensureMissionControlLayout() const;
+    QStringList missionImageIds() const;
+    QString missionImageAt(const QPoint& viewportPoint) const;
+    QRect missionImageRect(const QString& imageId) const;
+    void paintMissionControl(QPainter* painter);
+    QHash<QString, QRectF> normalImageRects() const;
+    QRectF interpolatedMissionRect(const QString& imageId, const QRectF& targetRect) const;
+    QVector<MissionTile> missionDisplayTiles() const;
+    QPixmap missionPixmapForImage(const QString& imageId, bool fullQuality);
     int rowDropIndexForPosition(const QPoint& point, const QString& rowId) const;
     QModelIndex imageDropIndexForPosition(const QPoint& point) const;
     QRect animatedVisualRect(const QModelIndex& index) const;
@@ -153,6 +183,20 @@ private:
     QVariantAnimation* m_dockHoverAnimation{nullptr};
     QString m_canvasBackgroundCachePath;
     QPixmap m_canvasBackgroundCache;
+    bool m_missionControlActive{false};
+    qreal m_missionTransitionProgress{0.0};
+    QVariantAnimation* m_missionTransitionAnimation{nullptr};
+    QHash<QString, QRectF> m_missionNormalRects;
+    QString m_missionHoverImageId;
+    QPointF m_missionHoverPosition;
+    qreal m_missionHoverProgress{0.0};
+    QVariantAnimation* m_missionHoverAnimation{nullptr};
+    mutable bool m_missionLayoutDirty{true};
+    mutable QSize m_missionLayoutViewportSize;
+    mutable QStringList m_missionLayoutImageIds;
+    mutable QVector<MissionTile> m_missionTiles;
+    mutable QHash<QString, QSize> m_missionSourceSizeCache;
+    QHash<QString, QPixmap> m_missionFullPixmapCache;
 };
 
 } // namespace tlm

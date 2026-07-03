@@ -41,6 +41,15 @@ constexpr int kSidebarMaximumWidth = 420;
 constexpr int kSplitterHandleWidth = 0;
 constexpr int kTitleBarHeight = 54;
 constexpr int kSidebarToggleInset = 14;
+
+Qt::KeyboardModifier physicalControlModifier() {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    // Qt maps the physical macOS Control key to MetaModifier; ControlModifier is Command.
+    return Qt::MetaModifier;
+#else
+    return Qt::ControlModifier;
+#endif
+}
 } // namespace
 
 RootWidget::RootWidget(ProjectRepository* repository, RecentProjectsStore* recentProjects,
@@ -557,7 +566,8 @@ void RootWidget::setupShortcuts() {
         }
     });
     addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S), m_editPage, SLOT(saveProjectAs()));
-    addShortcut(QKeySequence(Qt::CTRL | Qt::Key_I), m_editPage, SLOT(importImagesFromDialog()));
+    auto* missionShortcut = new QShortcut(QKeySequence(QKeyCombination(physicalControlModifier(), Qt::Key_I)), this);
+    connect(missionShortcut, &QShortcut::activated, m_editPage, &EditPage::toggleMissionControlMode);
     addShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), m_editPage, SLOT(exportProjectFromDialog()));
 
     auto* preferencesShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Comma), this);

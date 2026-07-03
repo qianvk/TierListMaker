@@ -642,6 +642,12 @@ void EditPage::setTierFocusMode(bool enabled) {
     update();
 }
 
+void EditPage::toggleMissionControlMode() {
+    if (m_board) {
+        m_board->toggleMissionControlMode();
+    }
+}
+
 void EditPage::layoutOverlays() {
     constexpr int kRevealZoneHeight = 34;
     const int poolHeight = m_pool ? m_pool->preferredOverlayHeight(width(), height()) : qBound(138, height() / 5, 190);

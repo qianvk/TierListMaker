@@ -50,6 +50,7 @@ public slots:
     void previewSelectedImage();
     bool confirmSaveIfDirty();
     void setTierFocusMode(bool enabled);
+    void toggleMissionControlMode();
 
 signals:
     void titleChanged(const QString& title);

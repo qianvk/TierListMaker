@@ -24,6 +24,9 @@ public:
                  ThumbnailCache* thumbnailCache, const QString& selectedImageId);
     void refreshVisuals();
     QRect imageSourceRect(const QString& imageId) const;
+    void toggleMissionControlMode();
+    void setMissionControlMode(bool active);
+    bool isMissionControlModeActive() const;
 
 signals:
     void imageDropped(const QString& imageId, const QString& rowId, int index);
