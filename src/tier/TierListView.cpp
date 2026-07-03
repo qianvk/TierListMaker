@@ -39,8 +39,8 @@ constexpr int kInitialLayoutLineHeight = 84;
 constexpr qreal kDockMaxScale = 1.30;
 constexpr int kMissionLayoutSearchSteps = 34;
 constexpr int kMissionTransitionMs = 320;
-constexpr int kMissionHoverMs = 128;
-constexpr int kMissionCollisionPasses = 10;
+constexpr int kMissionHoverMs = 118;
+constexpr int kMissionCollisionPasses = 18;
 
 Qt::KeyboardModifier physicalControlModifier() {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
@@ -127,6 +127,175 @@ QSizeF missionSizeForLongSide(qreal aspect, qreal longSide) {
         return QSizeF(longSide, longSide / aspect);
     }
     return QSizeF(longSide * aspect, longSide);
+}
+
+qreal missionLayoutMarginForSize(const QSizeF& viewportSize) {
+    const qreal shortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
+    return qBound<qreal>(12.0, shortSide / 34.0, 24.0);
+}
+
+QRectF missionHoverSafeBounds(const QSizeF& viewportSize) {
+    QRectF bounds(QPointF(0.0, 0.0), viewportSize);
+    const qreal shortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
+    const qreal margin = missionLayoutMarginForSize(viewportSize) + qBound<qreal>(6.0, shortSide / 96.0, 14.0);
+    if (bounds.width() <= margin * 2.0 || bounds.height() <= margin * 2.0) {
+        return bounds.adjusted(2.0, 2.0, -2.0, -2.0);
+    }
+    return bounds.adjusted(margin, margin, -margin, -margin);
+}
+
+QRectF missionClampRectInside(const QRectF& rect, const QRectF& bounds) {
+    if (!bounds.isValid() || bounds.isEmpty()) {
+        return rect;
+    }
+    QRectF clamped = rect;
+    if (clamped.width() > bounds.width()) {
+        clamped.setWidth(bounds.width());
+    }
+    if (clamped.height() > bounds.height()) {
+        clamped.setHeight(bounds.height());
+    }
+    clamped.moveLeft(missionClamp(bounds.left(), clamped.left(), bounds.right() - clamped.width()));
+    clamped.moveTop(missionClamp(bounds.top(), clamped.top(), bounds.bottom() - clamped.height()));
+    return clamped;
+}
+
+QRectF missionRectAroundCenter(const QPointF& center, const QSizeF& size);
+
+qreal missionSmoothStep(qreal value) {
+    value = qBound<qreal>(0.0, value, 1.0);
+    return value * value * (3.0 - 2.0 * value);
+}
+
+qreal missionDistanceToRect(const QPointF& point, const QRectF& rect) {
+    const qreal dx = qMax(qMax(rect.left() - point.x(), 0.0), point.x() - rect.right());
+    const qreal dy = qMax(qMax(rect.top() - point.y(), 0.0), point.y() - rect.bottom());
+    return std::hypot(dx, dy);
+}
+
+QPointF missionPushVectorForOverlap(const QRectF& fixedRect, const QRectF& movingRect,
+                                    qreal gap, int salt) {
+    const QRectF fixed = fixedRect.adjusted(-gap / 2.0, -gap / 2.0, gap / 2.0, gap / 2.0);
+    const QRectF moving = movingRect.adjusted(-gap / 2.0, -gap / 2.0, gap / 2.0, gap / 2.0);
+    const QRectF overlap = fixed.intersected(moving);
+    if (!overlap.isValid() || overlap.isEmpty()) {
+        return {};
+    }
+
+    QPointF direction = moving.center() - fixed.center();
+    if (qAbs(direction.x()) < 0.5 && qAbs(direction.y()) < 0.5) {
+        direction = QPointF((salt % 2) ? 1.0 : -1.0, (salt % 3) ? 1.0 : -1.0);
+    }
+
+    // Use the smallest separating axis. This keeps the Mission Control layout stable
+    // while still allowing surrounding tiles to escape the board edges when needed.
+    if (overlap.width() < overlap.height()) {
+        return QPointF(direction.x() >= 0.0 ? overlap.width() + gap : -overlap.width() - gap, 0.0);
+    }
+    return QPointF(0.0, direction.y() >= 0.0 ? overlap.height() + gap : -overlap.height() - gap);
+}
+
+QVector<TierListView::MissionTile> missionTilesWithHoverExpansion(QVector<TierListView::MissionTile> tiles,
+                                                                  int hoverIndex,
+                                                                  const QRectF& hoverTarget,
+                                                                  qreal progress,
+                                                                  const QSizeF& viewportSize) {
+    if (hoverIndex < 0 || hoverIndex >= tiles.size() || progress <= 0.001) {
+        return tiles;
+    }
+
+    const QRectF hoverBase = tiles.at(hoverIndex).rect;
+    const qreal easedProgress = missionSmoothStep(progress);
+    const qreal boardShortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
+    const qreal baseLongSide = qMax<qreal>(1.0, qMax(hoverBase.width(), hoverBase.height()));
+    const qreal influenceRadius = qMax<qreal>(baseLongSide * 3.1, boardShortSide * 0.30);
+    const qreal gap = qBound<qreal>(6.0, boardShortSide / 108.0, 13.0);
+
+    QRectF hoverRect(hoverBase.topLeft() + (hoverTarget.topLeft() - hoverBase.topLeft()) * easedProgress,
+                     hoverBase.size() + (hoverTarget.size() - hoverBase.size()) * easedProgress);
+    tiles[hoverIndex].rect = hoverRect;
+
+    int influenced = 0;
+    qreal strongestShrink = 1.0;
+    for (int i = 0; i < tiles.size(); ++i) {
+        if (i == hoverIndex) {
+            continue;
+        }
+
+        const QRectF base = tiles.at(i).rect;
+        const qreal distance = missionDistanceToRect(base.center(), hoverBase);
+        const qreal falloff = missionSmoothStep(1.0 - qBound<qreal>(0.0, distance / influenceRadius, 1.0));
+        const qreal shrink = qBound<qreal>(0.54, 1.0 - 0.42 * falloff * easedProgress, 1.0);
+        strongestShrink = qMin(strongestShrink, shrink);
+        if (shrink < 0.995) {
+            ++influenced;
+        }
+
+        const QSizeF shrunkSize(base.width() * shrink, base.height() * shrink);
+        QRectF rect = missionRectAroundCenter(base.center(), shrunkSize);
+
+        // First clear space around the expanded tile. The direction is determined by
+        // the local collision axis, not by a global radial layout, so unchanged tiles
+        // stay close to their original mosaic positions.
+        const QPointF hoverPush = missionPushVectorForOverlap(hoverRect, rect, gap, i);
+        rect.translate(hoverPush * easedProgress);
+        tiles[i].rect = rect;
+    }
+
+    int resolvedPairs = 0;
+    for (int pass = 0; pass < kMissionCollisionPasses; ++pass) {
+        bool moved = false;
+        for (int i = 0; i < tiles.size(); ++i) {
+            for (int j = i + 1; j < tiles.size(); ++j) {
+                if (i == hoverIndex || j == hoverIndex) {
+                    const int movingIndex = i == hoverIndex ? j : i;
+                    const QRectF fixedRect = tiles.at(hoverIndex).rect;
+                    const QRectF movingRect = tiles.at(movingIndex).rect;
+                    const QPointF push = missionPushVectorForOverlap(fixedRect, movingRect, gap, i * 31 + j);
+                    if (!push.isNull()) {
+                        tiles[movingIndex].rect.translate(push);
+                        moved = true;
+                        ++resolvedPairs;
+                    }
+                    continue;
+                }
+
+                const QPointF push = missionPushVectorForOverlap(tiles.at(i).rect, tiles.at(j).rect, gap,
+                                                                 i * 31 + j);
+                if (push.isNull()) {
+                    continue;
+                }
+                tiles[i].rect.translate(-push / 2.0);
+                tiles[j].rect.translate(push / 2.0);
+                moved = true;
+                ++resolvedPairs;
+            }
+        }
+        if (!moved) {
+            break;
+        }
+    }
+
+    static QString lastLoggedHoverId;
+    static int lastLoggedProgressBucket = -1;
+    const int progressBucket = qRound(easedProgress * 10.0);
+    if (tiles.at(hoverIndex).imageId != lastLoggedHoverId || progressBucket != lastLoggedProgressBucket) {
+        lastLoggedHoverId = tiles.at(hoverIndex).imageId;
+        lastLoggedProgressBucket = progressBucket;
+        Logger::debug(QStringLiteral("tier.list.mission.hover.layout imageId=%1 progress=%2 influenced=%3 "
+                                     "minNeighborScale=%4 resolvedPairs=%5 hoverRect=(%6,%7,%8,%9)")
+                          .arg(tiles.at(hoverIndex).imageId)
+                          .arg(easedProgress, 0, 'f', 2)
+                          .arg(influenced)
+                          .arg(strongestShrink, 0, 'f', 2)
+                          .arg(resolvedPairs)
+                          .arg(qRound(hoverRect.x()))
+                          .arg(qRound(hoverRect.y()))
+                          .arg(qRound(hoverRect.width()))
+                          .arg(qRound(hoverRect.height())));
+    }
+
+    return tiles;
 }
 
 class MissionMaxRectsPacker {
@@ -395,17 +564,21 @@ QRectF missionRectAroundCenter(const QPointF& center, const QSizeF& size) {
 
 QRectF missionHoverTargetRect(const TierListView::MissionTile& tile, const QSizeF& viewportSize) {
     const QRectF base = tile.rect;
-    const qreal boardShortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
-    const qreal boardLongSide = qMax<qreal>(1.0, qMax(viewportSize.width(), viewportSize.height()));
+    const QRectF safeBounds = missionHoverSafeBounds(viewportSize);
+    const qreal boardShortSide = qMax<qreal>(1.0, qMin(safeBounds.width(), safeBounds.height()));
+    const qreal boardLongSide = qMax<qreal>(1.0, qMax(safeBounds.width(), safeBounds.height()));
     const qreal baseLongSide = qMax<qreal>(1.0, qMax(base.width(), base.height()));
     const qreal preferredScale =
-        qBound<qreal>(2.05, boardShortSide / qMax<qreal>(1.0, baseLongSide * 3.55), 2.85);
-    const qreal maxLongSide = qMax(baseLongSide * 1.35, qMin(boardShortSide * 0.38, boardLongSide * 0.30));
-    const qreal minLongSide = qMin(baseLongSide * 1.65, maxLongSide);
+        qBound<qreal>(1.58, boardShortSide / qMax<qreal>(1.0, baseLongSide * 3.15), 2.45);
+    const qreal maxLongSide = qMax(baseLongSide * 1.28, qMin(boardShortSide * 0.42, boardLongSide * 0.34));
+    const qreal minLongSide = qMin(baseLongSide * 1.42, maxLongSide);
     const qreal targetLongSide = qBound(minLongSide, baseLongSide * preferredScale, maxLongSide);
 
-    return missionRectAroundCenter(base.center(),
-                                   missionSizeForLongSide(missionTileAspect(tile), targetLongSide));
+    QSizeF targetSize = missionSizeForLongSide(missionTileAspect(tile), targetLongSide);
+    const qreal fitScale = qMin<qreal>(1.0, qMin(safeBounds.width() / qMax<qreal>(1.0, targetSize.width()),
+                                                 safeBounds.height() / qMax<qreal>(1.0, targetSize.height())));
+    targetSize *= fitScale;
+    return missionClampRectInside(missionRectAroundCenter(base.center(), targetSize), safeBounds);
 }
 
 qreal missionTileCornerRadius(const QRectF& rect) {
@@ -2076,14 +2249,22 @@ void TierListView::updateMissionHover(const QPoint& viewportPoint) {
                 break;
             }
         }
-        Logger::debug(QStringLiteral("tier.list.mission.hover imageId=%1 pos=(%2,%3) base=(%4,%5) target=(%6,%7)")
+        const QRectF safeBounds = missionHoverSafeBounds(viewport()->size());
+        Logger::debug(QStringLiteral("tier.list.mission.hover imageId=%1 pos=(%2,%3) base=(%4,%5) "
+                                     "target=(%6,%7,%8,%9) safe=(%10,%11,%12,%13)")
                           .arg(imageId)
                           .arg(viewportPoint.x())
                           .arg(viewportPoint.y())
                           .arg(qRound(baseRect.width()))
                           .arg(qRound(baseRect.height()))
+                          .arg(qRound(targetRect.x()))
+                          .arg(qRound(targetRect.y()))
                           .arg(qRound(targetRect.width()))
-                          .arg(qRound(targetRect.height())));
+                          .arg(qRound(targetRect.height()))
+                          .arg(qRound(safeBounds.x()))
+                          .arg(qRound(safeBounds.y()))
+                          .arg(qRound(safeBounds.width()))
+                          .arg(qRound(safeBounds.height())));
     }
     animateMissionHover(1.0);
 }
@@ -2275,87 +2456,10 @@ QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
         }();
 
         if (hoverIndex >= 0) {
-            const QRectF hoverBase = tiles.at(hoverIndex).rect;
             const QSizeF viewportSize = viewport()->size();
             const QRectF hoverTarget = missionHoverTargetRect(tiles.at(hoverIndex), viewportSize);
-            const QPointF hoverCenter = hoverBase.center();
-            tiles[hoverIndex].rect = QRectF(
-                hoverBase.topLeft() + (hoverTarget.topLeft() - hoverBase.topLeft()) * m_missionHoverProgress,
-                hoverBase.size() + (hoverTarget.size() - hoverBase.size()) * m_missionHoverProgress);
-
-            const qreal boardShortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
-            const qreal hoverScale =
-                qMax(tiles.at(hoverIndex).rect.width() / qMax<qreal>(1.0, hoverBase.width()),
-                     tiles.at(hoverIndex).rect.height() / qMax<qreal>(1.0, hoverBase.height()));
-            const qreal baseLongSide = qMax<qreal>(hoverBase.width(), hoverBase.height());
-            const qreal sigma = qMax<qreal>(baseLongSide * 2.2, boardShortSide * 0.24);
-            const qreal gap = qBound<qreal>(8.0, qMin(viewportSize.width(), viewportSize.height()) / 92.0, 16.0);
-            for (int i = 0; i < tiles.size(); ++i) {
-                if (i == hoverIndex) {
-                    continue;
-                }
-                const QRectF base = tiles.at(i).rect;
-                QPointF direction = base.center() - hoverCenter;
-                qreal distance = std::hypot(direction.x(), direction.y());
-                if (distance < 0.5) {
-                    direction = QPointF(i % 2 == 0 ? 1.0 : -1.0, i % 3 == 0 ? 1.0 : -1.0);
-                    distance = std::hypot(direction.x(), direction.y());
-                }
-                direction /= distance;
-                const qreal influence = std::exp(-(distance * distance) / (2.0 * sigma * sigma)) *
-                                        m_missionHoverProgress;
-                const qreal neighborScale =
-                    1.0 + qMax<qreal>(0.0, hoverScale - 1.0) * 0.66 * influence;
-                const QSizeF targetSize(base.width() * neighborScale, base.height() * neighborScale);
-                const qreal hoverExpansion =
-                    qMax(qMax(0.0, tiles.at(hoverIndex).rect.width() - hoverBase.width()),
-                         qMax(0.0, tiles.at(hoverIndex).rect.height() - hoverBase.height()));
-                const qreal neighborExpansion =
-                    qMax(targetSize.width() - base.width(), targetSize.height() - base.height());
-                const QPointF pushedCenter =
-                    base.center() + direction * (hoverExpansion * 0.48 + neighborExpansion * 0.52 + gap * 2.0) *
-                                        influence;
-                tiles[i].rect = QRectF(pushedCenter.x() - targetSize.width() / 2.0,
-                                       pushedCenter.y() - targetSize.height() / 2.0,
-                                       targetSize.width(), targetSize.height());
-            }
-
-            // Resolve residual collisions in two dimensions. The hovered tile stays fixed;
-            // surrounding tiles are allowed to move outside the board instead of overlapping.
-            for (int pass = 0; pass < kMissionCollisionPasses; ++pass) {
-                bool moved = false;
-                for (int i = 0; i < tiles.size(); ++i) {
-                    for (int j = i + 1; j < tiles.size(); ++j) {
-                        QRectF a = tiles.at(i).rect.adjusted(-gap / 2.0, -gap / 2.0, gap / 2.0, gap / 2.0);
-                        QRectF b = tiles.at(j).rect.adjusted(-gap / 2.0, -gap / 2.0, gap / 2.0, gap / 2.0);
-                        const QRectF overlap = a.intersected(b);
-                        if (!overlap.isValid() || overlap.isEmpty()) {
-                            continue;
-                        }
-
-                        QPointF direction = tiles.at(j).rect.center() - tiles.at(i).rect.center();
-                        qreal length = std::hypot(direction.x(), direction.y());
-                        if (length < 0.5) {
-                            direction = QPointF((j % 2) ? 1.0 : -1.0, (j % 3) ? 1.0 : -1.0);
-                            length = std::hypot(direction.x(), direction.y());
-                        }
-                        direction /= length;
-                        const qreal push = qMax(overlap.width(), overlap.height()) + gap;
-                        if (i == hoverIndex) {
-                            tiles[j].rect.translate(direction * push);
-                        } else if (j == hoverIndex) {
-                            tiles[i].rect.translate(-direction * push);
-                        } else {
-                            tiles[i].rect.translate(-direction * (push / 2.0));
-                            tiles[j].rect.translate(direction * (push / 2.0));
-                        }
-                        moved = true;
-                    }
-                }
-                if (!moved) {
-                    break;
-                }
-            }
+            tiles = missionTilesWithHoverExpansion(tiles, hoverIndex, hoverTarget, m_missionHoverProgress,
+                                                   viewportSize);
         }
     }
 
