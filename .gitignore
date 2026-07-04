@@ -37,7 +37,7 @@ ui_*.h
 # Local app data and user projects
 *.tlmproject
 *.tlmproject.assets/
-assets/
+/assets/
 thumbnails/
 logs/
 crash/
@@ -60,4 +60,3 @@ crash/
 # OS noise
 .DS_Store
 Thumbs.db
-
