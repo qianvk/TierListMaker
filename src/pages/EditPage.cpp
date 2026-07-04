@@ -6,6 +6,7 @@
 #include "tier/ImageGalleryPopover.h"
 #include "tier/TierBoardWidget.h"
 
+#include <QApplication>
 #include <QColorDialog>
 #include <QDialog>
 #include <QDialogButtonBox>
@@ -20,11 +21,16 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
+#include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPaintEvent>
 #include <QPushButton>
+#include <QPixmap>
 #include <QScreen>
+#include <QShowEvent>
+#include <QHideEvent>
+#include <QSignalBlocker>
 #include <QSlider>
 #include <QSizePolicy>
 #include <QTimer>
@@ -40,6 +46,8 @@ constexpr int kPopoverArrowHeight = 12;
 constexpr int kPopoverArrowCenterX = 46;
 constexpr int kContentTitleBarHeight = 54;
 constexpr int kTierBoardOuterMargin = 16;
+constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
+constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
 
 int platformPopoverRadius() {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
@@ -49,15 +57,66 @@ int platformPopoverRadius() {
 #endif
 }
 
+QColor popoverSurfaceColor(const QPalette& palette) {
+    return palette.color(QPalette::Base).lightness() < 96 ? QColor(31, 35, 53)
+                                                          : QColor(250, 251, 253);
+}
+
+QColor popoverStrokeColor(const QPalette& palette) {
+    return palette.color(QPalette::Base).lightness() < 96 ? QColor(68, 76, 110)
+                                                          : QColor(210, 218, 232);
+}
+
+QPainterPath roundedPopoverPath(const QRectF& bubbleRect, qreal arrowCenterX, qreal arrowHeight,
+                                qreal radius) {
+    QPainterPath bubble;
+    bubble.addRoundedRect(bubbleRect, radius, radius);
+
+    if (bubbleRect.width() <= radius * 2.0 || arrowHeight <= 0.0) {
+        return bubble;
+    }
+
+    constexpr qreal kArrowHalfWidth = 18.0;
+    constexpr qreal kTipHalfWidth = 4.2;
+    constexpr qreal kBodyOverlap = 2.5;
+    const qreal minCenter = bubbleRect.left() + radius + kArrowHalfWidth;
+    const qreal maxCenter = bubbleRect.right() - radius - kArrowHalfWidth;
+    const qreal centerX = qBound(minCenter, arrowCenterX, maxCenter);
+    const qreal baseY = bubbleRect.top() + kBodyOverlap;
+    const qreal tipY = bubbleRect.top() - arrowHeight + 0.5;
+
+    // The arrow overlaps the body, then both paths are unioned so the shared edge is never stroked.
+    QPainterPath arrow;
+    arrow.moveTo(centerX - kArrowHalfWidth, baseY);
+    arrow.cubicTo(centerX - 13.0, baseY, centerX - 9.5, tipY + 6.0,
+                  centerX - kTipHalfWidth, tipY + 2.8);
+    arrow.quadTo(centerX, tipY - 0.4, centerX + kTipHalfWidth, tipY + 2.8);
+    arrow.cubicTo(centerX + 9.5, tipY + 6.0, centerX + 13.0, baseY,
+                  centerX + kArrowHalfWidth, baseY);
+    arrow.closeSubpath();
+
+    return bubble.united(arrow);
+}
+
 class BackgroundPopover final : public QDialog {
 public:
     explicit BackgroundPopover(QWidget* parent = nullptr)
-        : QDialog(parent, Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint) {
+        : QDialog(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint) {
         setAttribute(Qt::WA_TranslucentBackground);
+        setAutoFillBackground(false);
         setObjectName(QStringLiteral("BackgroundPopover"));
     }
 
+    void setOutsideDismissSuspended(bool suspended) {
+        if (m_outsideDismissSuspended == suspended) {
+            return;
+        }
+        m_outsideDismissSuspended = suspended;
+        Logger::debug(QStringLiteral("tier.edit.background.popover.dismiss.suspended value=%1").arg(suspended));
+    }
+
     void placeBelow(const QRect& globalAnchorRect) {
+        m_anchorGlobalRect = globalAnchorRect;
         adjustSize();
         const QSize popupSize = sizeHint().expandedTo(size());
         const int anchorCenterX = globalAnchorRect.isValid()
@@ -82,32 +141,155 @@ public:
     }
 
 protected:
+    bool eventFilter(QObject* watched, QEvent* event) override {
+        Q_UNUSED(watched);
+        if (!isVisible() || m_outsideDismissSuspended || event->type() != QEvent::MouseButtonPress) {
+            return false;
+        }
+
+        const auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (geometry().contains(mouseEvent->globalPosition().toPoint())) {
+            return false;
+        }
+
+        Logger::info(QStringLiteral("tier.edit.background.cancel reason=outside-click"));
+        reject();
+        return true;
+    }
+
+    void showEvent(QShowEvent* event) override {
+        QDialog::showEvent(event);
+        if (!m_eventFilterInstalled && qApp) {
+            qApp->installEventFilter(this);
+            m_eventFilterInstalled = true;
+        }
+    }
+
+    void hideEvent(QHideEvent* event) override {
+        if (m_eventFilterInstalled && qApp) {
+            qApp->removeEventFilter(this);
+            m_eventFilterInstalled = false;
+        }
+        QDialog::hideEvent(event);
+    }
+
     void paintEvent(QPaintEvent* event) override {
         Q_UNUSED(event);
         QPainter painter(this);
         painter.setRenderHint(QPainter::Antialiasing);
         const int radius = platformPopoverRadius();
         const QRectF bubbleRect = QRectF(rect()).adjusted(0.5, kPopoverArrowHeight + 0.5, -0.5, -0.5);
+        const QPainterPath path =
+            roundedPopoverPath(bubbleRect, m_arrowCenterX, kPopoverArrowHeight, radius);
 
-        QPainterPath path;
-        path.moveTo(m_arrowCenterX - 11, kPopoverArrowHeight + 0.5);
-        path.lineTo(m_arrowCenterX, 0.5);
-        path.lineTo(m_arrowCenterX + 11, kPopoverArrowHeight + 0.5);
-        path.addRoundedRect(bubbleRect, radius, radius);
-
-        const bool dark = palette().color(QPalette::Base).lightness() < 96;
-        painter.setPen(QPen(dark ? QColor(68, 76, 110, 190) : QColor(95, 106, 125, 58), 1));
-        painter.setBrush(dark ? QColor(31, 35, 53, 248) : QColor(250, 251, 253, 246));
-        painter.drawPath(path.simplified());
+        QColor fill = popoverSurfaceColor(palette());
+        fill.setAlpha(255);
+        QColor stroke = popoverStrokeColor(palette());
+        stroke.setAlpha(palette().color(QPalette::Base).lightness() < 96 ? 210 : 150);
+        painter.fillPath(path, fill);
+        painter.setPen(QPen(stroke, 1));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawPath(path);
     }
 
 private:
     int m_arrowCenterX{kPopoverArrowCenterX};
+    QRect m_anchorGlobalRect;
+    bool m_outsideDismissSuspended{false};
+    bool m_eventFilterInstalled{false};
+};
+
+class BackgroundPreviewWidget final : public QWidget {
+public:
+    explicit BackgroundPreviewWidget(QWidget* parent = nullptr) : QWidget(parent) {
+        setFixedHeight(118);
+        setMinimumWidth(320);
+        setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    }
+
+    void setPreview(const QString& imagePath, bool centeredIcon, qreal visibility,
+                    const QString& defaultText) {
+        if (m_imagePath != imagePath) {
+            m_imagePath = imagePath;
+            m_pixmap = QPixmap(m_imagePath);
+        }
+        m_centeredIcon = centeredIcon;
+        m_visibility = qBound<qreal>(0.0, visibility, 1.0);
+        m_defaultText = defaultText;
+        update();
+    }
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        Q_UNUSED(event);
+        QPainter painter(this);
+        painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform |
+                               QPainter::TextAntialiasing);
+
+        QPainterPath clip;
+        clip.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12);
+        painter.setClipPath(clip);
+        painter.fillPath(clip, palette().color(QPalette::AlternateBase));
+
+        if (!m_pixmap.isNull() && !rect().isEmpty()) {
+            painter.setOpacity(m_visibility);
+            if (m_centeredIcon) {
+                painter.drawPixmap(centeredIconTargetRect(rect()), m_pixmap, QRectF(m_pixmap.rect()));
+            } else {
+                painter.drawPixmap(rect(), m_pixmap, sourceRectForTarget(rect().size()));
+            }
+            painter.setOpacity(1.0);
+        } else {
+            painter.setPen(palette().color(QPalette::WindowText));
+            painter.drawText(rect().adjusted(12, 8, -12, -8), Qt::AlignCenter, m_defaultText);
+        }
+
+        painter.setClipping(false);
+        QColor stroke = palette().color(QPalette::Mid);
+        stroke.setAlpha(120);
+        painter.setPen(QPen(stroke, 1));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12);
+    }
+
+private:
+    QRectF centeredIconTargetRect(const QRect& targetRect) const {
+        const qreal shortSide = qMax<qreal>(1.0, qMin(targetRect.width(), targetRect.height()));
+        const qreal upperSide = qMax<qreal>(24.0, shortSide - 18.0);
+        const qreal lowerSide = qMin<qreal>(48.0, upperSide);
+        const qreal side = qBound<qreal>(lowerSide, shortSide * 0.58, upperSide);
+        const QPointF center = QRectF(targetRect).center();
+        return QRectF(center.x() - side / 2.0, center.y() - side / 2.0, side, side);
+    }
+
+    QRect sourceRectForTarget(const QSize& targetSize) const {
+        if (m_pixmap.isNull() || targetSize.isEmpty()) {
+            return {};
+        }
+        const QSize sourceSize = m_pixmap.size();
+        const qreal targetRatio = static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
+        const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
+        if (sourceRatio > targetRatio) {
+            const int cropWidth = qRound(sourceSize.height() * targetRatio);
+            return QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
+        }
+        const int cropHeight = qRound(sourceSize.width() / targetRatio);
+        return QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
+    }
+
+    QString m_imagePath;
+    QPixmap m_pixmap;
+    QString m_defaultText;
+    qreal m_visibility{1.0};
+    bool m_centeredIcon{false};
 };
 
 QString resolvedCanvasImagePath(const TierProject& project, const QString& storedPath) {
     if (storedPath.isEmpty()) {
         return {};
+    }
+    if (storedPath.startsWith(QStringLiteral(":/")) || storedPath.startsWith(QStringLiteral("qrc:/"))) {
+        return storedPath;
     }
     const QFileInfo info(storedPath);
     if (info.isAbsolute()) {
@@ -120,11 +302,13 @@ QString resolvedCanvasImagePath(const TierProject& project, const QString& store
 }
 
 qreal canvasBackgroundVisibility(const QJsonObject& canvas) {
+    const bool hasCustomBackground = !canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
+    const qreal fallback = hasCustomBackground ? 1.0 : kDefaultBackgroundIconVisibility;
     return qBound<qreal>(
         0.0,
         canvas.value(QStringLiteral("backgroundVisibility"))
             .toDouble(canvas.value(QStringLiteral("backgroundImageOpacity")).toDouble(
-                canvas.value(QStringLiteral("backgroundOpacity")).toDouble(1.0))),
+                canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
         1.0);
 }
 
@@ -243,9 +427,7 @@ void EditPage::resetRows() {
 }
 
 void EditPage::importImagesFromDialog() {
-    const QStringList files =
-        QFileDialog::getOpenFileNames(this, tr("Import Images"), QString(),
-                                      m_assetManager->supportedNameFilters().join(QStringLiteral(";;")));
+    const QStringList files = chooseImageImportFiles(this);
     if (!files.isEmpty()) {
         importImages(files);
     }
@@ -304,26 +486,25 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     m_backgroundPreviewActive = true;
 
     BackgroundPopover dialog(this);
+    dialog.setPalette(qApp ? qApp->palette() : palette());
     dialog.setWindowTitle(tr("Tier List Background"));
     dialog.setFixedWidth(380);
     dialog.setStyleSheet(QStringLiteral(
-        "QDialog#BackgroundPopover{background:transparent;}"
         "QLabel{color:palette(window-text);}"
         "QPushButton{border:1px solid palette(mid);border-radius:8px;"
         "padding:7px 12px;background:palette(alternate-base);}"
         "QPushButton:hover{background:palette(midlight);}"
-        "QPushButton:pressed{background:palette(midlight);}"));
+        "QPushButton:pressed{background:palette(midlight);}"
+        "QSlider::groove:horizontal{height:4px;border-radius:2px;background:palette(mid);}"
+        "QSlider::sub-page:horizontal{height:4px;border-radius:2px;background:palette(highlight);}"
+        "QSlider::add-page:horizontal{height:4px;border-radius:2px;background:palette(alternate-base);}"
+        "QSlider::handle:horizontal{width:16px;height:16px;margin:-6px 0px;"
+        "border-radius:8px;background:palette(window);border:1px solid palette(mid);}"));
     auto* layout = new QVBoxLayout(&dialog);
     layout->setContentsMargins(18, kPopoverArrowHeight + 18, 18, 16);
     layout->setSpacing(12);
 
-    auto* preview = new QLabel(&dialog);
-    preview->setFixedHeight(118);
-    preview->setMinimumWidth(320);
-    preview->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
-    preview->setAlignment(Qt::AlignCenter);
-    preview->setStyleSheet(QStringLiteral(
-        "QLabel{border-radius:12px;background:palette(alternate-base);border:1px solid palette(mid);}"));
+    auto* preview = new BackgroundPreviewWidget(&dialog);
 
     auto* pathLabel = new QLabel(&dialog);
     pathLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
@@ -331,33 +512,14 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     pathLabel->setWordWrap(true);
 
     auto updatePreview = [&]() {
-        QPixmap pixmap(selectedPath);
+        const QPixmap pixmap(selectedPath);
         if (!clearBackground && !pixmap.isNull()) {
-            QPixmap scaled = pixmap.scaled(preview->size(), Qt::KeepAspectRatioByExpanding,
-                                           Qt::SmoothTransformation);
-            const QRect crop((scaled.width() - preview->width()) / 2,
-                             (scaled.height() - preview->height()) / 2,
-                             preview->width(), preview->height());
-            QPixmap composed(preview->size());
-            composed.fill(Qt::transparent);
-            QPainter previewPainter(&composed);
-            previewPainter.setRenderHint(QPainter::SmoothPixmapTransform);
-            previewPainter.setRenderHint(QPainter::Antialiasing);
-            QPainterPath previewClip;
-            previewClip.addRoundedRect(QRectF(composed.rect()).adjusted(0.5, 0.5, -0.5, -0.5),
-                                       12, 12);
-            previewPainter.setClipPath(previewClip);
-            previewPainter.fillRect(composed.rect(), palette().color(QPalette::Base));
-            previewPainter.setOpacity(backgroundVisibility);
-            previewPainter.drawPixmap(composed.rect(), scaled.copy(crop));
-            previewPainter.end();
-            preview->setText({});
-            preview->setPixmap(composed);
+            preview->setPreview(selectedPath, false, backgroundVisibility, tr("Default Background"));
             pathLabel->setText(QFileInfo(selectedPath).fileName());
         } else {
-            preview->setPixmap({});
-            preview->setText(tr("Default Background"));
-            pathLabel->setText(tr("No image selected. The tier list uses the current clean background."));
+            preview->setPreview(QString::fromUtf8(kDefaultBackgroundIconPath), true,
+                                backgroundVisibility, tr("Default Background"));
+            pathLabel->setText(tr("Default Background"));
         }
 
         m_project.canvas = originalCanvas;
@@ -369,7 +531,7 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
         if (!clearBackground && !selectedPath.isEmpty()) {
             m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
         } else {
-            m_project.canvas.remove(QStringLiteral("backgroundVisibility"));
+            m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
         }
         m_project.canvas.remove(QStringLiteral("backgroundImageOpacity"));
         m_project.canvas.remove(QStringLiteral("backgroundOpacity"));
@@ -413,9 +575,12 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     connect(choose, &QPushButton::clicked, &dialog, [&]() {
         const QStringList filters = m_assetManager ? m_assetManager->supportedNameFilters()
                                                    : QStringList{tr("Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif)")};
-        const QString imagePath = QFileDialog::getOpenFileName(this, tr("Choose Background Image"),
+        dialog.setOutsideDismissSuspended(true);
+        const QString imagePath = QFileDialog::getOpenFileName(&dialog, tr("Choose Background Image"),
                                                                QString(), filters.join(QStringLiteral(";;")));
+        dialog.setOutsideDismissSuspended(false);
         if (imagePath.isEmpty()) {
+            Logger::debug(QStringLiteral("tier.edit.background.preview.choose.cancel"));
             return;
         }
         selectedPath = imagePath;
@@ -426,6 +591,12 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     connect(clear, &QPushButton::clicked, &dialog, [&]() {
         selectedPath.clear();
         clearBackground = true;
+        backgroundVisibility = kDefaultBackgroundIconVisibility;
+        {
+            const QSignalBlocker blocker(opacitySlider);
+            opacitySlider->setValue(qRound(backgroundVisibility * 100.0));
+        }
+        updateOpacityLabel();
         Logger::info(QStringLiteral("tier.edit.background.preview.clear"));
         updatePreview();
     });
@@ -468,10 +639,16 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
 
     if (clearBackground || selectedPath.isEmpty()) {
         changed = changed || !previousPath.isEmpty() ||
-                  originalCanvas.contains(QStringLiteral("backgroundVisibility")) ||
+                  !qFuzzyCompare(previousBackgroundVisibility + 1.0, backgroundVisibility + 1.0) ||
+                  (originalCanvas.contains(QStringLiteral("backgroundVisibility")) &&
+                   qFuzzyCompare(backgroundVisibility + 1.0, kDefaultBackgroundIconVisibility + 1.0)) ||
                   originalCanvas.contains(QStringLiteral("backgroundImageOpacity"));
         m_project.canvas.remove(QStringLiteral("backgroundImagePath"));
-        m_project.canvas.remove(QStringLiteral("backgroundVisibility"));
+        if (qFuzzyCompare(backgroundVisibility + 1.0, kDefaultBackgroundIconVisibility + 1.0)) {
+            m_project.canvas.remove(QStringLiteral("backgroundVisibility"));
+        } else {
+            m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
+        }
     } else {
         const QString previousResolved = resolvedCanvasImagePath(m_project, previousPath);
         if (!previousPath.isEmpty() && QFileInfo(previousResolved).absoluteFilePath() ==
@@ -633,10 +810,23 @@ void EditPage::toggleGallery(const QRect& anchorGlobalRect) {
     popover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
     connect(popover, &QObject::destroyed, this, [this]() { m_galleryPopover = nullptr; });
     connect(popover, &ImageGalleryPopover::importRequested, this, [this]() {
-        if (m_galleryPopover) {
-            m_galleryPopover->close();
+        QPointer<ImageGalleryPopover> guard = m_galleryPopover;
+        if (guard) {
+            guard->setOutsideDismissSuspended(true);
         }
-        importImagesFromDialog();
+        QWidget* dialogParent = guard ? static_cast<QWidget*>(guard.data()) : static_cast<QWidget*>(this);
+        const QStringList files = chooseImageImportFiles(dialogParent);
+        if (guard) {
+            guard->setOutsideDismissSuspended(false);
+            guard->raise();
+            guard->activateWindow();
+        }
+        if (!files.isEmpty()) {
+            importImages(files);
+        } else {
+            Logger::debug(QStringLiteral("tier.gallery.import.cancel popoverAlive=%1")
+                              .arg(guard != nullptr));
+        }
     });
     connect(popover, &ImageGalleryPopover::imageFilesDropped, this, &EditPage::importImages);
     connect(popover, &ImageGalleryPopover::dragActiveChanged, this, [](bool active) {
@@ -805,6 +995,18 @@ QString EditPage::chooseSavePath() {
         path += QStringLiteral(".tlmproject");
     }
     return path;
+}
+
+QStringList EditPage::chooseImageImportFiles(QWidget* dialogParent) {
+    const QString filter = m_assetManager
+                               ? m_assetManager->supportedNameFilters().join(QStringLiteral(";;"))
+                               : tr("Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)");
+    const QStringList files = QFileDialog::getOpenFileNames(dialogParent ? dialogParent : this,
+                                                            tr("Import Images"), QString(), filter);
+    Logger::debug(QStringLiteral("tier.edit.images.import.dialog.finish count=%1 parent=%2")
+                      .arg(files.size())
+                      .arg(dialogParent ? dialogParent->metaObject()->className() : "null"));
+    return files;
 }
 
 void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int index) {

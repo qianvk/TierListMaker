@@ -71,6 +71,7 @@ private:
     void setProject(TierProject project);
     void showError(const QString& title, const Error& error);
     QString chooseSavePath();
+    QStringList chooseImageImportFiles(QWidget* dialogParent);
     void moveImageToRow(const QString& imageId, const QString& rowId, int index);
     void moveRowToIndex(const QString& rowId, int destinationIndex);
     void editImage(const QString& imageId);

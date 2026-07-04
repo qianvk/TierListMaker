@@ -15,16 +15,94 @@
 #include <QFont>
 #include <QGuiApplication>
 #include <QHelpEvent>
+#include <QIcon>
 #include <QLabel>
+#include <QPainter>
+#include <QPainterPath>
 #include <QPointer>
 #include <QScreen>
 #include <QTimer>
 #include <QToolTip>
 #include <QWidget>
 
+#include <cmath>
+
 namespace tlm {
 
 namespace {
+qreal relativeLuminance(const QColor& color) {
+    const auto channel = [](qreal value) {
+        value /= 255.0;
+        return value <= 0.03928 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(color.redF() * 255.0) +
+           0.7152 * channel(color.greenF() * 255.0) +
+           0.0722 * channel(color.blueF() * 255.0);
+}
+
+class TextOnlyToolTipLabel final : public QLabel {
+public:
+    explicit TextOnlyToolTipLabel(QWidget* parent = nullptr)
+        : QLabel(parent, Qt::Tool | Qt::FramelessWindowHint |
+                            Qt::WindowDoesNotAcceptFocus |
+                            Qt::NoDropShadowWindowHint) {
+        setAttribute(Qt::WA_TranslucentBackground);
+        setAttribute(Qt::WA_ShowWithoutActivating);
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setObjectName(QStringLiteral("TextOnlyToolTip"));
+        setMargin(0);
+        setIndent(0);
+    }
+
+    void setReferencePalette(const QPalette& palette, QPalette::ColorRole role) {
+        QColor background = palette.color(role);
+        if (!background.isValid()) {
+            background = palette.color(QPalette::Window);
+        }
+        const bool darkBackground = relativeLuminance(background) < 0.46;
+        m_textColor = darkBackground ? QColor(255, 255, 255) : QColor(18, 22, 30);
+        m_outlineColor = darkBackground ? QColor(0, 0, 0, 210) : QColor(255, 255, 255, 220);
+    }
+
+protected:
+    void paintEvent(QPaintEvent*) override {
+        QPainter painter(this);
+        painter.setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
+        QFont tipFont = font();
+        tipFont.setBold(true);
+        painter.setFont(tipFont);
+
+        const QFontMetrics metrics(tipFont);
+        const QStringList lines = text().split(QLatin1Char('\n'));
+        int y = 3 + metrics.ascent();
+        for (const QString& line : lines) {
+            QPainterPath glyphs;
+            glyphs.addText(2, y, tipFont, line);
+            painter.setPen(QPen(m_outlineColor, 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+            painter.drawPath(glyphs);
+            painter.fillPath(glyphs, m_textColor);
+            y += metrics.lineSpacing();
+        }
+    }
+
+    QSize sizeHint() const override {
+        QFont tipFont = font();
+        tipFont.setBold(true);
+        const QFontMetrics metrics(tipFont);
+        const QStringList lines = text().split(QLatin1Char('\n'));
+        int width = 0;
+        for (const QString& line : lines) {
+            width = qMax(width, metrics.horizontalAdvance(line));
+        }
+        const int lineCount = qMax(1, static_cast<int>(lines.size()));
+        return QSize(width + 6, metrics.lineSpacing() * lineCount + 6);
+    }
+
+private:
+    QColor m_textColor{Qt::white};
+    QColor m_outlineColor{0, 0, 0, 210};
+};
+
 class TextOnlyToolTipFilter final : public QObject {
 public:
     using QObject::QObject;
@@ -63,23 +141,14 @@ protected:
 private:
     void showTip(const QString& text, const QPoint& globalPos, QWidget* owner) {
         if (!m_tip) {
-            m_tip = new QLabel(nullptr, Qt::Tool | Qt::FramelessWindowHint |
-                                           Qt::WindowDoesNotAcceptFocus |
-                                           Qt::NoDropShadowWindowHint);
-            m_tip->setAttribute(Qt::WA_TranslucentBackground);
-            m_tip->setAttribute(Qt::WA_ShowWithoutActivating);
-            m_tip->setAttribute(Qt::WA_TransparentForMouseEvents);
-            m_tip->setObjectName(QStringLiteral("TextOnlyToolTip"));
-            m_tip->setMargin(0);
-            m_tip->setIndent(0);
+            m_tip = new TextOnlyToolTipLabel();
             m_tip->setFont(QToolTip::font());
-            m_tip->setStyleSheet(QStringLiteral(
-                "QLabel#TextOnlyToolTip{background:transparent;border:none;padding:0px;"
-                "color:palette(window-text);font-weight:500;}"));
         }
 
         m_owner = owner;
-        m_tip->setPalette(owner ? owner->palette() : qApp->palette());
+        const QPalette ownerPalette = owner ? owner->palette() : qApp->palette();
+        m_tip->setPalette(ownerPalette);
+        m_tip->setReferencePalette(ownerPalette, owner ? owner->backgroundRole() : QPalette::Window);
         m_tip->setText(text);
         m_tip->adjustSize();
 
@@ -101,7 +170,7 @@ private:
         m_owner = nullptr;
     }
 
-    QPointer<QLabel> m_tip;
+    QPointer<TextOnlyToolTipLabel> m_tip;
     QPointer<QWidget> m_owner;
 };
 } // namespace
@@ -146,9 +215,10 @@ void Application::configureApplication() {
     setApplicationName(QStringLiteral("TierListMaker"));
     setApplicationDisplayName(QStringLiteral("TierListMaker"));
     setApplicationVersion(QStringLiteral(TLM_APP_VERSION));
+    setWindowIcon(QIcon(QStringLiteral(":/images/app-icon.png")));
     setQuitOnLastWindowClosed(true);
     setStyleSheet(QStringLiteral(
-        "QToolTip{background:transparent;border:0px;padding:0px;color:palette(window-text);}"));
+        "QToolTip{background:transparent;border:0px;padding:0px;color:palette(window-text);font-weight:700;}"));
     installEventFilter(new TextOnlyToolTipFilter(this));
 }
 

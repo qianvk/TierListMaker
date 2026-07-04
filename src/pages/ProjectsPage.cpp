@@ -198,11 +198,12 @@ public:
         const QRect r = option.rect.adjusted(8, 6, -8, -6);
         const bool selected = option.state.testFlag(QStyle::State_Selected);
         const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
+        const bool dark = option.palette.color(QPalette::Base).lightness() < 96;
         QColor fill = selected ? option.palette.highlight().color()
                                : option.palette.color(hovered ? QPalette::Midlight : QPalette::AlternateBase);
-        fill.setAlpha(selected ? 90 : (hovered ? 210 : 188));
+        fill.setAlpha(selected ? (dark ? 156 : 96) : (hovered ? (dark ? 118 : 210) : (dark ? 210 : 188)));
         QColor border = selected ? option.palette.highlight().color() : option.palette.color(QPalette::Mid);
-        border.setAlpha(selected ? 150 : 90);
+        border.setAlpha(selected ? (dark ? 220 : 150) : (dark ? 140 : 90));
         painter->setPen(QPen(border, 1));
         painter->setBrush(fill);
         painter->drawRoundedRect(r, 10, 10);
@@ -253,11 +254,16 @@ public:
         titleFont.setBold(true);
         titleFont.setPointSize(titleFont.pointSize() + 1);
         painter->setFont(titleFont);
-        painter->setPen(option.palette.color(QPalette::WindowText));
+        painter->setPen(selected && dark ? option.palette.color(QPalette::HighlightedText)
+                                         : option.palette.color(QPalette::WindowText));
         painter->drawText(textRect, Qt::AlignLeft | Qt::AlignTop,
                           painter->fontMetrics().elidedText(name, Qt::ElideRight, textRect.width()));
         painter->setFont(option.font);
-        painter->setPen(exists ? option.palette.color(QPalette::PlaceholderText) : QColor(QStringLiteral("#f7768e")));
+        QColor metaColor = exists ? option.palette.color(QPalette::PlaceholderText) : QColor(QStringLiteral("#f7768e"));
+        if (selected && dark && exists) {
+            metaColor = QColor(QStringLiteral("#d7defd"));
+        }
+        painter->setPen(metaColor);
         const QString meta =
             QCoreApplication::translate("tlm::ProjectsPage",
                                         "Updated %1  |  Created %2  |  %3 rows, %4 images%5")

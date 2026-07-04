@@ -93,6 +93,11 @@ protected:
     void dropEvent(QDropEvent* event) override;
 
 private:
+    enum class MissionControlSource {
+        TierRows,
+        Gallery
+    };
+
     enum class PressKind {
         None,
         RowLabel,
@@ -136,6 +141,8 @@ private:
     void updateDockHover(const QPoint& viewportPoint);
     void animateDockHover(qreal targetProgress);
     void stopDockHoverAnimation();
+    void setMissionControlActiveForSource(bool active, MissionControlSource source,
+                                          const QRect& sourceGlobalRect = {});
     void animateMissionTransition(qreal targetProgress);
     void stopMissionTransitionAnimation();
     void updateMissionHover(const QPoint& viewportPoint);

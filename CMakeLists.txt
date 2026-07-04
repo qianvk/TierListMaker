@@ -125,6 +125,14 @@ set(TLM_APP_SOURCES
 )
 
 if(APPLE)
+    set(TLM_APP_ICON_MACOS "${CMAKE_CURRENT_SOURCE_DIR}/resources/macos/app-icon.icns")
+    list(APPEND TLM_APP_SOURCES "${TLM_APP_ICON_MACOS}")
+    set_source_files_properties("${TLM_APP_ICON_MACOS}" PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+endif()
+
+if(APPLE)
     list(APPEND TLM_CORE_SOURCES src/platform/PlatformMac.mm)
 elseif(WIN32)
     list(APPEND TLM_CORE_SOURCES src/platform/PlatformWindows.cpp)
@@ -171,6 +179,7 @@ set_target_properties(TierListMaker PROPERTIES
     MACOSX_BUNDLE TRUE
     MACOSX_BUNDLE_BUNDLE_NAME "TierListMaker"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.tierlistmaker.app"
+    MACOSX_BUNDLE_ICON_FILE "app-icon.icns"
 )
 
 include(InstallRules)

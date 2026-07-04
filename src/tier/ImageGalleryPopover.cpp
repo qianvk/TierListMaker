@@ -15,6 +15,8 @@
 #include <QPainterPath>
 #include <QPointer>
 #include <QScreen>
+#include <QShowEvent>
+#include <QHideEvent>
 #include <QMenu>
 #include <QUrl>
 
@@ -37,6 +39,47 @@ int platformPopoverRadius() {
 #else
     return 10;
 #endif
+}
+
+QColor popoverSurfaceColor(const QPalette& palette) {
+    return palette.color(QPalette::Base).lightness() < 96 ? QColor(31, 35, 53)
+                                                          : QColor(250, 251, 253);
+}
+
+QColor popoverStrokeColor(const QPalette& palette) {
+    return palette.color(QPalette::Base).lightness() < 96 ? QColor(68, 76, 110)
+                                                          : QColor(210, 218, 232);
+}
+
+QPainterPath roundedPopoverPath(const QRectF& bubbleRect, qreal arrowCenterX, qreal arrowHeight,
+                                qreal radius) {
+    QPainterPath bubble;
+    bubble.addRoundedRect(bubbleRect, radius, radius);
+
+    if (bubbleRect.width() <= radius * 2.0 || arrowHeight <= 0.0) {
+        return bubble;
+    }
+
+    constexpr qreal kArrowHalfWidth = 18.0;
+    constexpr qreal kTipHalfWidth = 4.2;
+    constexpr qreal kBodyOverlap = 2.5;
+    const qreal minCenter = bubbleRect.left() + radius + kArrowHalfWidth;
+    const qreal maxCenter = bubbleRect.right() - radius - kArrowHalfWidth;
+    const qreal centerX = qBound(minCenter, arrowCenterX, maxCenter);
+    const qreal baseY = bubbleRect.top() + kBodyOverlap;
+    const qreal tipY = bubbleRect.top() - arrowHeight + 0.5;
+
+    // The arrow overlaps the body, then both paths are unioned so the shared edge is never stroked.
+    QPainterPath arrow;
+    arrow.moveTo(centerX - kArrowHalfWidth, baseY);
+    arrow.cubicTo(centerX - 13.0, baseY, centerX - 9.5, tipY + 6.0,
+                  centerX - kTipHalfWidth, tipY + 2.8);
+    arrow.quadTo(centerX, tipY - 0.4, centerX + kTipHalfWidth, tipY + 2.8);
+    arrow.cubicTo(centerX + 9.5, tipY + 6.0, centerX + 13.0, baseY,
+                  centerX + kArrowHalfWidth, baseY);
+    arrow.closeSubpath();
+
+    return bubble.united(arrow);
 }
 
 QRect centeredCropSourceRect(const QPixmap& pixmap, const QSize& targetSize) {
@@ -124,8 +167,7 @@ protected:
                             platformPopoverRadius(), platformPopoverRadius());
         painter.setClipPath(clip);
 
-        const bool dark = palette().color(QPalette::Base).lightness() < 96;
-        painter.fillPath(clip, dark ? QColor(31, 35, 53, 248) : QColor(250, 251, 253, 246));
+        painter.fillPath(clip, popoverSurfaceColor(palette()));
 
         const QStringList ids = m_owner->imageIds();
         const int itemCount = static_cast<int>(ids.size()) + 1;
@@ -257,7 +299,16 @@ protected:
         menu.setAttribute(Qt::WA_TranslucentBackground, false);
         QAction* editAction = menu.addAction(tr("Edit"));
         QAction* removeAction = menu.addAction(tr("Remove from Image Gallery"));
+        QPointer<ImageGalleryPopover> guard(m_owner);
+        m_owner->setOutsideDismissSuspended(true);
         QAction* chosen = menu.exec(event->globalPos());
+        if (guard) {
+            guard->setOutsideDismissSuspended(false);
+        }
+        if (!guard) {
+            event->accept();
+            return;
+        }
         if (chosen == editAction) {
             Logger::info(QStringLiteral("tier.gallery.context.edit imageId=%1").arg(imageId));
             emit m_owner->imageEditRequested(imageId);
@@ -340,9 +391,10 @@ private:
 };
 
 ImageGalleryPopover::ImageGalleryPopover(QWidget* parent)
-    : QDialog(parent, Qt::Popup | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint),
+    : QDialog(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint),
       m_grid(new GalleryGridWidget(this)) {
     setAttribute(Qt::WA_TranslucentBackground);
+    setAutoFillBackground(false);
     setObjectName(QStringLiteral("ImageGalleryPopover"));
 }
 
@@ -386,7 +438,16 @@ void ImageGalleryPopover::setSelectedImageId(const QString& selectedImageId) {
     }
 }
 
+void ImageGalleryPopover::setOutsideDismissSuspended(bool suspended) {
+    if (m_outsideDismissSuspended == suspended) {
+        return;
+    }
+    m_outsideDismissSuspended = suspended;
+    Logger::debug(QStringLiteral("tier.gallery.popover.dismiss.suspended value=%1").arg(suspended));
+}
+
 void ImageGalleryPopover::placeBelow(const QRect& globalAnchorRect) {
+    m_anchorGlobalRect = globalAnchorRect;
     QScreen* screen = globalAnchorRect.isValid() ? QGuiApplication::screenAt(globalAnchorRect.center())
                                                  : QGuiApplication::screenAt(QCursor::pos());
     const QRect available = screen ? screen->availableGeometry().adjusted(10, 10, -10, -10)
@@ -434,22 +495,57 @@ QSize ImageGalleryPopover::sizeHint() const {
                  qMax(1, m_rows) * m_tileExtent + kPopoverArrowHeight);
 }
 
+bool ImageGalleryPopover::eventFilter(QObject* watched, QEvent* event) {
+    Q_UNUSED(watched);
+    if (!isVisible() || m_outsideDismissSuspended) {
+        return false;
+    }
+    if (event->type() != QEvent::MouseButtonPress) {
+        return false;
+    }
+
+    const auto* mouseEvent = static_cast<QMouseEvent*>(event);
+    if (!shouldDismissForGlobalPosition(mouseEvent->globalPosition().toPoint())) {
+        return false;
+    }
+
+    Logger::debug(QStringLiteral("tier.gallery.popover.close reason=outside-click"));
+    close();
+    return false;
+}
+
+void ImageGalleryPopover::showEvent(QShowEvent* event) {
+    QDialog::showEvent(event);
+    if (!m_eventFilterInstalled && qApp) {
+        qApp->installEventFilter(this);
+        m_eventFilterInstalled = true;
+    }
+}
+
+void ImageGalleryPopover::hideEvent(QHideEvent* event) {
+    if (m_eventFilterInstalled && qApp) {
+        qApp->removeEventFilter(this);
+        m_eventFilterInstalled = false;
+    }
+    QDialog::hideEvent(event);
+}
+
 void ImageGalleryPopover::paintEvent(QPaintEvent*) {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QRectF bubbleRect = QRectF(rect()).adjusted(0.5, kPopoverArrowHeight + 0.5, -0.5, -0.5);
     const int radius = platformPopoverRadius();
+    const QPainterPath path =
+        roundedPopoverPath(bubbleRect, m_arrowCenterX, kPopoverArrowHeight, radius);
 
-    QPainterPath path;
-    path.moveTo(m_arrowCenterX - 11, kPopoverArrowHeight + 0.5);
-    path.lineTo(m_arrowCenterX, 0.5);
-    path.lineTo(m_arrowCenterX + 11, kPopoverArrowHeight + 0.5);
-    path.addRoundedRect(bubbleRect, radius, radius);
-
-    const bool dark = palette().color(QPalette::Base).lightness() < 96;
-    painter.setPen(QPen(dark ? QColor(68, 76, 110, 190) : QColor(95, 106, 125, 58), 1));
-    painter.setBrush(dark ? QColor(31, 35, 53, 248) : QColor(250, 251, 253, 246));
-    painter.drawPath(path.simplified());
+    QColor fill = popoverSurfaceColor(palette());
+    fill.setAlpha(255);
+    QColor stroke = popoverStrokeColor(palette());
+    stroke.setAlpha(palette().color(QPalette::Base).lightness() < 96 ? 210 : 150);
+    painter.fillPath(path, fill);
+    painter.setPen(QPen(stroke, 1));
+    painter.setBrush(Qt::NoBrush);
+    painter.drawPath(path);
 }
 
 void ImageGalleryPopover::resizeEvent(QResizeEvent* event) {
@@ -566,6 +662,14 @@ void ImageGalleryPopover::requestThumbnails() {
             m_thumbnailCache->requestThumbnail(image.id, resolvedPathForImage(image), requestSize);
         }
     }
+}
+
+bool ImageGalleryPopover::shouldDismissForGlobalPosition(const QPoint& globalPosition) const {
+    if (m_anchorGlobalRect.isValid() && m_anchorGlobalRect.adjusted(-3, -3, 3, 3).contains(globalPosition)) {
+        // Let the gallery toolbar button deliver its clicked() signal; EditPage will close the popover.
+        return false;
+    }
+    return !geometry().contains(globalPosition);
 }
 
 } // namespace tlm

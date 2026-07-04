@@ -14,6 +14,7 @@ QString buildDarkColorStyleSheet(const ThemeTokens& t) {
     const QString text = t.primaryText.name(QColor::HexRgb);
     const QString muted = t.secondaryText.name(QColor::HexRgb);
     const QString selection = t.selection.name(QColor::HexRgb);
+    const QString border = t.separator.name(QColor::HexRgb);
 
     return QStringLiteral(R"(
 QWidget {
@@ -31,6 +32,8 @@ QDialog, QMessageBox, QFileDialog {
 QToolTip {
     background:transparent;
     color:%1;
+    font-weight:700;
+    border:0px;
 }
 QAbstractButton,
 QLineEdit,
@@ -40,6 +43,23 @@ QComboBox,
 QSpinBox,
 QDoubleSpinBox {
     color:%1;
+}
+QLineEdit,
+QTextEdit,
+QPlainTextEdit,
+QComboBox,
+QSpinBox,
+QDoubleSpinBox {
+    background-color:%5;
+    selection-background-color:%2;
+    selection-color:#ffffff;
+}
+QComboBox QAbstractItemView {
+    color:%1;
+    background:%5;
+    selection-background-color:%2;
+    selection-color:#ffffff;
+    border:1px solid %6;
 }
 QPushButton:disabled, QToolButton:disabled {
     color:%4;
@@ -67,7 +87,7 @@ QMenu::item:selected {
 QLabel:disabled {
     color:%4;
 }
-)").arg(text, selection, bg, muted, panel);
+)").arg(text, selection, bg, muted, panel, border);
 }
 } // namespace
 

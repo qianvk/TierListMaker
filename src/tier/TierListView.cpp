@@ -47,6 +47,8 @@ constexpr qreal kDockMaxScale = 1.30;
 constexpr int kMissionLayoutSearchSteps = 34;
 constexpr int kMissionTransitionMs = 320;
 constexpr int kMissionHoverMs = 220;
+constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
+constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
 
 Qt::KeyboardModifier physicalControlModifier() {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
@@ -74,14 +76,16 @@ QString blankAreaActionLogName(BlankAreaAction action) {
 }
 
 qreal canvasBackgroundVisibility(const TierProject* project) {
-    if (!project || project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty()) {
-        return 0.0;
+    if (!project) {
+        return kDefaultBackgroundIconVisibility;
     }
+    const bool hasCustomBackground = !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
+    const qreal fallback = hasCustomBackground ? 1.0 : kDefaultBackgroundIconVisibility;
     return qBound<qreal>(
         0.0,
         project->canvas.value(QStringLiteral("backgroundVisibility"))
             .toDouble(project->canvas.value(QStringLiteral("backgroundImageOpacity")).toDouble(
-                project->canvas.value(QStringLiteral("backgroundOpacity")).toDouble(1.0))),
+                project->canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
         1.0);
 }
 
@@ -979,62 +983,40 @@ void TierListView::setBlankAreaActions(BlankAreaAction doubleClickAction,
 }
 
 void TierListView::setMissionControlActive(bool active) {
-    if (m_missionControlActive == active &&
-        ((active && m_missionTransitionProgress >= 0.999) ||
-         (!active && m_missionTransitionProgress <= 0.001))) {
-        return;
-    }
-
-    const bool entering = active;
-    if (active) {
-        m_missionFromGallery = false;
-        m_missionGallerySourceRect = {};
-    }
-    m_missionNormalRects = normalImageRects();
-    invalidateMissionControlLayout();
-    ensureMissionControlLayout();
-    m_missionControlActive = active;
-    clearDropState();
-    finishImageDragVisuals();
-    stopDockHoverAnimation();
-    m_dockHoverProgress = 0.0;
-    m_dockHoverImageId.clear();
-    m_dockHoverRow = -1;
-    if (!active) {
-        animateMissionHover(0.0);
-    }
-    if (active) {
-        setCursor(Qt::ArrowCursor);
-    } else {
-        unsetCursor();
-    }
-    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=row algorithm=justified-gallery")
-                     .arg(active)
-                     .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit")));
-    animateMissionTransition(active ? 1.0 : 0.0);
-    viewport()->update();
+    setMissionControlActiveForSource(active, MissionControlSource::TierRows);
 }
 
 void TierListView::setGalleryMissionControlActive(bool active, const QRect& sourceGlobalRect) {
-    if (m_missionControlActive == active && m_missionFromGallery &&
+    setMissionControlActiveForSource(active, MissionControlSource::Gallery, sourceGlobalRect);
+}
+
+void TierListView::setMissionControlActiveForSource(bool active, MissionControlSource source,
+                                                    const QRect& sourceGlobalRect) {
+    const bool gallerySource = source == MissionControlSource::Gallery;
+    if (m_missionControlActive == active &&
+        m_missionFromGallery == gallerySource &&
         ((active && m_missionTransitionProgress >= 0.999) ||
          (!active && m_missionTransitionProgress <= 0.001))) {
         return;
     }
 
     const bool entering = active;
-    if (sourceGlobalRect.isValid()) {
-        m_missionGallerySourceRect = QRectF(viewport()->mapFromGlobal(sourceGlobalRect.topLeft()),
-                                            sourceGlobalRect.size());
+    if (gallerySource) {
+        if (sourceGlobalRect.isValid()) {
+            m_missionGallerySourceRect = QRectF(viewport()->mapFromGlobal(sourceGlobalRect.topLeft()),
+                                                sourceGlobalRect.size());
+        }
+        if (!m_missionGallerySourceRect.isValid()) {
+            const QSizeF fallbackSize(36.0, 36.0);
+            const QPointF fallbackCenter(viewport()->rect().right() - 42.0, 28.0);
+            m_missionGallerySourceRect = missionRectAroundCenter(fallbackCenter, fallbackSize);
+        }
+        m_missionNormalRects.clear();
+    } else {
+        m_missionGallerySourceRect = {};
+        m_missionNormalRects = normalImageRects();
     }
-    if (!m_missionGallerySourceRect.isValid()) {
-        const QSizeF fallbackSize(36.0, 36.0);
-        const QPointF fallbackCenter(viewport()->rect().right() - 42.0, 28.0);
-        m_missionGallerySourceRect = missionRectAroundCenter(fallbackCenter, fallbackSize);
-    }
-
-    m_missionFromGallery = true;
-    m_missionNormalRects.clear();
+    m_missionFromGallery = gallerySource;
     invalidateMissionControlLayout();
     ensureMissionControlLayout();
     m_missionControlActive = active;
@@ -1052,9 +1034,10 @@ void TierListView::setGalleryMissionControlActive(bool active, const QRect& sour
     } else {
         unsetCursor();
     }
-    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=gallery algorithm=justified-gallery")
+    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=%3 algorithm=justified-gallery")
                      .arg(active)
-                     .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit")));
+                     .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit"))
+                     .arg(gallerySource ? QStringLiteral("gallery") : QStringLiteral("row")));
     animateMissionTransition(active ? 1.0 : 0.0);
     viewport()->update();
 }
@@ -3614,11 +3597,11 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
     }
 
     const QString backgroundPath = resolvedCanvasBackgroundPath();
-    if (backgroundPath.isEmpty()) {
-        return;
-    }
+    const bool defaultIconBackground = backgroundPath.isEmpty();
+    const QString pixmapPath = defaultIconBackground ? QString::fromUtf8(kDefaultBackgroundIconPath)
+                                                     : backgroundPath;
 
-    const QPixmap pixmap = canvasBackgroundPixmap(backgroundPath);
+    const QPixmap pixmap = canvasBackgroundPixmap(pixmapPath);
     if (pixmap.isNull()) {
         return;
     }
@@ -3647,21 +3630,33 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
     painter->setClipPath(outerClip.intersected(contentClip));
     painter->fillRect(contentBounds, palette().color(QPalette::AlternateBase));
 
-    const QSizeF targetSize = contentBounds.size();
-    const QSize sourceSize = pixmap.size();
-    const qreal targetRatio = targetSize.width() / qMax<qreal>(1.0, targetSize.height());
-    const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
-    QRect sourceRect;
-    if (sourceRatio > targetRatio) {
-        const int cropWidth = qRound(sourceSize.height() * targetRatio);
-        sourceRect = QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
-    } else {
-        const int cropHeight = qRound(sourceSize.width() / targetRatio);
-        sourceRect = QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
-    }
-    // Crop from the original cached pixmap on every paint so resize changes never distort the ratio.
     painter->setOpacity(backgroundVisibility);
-    painter->drawPixmap(contentBounds, pixmap, sourceRect);
+    if (defaultIconBackground) {
+        const qreal shortSide = qMax<qreal>(1.0, qMin(contentBounds.width(), contentBounds.height()));
+        const qreal maxSide = qMax<qreal>(32.0, shortSide - 18.0);
+        const qreal upperSide = qMin<qreal>(360.0, maxSide);
+        const qreal lowerSide = qMin<qreal>(72.0, upperSide);
+        const qreal side = qBound<qreal>(lowerSide, shortSide * 0.38, upperSide);
+        const QRectF iconTarget(contentBounds.center().x() - side / 2.0,
+                                contentBounds.center().y() - side / 2.0,
+                                side, side);
+        painter->drawPixmap(iconTarget, pixmap, QRectF(pixmap.rect()));
+    } else {
+        const QSizeF targetSize = contentBounds.size();
+        const QSize sourceSize = pixmap.size();
+        const qreal targetRatio = targetSize.width() / qMax<qreal>(1.0, targetSize.height());
+        const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
+        QRect sourceRect;
+        if (sourceRatio > targetRatio) {
+            const int cropWidth = qRound(sourceSize.height() * targetRatio);
+            sourceRect = QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
+        } else {
+            const int cropHeight = qRound(sourceSize.width() / targetRatio);
+            sourceRect = QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
+        }
+        // Crop from the original cached pixmap on every paint so resize changes never distort the ratio.
+        painter->drawPixmap(contentBounds, pixmap, sourceRect);
+    }
     painter->restore();
 }
 
@@ -3675,6 +3670,9 @@ QString TierListView::resolvedCanvasBackgroundPath() const {
     const QString storedPath = project->canvas.value(QStringLiteral("backgroundImagePath")).toString();
     if (storedPath.isEmpty()) {
         return {};
+    }
+    if (storedPath.startsWith(QStringLiteral(":/")) || storedPath.startsWith(QStringLiteral("qrc:/"))) {
+        return storedPath;
     }
     const QFileInfo info(storedPath);
     if (info.isAbsolute()) {

@@ -14,6 +14,9 @@
         <file alias="gallery.svg">icons/gallery.svg</file>
         <file alias="sidebar.svg">icons/sidebar.svg</file>
     </qresource>
+    <qresource prefix="/images">
+        <file alias="app-icon.png">images/app-icon.png</file>
+    </qresource>
     <qresource prefix="/themes">
         <file>themes/light.json</file>
         <file>themes/dark.json</file>

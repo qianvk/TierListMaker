@@ -28,20 +28,19 @@ const QColor kContentBackground(QStringLiteral("#f7f8fb"));
 const QColor kGridLine(QStringLiteral("#c8d0da"));
 const QColor kTextColor(QStringLiteral("#111111"));
 const QColor kTileBackground(QStringLiteral("#ffffff"));
-
-bool hasCanvasBackground(const TierProject* project) {
-    return project && !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
-}
+constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
 
 qreal canvasBackgroundVisibility(const TierProject* project) {
-    if (!hasCanvasBackground(project)) {
-        return 0.0;
+    if (!project) {
+        return kDefaultBackgroundIconVisibility;
     }
+    const bool hasCustomBackground = !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
+    const qreal fallback = hasCustomBackground ? 1.0 : kDefaultBackgroundIconVisibility;
     return qBound<qreal>(
         0.0,
         project->canvas.value(QStringLiteral("backgroundVisibility"))
             .toDouble(project->canvas.value(QStringLiteral("backgroundImageOpacity")).toDouble(
-                project->canvas.value(QStringLiteral("backgroundOpacity")).toDouble(1.0))),
+                project->canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
         1.0);
 }
 
@@ -307,9 +306,9 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
             paintOption.rect.translate(0, qRound(offset));
         }
     }
-    const qreal missionProgress = (view && !view->isGalleryMissionLayerVisible())
-                                      ? view->missionTransitionProgress()
-                                      : 0.0;
+    // Row and gallery Mission Control share the same board-material transition,
+    // including the leading-label slide. The image layer decides its own source.
+    const qreal missionProgress = view ? view->missionTransitionProgress() : 0.0;
 
     painter->save();
     painter->setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing |
