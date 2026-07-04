@@ -118,11 +118,11 @@ void TierProject::normalizeOrdering() {
         }
         rows[i].imageIds = valid;
     }
-    int poolOrder = 0;
+    int unassignedOrder = 0;
     for (TierImage& image : images) {
         if (!image.assignedTierRowId.has_value() || !rowById(*image.assignedTierRowId)) {
             image.assignedTierRowId.reset();
-            image.order = poolOrder++;
+            image.order = unassignedOrder++;
         }
     }
 }

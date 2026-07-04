@@ -28,6 +28,13 @@ TierBoardWidget::TierBoardWidget(QWidget* parent) : QWidget(parent) {
     connect(m_view, &TierListView::imageDropped, this, &TierBoardWidget::imageDropped);
     connect(m_view, &TierListView::imageSelected, this, &TierBoardWidget::imageSelected);
     connect(m_view, &TierListView::imagePreviewRequested, this, &TierBoardWidget::imagePreviewRequested);
+    connect(m_view, &TierListView::galleryMissionControlRequested, this,
+            &TierBoardWidget::galleryMissionControlRequested);
+    connect(m_view, &TierListView::imageEditRequested, this, &TierBoardWidget::imageEditRequested);
+    connect(m_view, &TierListView::imageRemoveFromTierRowRequested, this,
+            &TierBoardWidget::imageRemoveFromTierRowRequested);
+    connect(m_view, &TierListView::imageRemoveFromGalleryRequested, this,
+            &TierBoardWidget::imageRemoveFromGalleryRequested);
     connect(m_view, &TierListView::rowEditRequested, this, &TierBoardWidget::rowEditRequested);
     connect(m_view, &TierListView::rowMovedToIndex, this, &TierBoardWidget::rowMovedToIndex);
 }
@@ -54,6 +61,17 @@ void TierBoardWidget::setData(const TierProject* project, const AssetManager* as
     QTimer::singleShot(0, m_view, &TierListView::refreshLayoutMetrics);
 }
 
+void TierBoardWidget::setSelectedImageId(const QString& selectedImageId) {
+    if (m_selectedImageId == selectedImageId) {
+        return;
+    }
+    m_selectedImageId = selectedImageId;
+    if (m_delegate) {
+        m_delegate->setSelectedImageId(m_selectedImageId);
+    }
+    refreshVisuals();
+}
+
 void TierBoardWidget::refreshVisuals() {
     if (m_view && m_view->viewport()) {
         m_view->viewport()->update();
@@ -70,6 +88,12 @@ void TierBoardWidget::toggleMissionControlMode() {
     }
 }
 
+void TierBoardWidget::toggleGalleryMissionControlMode(const QRect& sourceGlobalRect) {
+    if (m_view) {
+        m_view->toggleGalleryMissionControlActive(sourceGlobalRect);
+    }
+}
+
 void TierBoardWidget::setMissionControlMode(bool active) {
     if (m_view) {
         m_view->setMissionControlActive(active);
@@ -78,6 +102,13 @@ void TierBoardWidget::setMissionControlMode(bool active) {
 
 bool TierBoardWidget::isMissionControlModeActive() const {
     return m_view && m_view->isMissionControlActive();
+}
+
+void TierBoardWidget::setBlankAreaActions(BlankAreaAction doubleClickAction,
+                                          BlankAreaAction longPressAction) {
+    if (m_view) {
+        m_view->setBlankAreaActions(doubleClickAction, longPressAction);
+    }
 }
 
 } // namespace tlm

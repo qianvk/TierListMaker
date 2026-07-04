@@ -6,11 +6,11 @@ Open TierListMaker. A new unsaved project is created automatically. Use **New** 
 
 ## Import Images
 
-Use **Import** or press `Cmd/Ctrl+I`. You can select multiple images. Dropping image files onto the image pool also imports them.
+Open the gallery button and use the final add tile to import images. You can select multiple images at once.
 
 ## Rank Images
 
-Drag images from the pool into tier rows. Drag them between rows to move them, or back to the pool to unrank them.
+Drag images from the gallery into tier rows. Drag images between rows to move them.
 
 ## Edit Rows
 
@@ -23,4 +23,3 @@ Select or hover an image and press Space. Press Space or Escape again, or click 
 ## Save and Export
 
 Projects are saved as `.tlmproject` files. Export creates PNG, JPEG, or PDF output without mutating the project.
-

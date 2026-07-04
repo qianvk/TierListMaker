@@ -1,5 +1,7 @@
 #pragma once
 
+#include <QRect>
+#include <QRectF>
 #include <QSize>
 #include <QString>
 
@@ -20,10 +22,12 @@ public:
     QString thumbnailPath;
     std::optional<QString> assignedTierRowId;
     int order{0};
+    QRectF cropRect;
 
     QSize size() const { return QSize(width, height); }
     bool isAssigned() const { return assignedTierRowId.has_value(); }
+    bool hasCropRect() const;
+    QRect thumbnailSourceRect(const QSize& sourceSize, const QSize& targetSize) const;
 };
 
 } // namespace tlm
-

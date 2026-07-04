@@ -9,6 +9,7 @@ namespace tlm {
 
 enum class AppearanceMode { System, Light, Dark };
 enum class ImageImportBehavior { CopyIntoProject, ReferenceOriginal, AskEveryTime };
+enum class BlankAreaAction { None, TierMissionControl, GalleryMissionControl };
 
 /** Persistent application preferences backed by QSettings. */
 class AppSettings : public QObject {
@@ -37,6 +38,11 @@ public:
     void setLastUpdateCheckAt(const QDateTime& checkedAt);
     bool shouldRunAutoUpdateCheck(const QDateTime& now = QDateTime::currentDateTimeUtc()) const;
 
+    BlankAreaAction blankDoubleClickAction() const;
+    void setBlankDoubleClickAction(BlankAreaAction action);
+    BlankAreaAction blankLongPressAction() const;
+    void setBlankLongPressAction(BlankAreaAction action);
+
     QString defaultExportFormat() const;
     void setDefaultExportFormat(const QString& format);
     int defaultExportScale() const;
@@ -55,6 +61,8 @@ signals:
     void languageChanged(const QString& language);
     void appearanceChanged(AppearanceMode mode);
     void autoUpdateEnabledChanged(bool enabled);
+    void blankDoubleClickActionChanged(BlankAreaAction action);
+    void blankLongPressActionChanged(BlankAreaAction action);
 
 private:
     QSettings m_settings;

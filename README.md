@@ -8,7 +8,7 @@ TierListMaker is a native Qt 6/C++20 desktop app for creating personal tier list
 
 - Create, save, reopen, and export `.tlmproject` files.
 - Import PNG, JPEG, BMP, GIF first frames, and WebP when the Qt image plugin is available.
-- Drag images between the pool and tier rows.
+- Open the gallery, then drag imported images into tier rows.
 - Rename, reorder, recolor, add, and remove tier rows.
 - Spacebar image preview with a Quick Look-style overlay.
 - Recent projects page with search and missing-file markers.

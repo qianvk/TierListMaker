@@ -47,6 +47,7 @@ private slots:
         TierImage alpha;
         alpha.id = QStringLiteral("image-alpha");
         alpha.displayName = QStringLiteral("Alpha");
+        alpha.cropRect = QRectF(0.125, 0.25, 0.5, 0.5);
         TierImage beta;
         beta.id = QStringLiteral("image-beta");
         beta.displayName = QStringLiteral("Beta");
@@ -73,6 +74,10 @@ private slots:
         QVERIFY(gammaImage->assignedTierRowId.has_value());
         QCOMPARE(*gammaImage->assignedTierRowId, rowId);
         QCOMPARE(gammaImage->order, 0);
+        const TierImage* alphaImage = loaded.value().imageById(QStringLiteral("image-alpha"));
+        QVERIFY(alphaImage);
+        QVERIFY(alphaImage->hasCropRect());
+        QCOMPARE(alphaImage->cropRect, QRectF(0.125, 0.25, 0.5, 0.5));
     }
 };
 

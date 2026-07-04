@@ -21,6 +21,7 @@ public:
 
     void setContext(const TierProject* project, const AssetManager* assetManager,
                     ThumbnailCache* thumbnailCache, QString selectedImageId);
+    void setSelectedImageId(QString selectedImageId);
 
     const TierProject* project() const { return m_project; }
     int labelWidth() const;
@@ -38,6 +39,7 @@ public:
     QString imageIdAt(const QModelIndex& index, const QRect& rowRect, const QPoint& point) const;
     QRect imageRectForId(const QModelIndex& index, const QRect& rowRect, const QString& imageId) const;
     QPixmap pixmapForImageId(const QString& imageId) const;
+    QPixmap pixmapForImageId(const QString& imageId, QSize targetPixelSize) const;
     QPixmap fullPixmapForImageId(const QString& imageId) const;
     QSize sourceSizeForImageId(const QString& imageId) const;
     int insertionIndexForPosition(const QModelIndex& index, const QRect& rowRect,
@@ -51,7 +53,7 @@ public:
 
 private:
     QStringList imageIdsForIndex(const QModelIndex& index) const;
-    QPixmap pixmapForImage(const TierImage& image) const;
+    QPixmap pixmapForImage(const TierImage& image, QSize targetPixelSize = QSize()) const;
 
     const TierProject* m_project{nullptr};
     const AssetManager* m_assetManager{nullptr};

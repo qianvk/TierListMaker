@@ -208,10 +208,16 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     connect(m_titleBar, &AppTitleBar::saveRequested, m_editPage, &EditPage::saveProject);
     connect(m_titleBar, &AppTitleBar::saveAsRequested, m_editPage, &EditPage::saveProjectAs);
     connect(m_titleBar, &AppTitleBar::backgroundRequested, m_editPage, &EditPage::configureBackground);
+    connect(m_titleBar, &AppTitleBar::galleryRequested, m_editPage, &EditPage::toggleGallery);
     connect(m_titleBar, &AppTitleBar::resetRowsRequested, m_editPage, &EditPage::resetRows);
     connect(m_titleBar, &AppTitleBar::projectTitleEdited, m_editPage, &EditPage::renameProject);
     connect(m_titleBar, &AppTitleBar::tierFocusModeRequested, this,
             [this]() { setTierFocusMode(!m_tierFocusMode); });
+    connect(m_editPage, &EditPage::galleryMissionControlRequested, this, [this]() {
+        if (m_editPage && m_titleBar) {
+            m_editPage->toggleGalleryMissionControlMode(m_titleBar->galleryButtonGlobalRect());
+        }
+    });
     connect(m_editPage, &EditPage::dirtyChanged, m_titleBar, &AppTitleBar::setSaveActionEnabled);
     connect(m_editPage, &EditPage::resetRowsAvailableChanged, m_titleBar,
             &AppTitleBar::setResetRowsActionEnabled);
@@ -568,6 +574,12 @@ void RootWidget::setupShortcuts() {
     addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S), m_editPage, SLOT(saveProjectAs()));
     auto* missionShortcut = new QShortcut(QKeySequence(QKeyCombination(physicalControlModifier(), Qt::Key_I)), this);
     connect(missionShortcut, &QShortcut::activated, m_editPage, &EditPage::toggleMissionControlMode);
+    auto* galleryMissionShortcut = new QShortcut(QKeySequence(QKeyCombination(physicalControlModifier(), Qt::Key_P)), this);
+    connect(galleryMissionShortcut, &QShortcut::activated, this, [this]() {
+        if (m_editPage && m_titleBar) {
+            m_editPage->toggleGalleryMissionControlMode(m_titleBar->galleryButtonGlobalRect());
+        }
+    });
     addShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), m_editPage, SLOT(exportProjectFromDialog()));
 
     auto* preferencesShortcut = new QShortcut(QKeySequence(Qt::CTRL | Qt::Key_Comma), this);

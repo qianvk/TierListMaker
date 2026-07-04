@@ -6,6 +6,9 @@
 #include "tier/TierListModel.h"
 
 #include <QApplication>
+#include <QAction>
+#include <QContextMenuEvent>
+#include <QCursor>
 #include <QDir>
 #include <QDrag>
 #include <QDragEnterEvent>
@@ -13,13 +16,17 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QMimeData>
 #include <QMouseEvent>
+#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
 #include <QFileInfo>
+#include <QPointer>
 #include <QScrollBar>
 #include <QSet>
+#include <QTimer>
 #include <QVariantAnimation>
 
 #include <algorithm>
@@ -52,6 +59,18 @@ Qt::KeyboardModifier physicalControlModifier() {
 
 bool hasRowMime(const QMimeData* mimeData) {
     return mimeData && mimeData->hasFormat(TierDragController::rowMimeType());
+}
+
+QString blankAreaActionLogName(BlankAreaAction action) {
+    switch (action) {
+    case BlankAreaAction::TierMissionControl:
+        return QStringLiteral("tierMissionControl");
+    case BlankAreaAction::GalleryMissionControl:
+        return QStringLiteral("galleryMissionControl");
+    case BlankAreaAction::None:
+    default:
+        return QStringLiteral("none");
+    }
 }
 
 qreal canvasBackgroundVisibility(const TierProject* project) {
@@ -111,6 +130,36 @@ bool rectContainsRect(const QRectF& outer, const QRectF& inner) {
            outer.top() <= inner.top() + kEpsilon &&
            outerRight + kEpsilon >= innerRight &&
            outerBottom + kEpsilon >= innerBottom;
+}
+
+QRect centeredPixmapCropRect(const QPixmap& pixmap, const QSize& targetSize) {
+    if (pixmap.isNull() || targetSize.isEmpty()) {
+        return {};
+    }
+    const QSize sourceSize = pixmap.size();
+    const qreal targetRatio = static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
+    const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
+    if (sourceRatio > targetRatio) {
+        const int cropWidth = qRound(sourceSize.height() * targetRatio);
+        return QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
+    }
+    const int cropHeight = qRound(sourceSize.width() / targetRatio);
+    return QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
+}
+
+QPixmap centeredDragPixmap(const QPixmap& pixmap, const QSize& logicalSize, qreal devicePixelRatio) {
+    if (pixmap.isNull() || logicalSize.isEmpty()) {
+        return {};
+    }
+
+    QPixmap result(logicalSize * devicePixelRatio);
+    result.setDevicePixelRatio(devicePixelRatio);
+    result.fill(Qt::transparent);
+    QPainter painter(&result);
+    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+    painter.drawPixmap(QRect(QPoint(0, 0), logicalSize), pixmap,
+                       centeredPixmapCropRect(pixmap, logicalSize));
+    return result;
 }
 
 qreal missionClamp(qreal minimum, qreal value, qreal maximum) {
@@ -914,6 +963,21 @@ TierListView::TierListView(QWidget* parent) : QListView(parent) {
     setStyleSheet(QStringLiteral("QListView{background:transparent;outline:0;}"));
 }
 
+void TierListView::setBlankAreaActions(BlankAreaAction doubleClickAction,
+                                       BlankAreaAction longPressAction) {
+    if (m_blankDoubleClickAction == doubleClickAction &&
+        m_blankLongPressAction == longPressAction) {
+        return;
+    }
+
+    m_blankDoubleClickAction = doubleClickAction;
+    m_blankLongPressAction = longPressAction;
+    viewport()->setToolTip({});
+    Logger::info(QStringLiteral("tier.list.blank.actions doubleClick=%1 longPress=%2")
+                     .arg(blankAreaActionLogName(m_blankDoubleClickAction),
+                          blankAreaActionLogName(m_blankLongPressAction)));
+}
+
 void TierListView::setMissionControlActive(bool active) {
     if (m_missionControlActive == active &&
         ((active && m_missionTransitionProgress >= 0.999) ||
@@ -922,6 +986,10 @@ void TierListView::setMissionControlActive(bool active) {
     }
 
     const bool entering = active;
+    if (active) {
+        m_missionFromGallery = false;
+        m_missionGallerySourceRect = {};
+    }
     m_missionNormalRects = normalImageRects();
     invalidateMissionControlLayout();
     ensureMissionControlLayout();
@@ -940,7 +1008,51 @@ void TierListView::setMissionControlActive(bool active) {
     } else {
         unsetCursor();
     }
-    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 algorithm=justified-gallery")
+    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=row algorithm=justified-gallery")
+                     .arg(active)
+                     .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit")));
+    animateMissionTransition(active ? 1.0 : 0.0);
+    viewport()->update();
+}
+
+void TierListView::setGalleryMissionControlActive(bool active, const QRect& sourceGlobalRect) {
+    if (m_missionControlActive == active && m_missionFromGallery &&
+        ((active && m_missionTransitionProgress >= 0.999) ||
+         (!active && m_missionTransitionProgress <= 0.001))) {
+        return;
+    }
+
+    const bool entering = active;
+    if (sourceGlobalRect.isValid()) {
+        m_missionGallerySourceRect = QRectF(viewport()->mapFromGlobal(sourceGlobalRect.topLeft()),
+                                            sourceGlobalRect.size());
+    }
+    if (!m_missionGallerySourceRect.isValid()) {
+        const QSizeF fallbackSize(36.0, 36.0);
+        const QPointF fallbackCenter(viewport()->rect().right() - 42.0, 28.0);
+        m_missionGallerySourceRect = missionRectAroundCenter(fallbackCenter, fallbackSize);
+    }
+
+    m_missionFromGallery = true;
+    m_missionNormalRects.clear();
+    invalidateMissionControlLayout();
+    ensureMissionControlLayout();
+    m_missionControlActive = active;
+    clearDropState();
+    finishImageDragVisuals();
+    stopDockHoverAnimation();
+    m_dockHoverProgress = 0.0;
+    m_dockHoverImageId.clear();
+    m_dockHoverRow = -1;
+    if (!active) {
+        animateMissionHover(0.0);
+    }
+    if (active) {
+        setCursor(Qt::ArrowCursor);
+    } else {
+        unsetCursor();
+    }
+    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=gallery algorithm=justified-gallery")
                      .arg(active)
                      .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit")));
     animateMissionTransition(active ? 1.0 : 0.0);
@@ -949,6 +1061,11 @@ void TierListView::setMissionControlActive(bool active) {
 
 void TierListView::toggleMissionControlActive() {
     setMissionControlActive(!m_missionControlActive);
+}
+
+void TierListView::toggleGalleryMissionControlActive(const QRect& sourceGlobalRect) {
+    const bool shouldExitGallery = m_missionControlActive && m_missionFromGallery;
+    setGalleryMissionControlActive(!shouldExitGallery, sourceGlobalRect);
 }
 
 void TierListView::refreshLayoutMetrics() {
@@ -1166,9 +1283,13 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
         if (event->button() == Qt::LeftButton) {
             const QString imageId = missionImageAt(event->pos());
             if (!imageId.isEmpty()) {
+                m_pressKind = PressKind::ImageTile;
+                m_pressedImageId = imageId;
+                m_pressPosition = event->pos();
                 m_activeImageId = imageId;
                 m_activeImageIndex = QPersistentModelIndex();
                 emit imageSelected(imageId);
+                scheduleMissionImageLift(imageId, event->pos());
                 Logger::debug(QStringLiteral("tier.list.mission.image.select imageId=%1 pos=(%2,%3)")
                                   .arg(imageId)
                                   .arg(event->pos().x())
@@ -1177,6 +1298,21 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
                 event->accept();
                 return;
             }
+            ++m_missionPressSerial;
+            m_suppressBlankDoubleClick = true;
+            QTimer::singleShot(QApplication::doubleClickInterval() + 80, this, [this]() {
+                m_suppressBlankDoubleClick = false;
+            });
+            Logger::info(QStringLiteral("tier.list.mission.blank.click action=exit pos=(%1,%2)")
+                             .arg(event->pos().x())
+                             .arg(event->pos().y()));
+            if (m_missionFromGallery) {
+                setGalleryMissionControlActive(false, {});
+            } else {
+                setMissionControlActive(false);
+            }
+            event->accept();
+            return;
         }
         QListView::mousePressEvent(event);
         return;
@@ -1230,6 +1366,19 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
         return;
     }
 
+    if (!delegate->labelRect(rowRect).contains(event->pos())) {
+        m_pressKind = PressKind::BlankArea;
+        setFocus(Qt::MouseFocusReason);
+        scheduleBlankMissionControl(event->pos());
+        Logger::debug(QStringLiteral("tier.list.mouse.press kind=blank rowId=%1 row=%2 pos=(%3,%4)")
+                          .arg(m_pressedRowId)
+                          .arg(index.row())
+                          .arg(event->pos().x())
+                          .arg(event->pos().y()));
+        event->accept();
+        return;
+    }
+
     QListView::mousePressEvent(event);
 }
 
@@ -1242,6 +1391,7 @@ void TierListView::mouseMoveEvent(QMouseEvent* event) {
 
     if (!(event->buttons() & Qt::LeftButton) || m_pressKind == PressKind::None) {
         updateDockHover(event->pos());
+        updateBlankAreaToolTip(event->pos());
         QListView::mouseMoveEvent(event);
         return;
     }
@@ -1249,6 +1399,12 @@ void TierListView::mouseMoveEvent(QMouseEvent* event) {
         return;
     }
 
+    if (m_pressKind == PressKind::BlankArea) {
+        ++m_blankPressSerial;
+        resetPressState();
+        event->accept();
+        return;
+    }
     if (m_pressKind == PressKind::RowLabel) {
         animateDockHover(0.0);
         startRowDrag();
@@ -1265,6 +1421,7 @@ void TierListView::mouseMoveEvent(QMouseEvent* event) {
 
 void TierListView::mouseReleaseEvent(QMouseEvent* event) {
     if (m_missionControlActive) {
+        ++m_missionPressSerial;
         resetPressState();
         QListView::mouseReleaseEvent(event);
         return;
@@ -1282,6 +1439,13 @@ void TierListView::mouseReleaseEvent(QMouseEvent* event) {
         !m_pressedImageId.isEmpty()) {
         emit imageSelected(m_pressedImageId);
         Logger::debug(QStringLiteral("tier.list.image.select imageId=%1").arg(m_pressedImageId));
+        resetPressState();
+        unsetCursor();
+        event->accept();
+        return;
+    }
+    if (event->button() == Qt::LeftButton && m_pressKind == PressKind::BlankArea) {
+        ++m_blankPressSerial;
         resetPressState();
         unsetCursor();
         event->accept();
@@ -1307,7 +1471,16 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
             event->accept();
             return;
         }
-        QListView::mouseDoubleClickEvent(event);
+        ++m_missionPressSerial;
+        Logger::info(QStringLiteral("tier.list.mission.blank.double-click action=exit pos=(%1,%2)")
+                         .arg(event->pos().x())
+                         .arg(event->pos().y()));
+        if (m_missionFromGallery) {
+            setGalleryMissionControlActive(false, {});
+        } else {
+            setMissionControlActive(false);
+        }
+        event->accept();
         return;
     }
 
@@ -1329,8 +1502,72 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
             event->accept();
             return;
         }
+        if (!delegate->labelRect(rowRect).contains(event->pos())) {
+            ++m_blankPressSerial;
+            if (m_suppressBlankDoubleClick) {
+                m_suppressBlankDoubleClick = false;
+                Logger::debug(QStringLiteral("tier.list.blank.double-click suppressed reason=missionExit"));
+                event->accept();
+                return;
+            }
+            runBlankAreaAction(m_blankDoubleClickAction, "double-click", event->pos());
+            event->accept();
+            return;
+        }
     }
     QListView::mouseDoubleClickEvent(event);
+}
+
+void TierListView::contextMenuEvent(QContextMenuEvent* event) {
+    TierListModel* model = tierModel();
+    TierListDelegate* delegate = tierDelegate();
+    const TierProject* project = model ? model->project() : nullptr;
+    if (!model || !delegate || !project) {
+        QListView::contextMenuEvent(event);
+        return;
+    }
+
+    QString imageId;
+    if (m_missionControlActive) {
+        imageId = missionImageAt(event->pos());
+    } else {
+        const QModelIndex index = indexAt(event->pos());
+        if (index.isValid()) {
+            imageId = delegate->imageIdAt(index, visualRect(index), event->pos());
+        }
+    }
+    const TierImage* image = project->imageById(imageId);
+    if (!image) {
+        QListView::contextMenuEvent(event);
+        return;
+    }
+
+    m_activeImageId = imageId;
+    m_activeImageIndex = QPersistentModelIndex();
+    emit imageSelected(imageId);
+
+    QMenu menu(this);
+    QAction* editAction = menu.addAction(tr("Edit"));
+    QAction* removeAction = menu.addAction(image->assignedTierRowId.has_value()
+                                               ? tr("Remove from Tier Row")
+                                               : tr("Remove from Image Gallery"));
+    QAction* chosen = menu.exec(event->globalPos());
+    if (chosen == editAction) {
+        Logger::info(QStringLiteral("tier.list.context.edit imageId=%1 mission=%2")
+                         .arg(imageId)
+                         .arg(m_missionControlActive));
+        emit imageEditRequested(imageId);
+    } else if (chosen == removeAction) {
+        if (image->assignedTierRowId.has_value()) {
+            Logger::info(QStringLiteral("tier.list.context.remove.from.row imageId=%1 rowId=%2")
+                             .arg(imageId, *image->assignedTierRowId));
+            emit imageRemoveFromTierRowRequested(imageId);
+        } else {
+            Logger::info(QStringLiteral("tier.list.context.remove.from.gallery imageId=%1").arg(imageId));
+            emit imageRemoveFromGalleryRequested(imageId);
+        }
+    }
+    event->accept();
 }
 
 void TierListView::keyPressEvent(QKeyEvent* event) {
@@ -1355,9 +1592,10 @@ void TierListView::keyPressEvent(QKeyEvent* event) {
 
 void TierListView::leaveEvent(QEvent* event) {
     animateDockHover(0.0);
-    if (m_missionControlActive) {
-        animateMissionHover(0.0);
-    }
+    viewport()->setToolTip({});
+    // Keep Mission Control hover expanded across preview overlays. A preview opens as a
+    // sibling widget, so the view can receive Leave even though the user still expects the
+    // selected Mission Control tile to remain the animation source and return target.
     QListView::leaveEvent(event);
 }
 
@@ -1375,7 +1613,9 @@ void TierListView::paintEvent(QPaintEvent* event) {
         QPainterPath boardClip;
         boardClip.addRoundedRect(QRectF(viewport()->rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                                  TierListDelegate::outerRadius(), TierListDelegate::outerRadius());
-        backgroundPainter.fillPath(boardClip, palette().color(QPalette::Base));
+        const QColor boardColor = missionLayerVisible ? palette().color(QPalette::AlternateBase)
+                                                      : palette().color(QPalette::Base);
+        backgroundPainter.fillPath(boardClip, boardColor);
         paintCanvasBackground(&backgroundPainter);
     }
 
@@ -1417,9 +1657,30 @@ void TierListView::paintEvent(QPaintEvent* event) {
     }
 
     if (!missionLayerVisible && m_imageDragActive && m_imagePlaceholderRect.isValid()) {
+        const QRectF placeholder = m_imagePlaceholderRect;
         QColor fill = kDropLine;
-        fill.setAlpha(42);
-        painter.fillRect(m_imagePlaceholderRect, fill);
+        fill.setAlpha(34);
+        painter.fillRect(placeholder, fill);
+        if (TierListDelegate* delegate = tierDelegate()) {
+            const qreal dpr = viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
+            const QSize targetPixels(qCeil(placeholder.width() * dpr), qCeil(placeholder.height() * dpr));
+            const QPixmap pixmap = delegate->pixmapForImageId(m_imageDragId, targetPixels);
+            const TierProject* project = tierModel() ? tierModel()->project() : nullptr;
+            const TierImage* image = project ? project->imageById(m_imageDragId) : nullptr;
+            if (!pixmap.isNull()) {
+                painter.save();
+                painter.setOpacity(0.38);
+                painter.drawPixmap(placeholder, pixmap,
+                                   image ? image->thumbnailSourceRect(pixmap.size(), placeholder.size().toSize())
+                                         : centeredPixmapCropRect(pixmap, placeholder.size().toSize()));
+                painter.restore();
+            }
+        }
+        QColor stroke = kDropLine;
+        stroke.setAlpha(165);
+        painter.setPen(QPen(stroke, 2));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRect(placeholder.adjusted(1.0, 1.0, -1.0, -1.0));
     }
 
     const QRectF outline = QRectF(viewport()->rect()).adjusted(0.5, 0.5, -0.5, -0.5);
@@ -1516,8 +1777,16 @@ void TierListView::dropEvent(QDropEvent* event) {
                                      .arg(target.row())
                                      .arg(insertionIndex));
                     emit imageDropped(imageId, model->rowIdAt(target.row()), insertionIndex);
+                } else {
+                    Logger::warn(QStringLiteral("tier.list.image.drop rejected imageId=%1 row=%2 reason=invalidInsertion")
+                                     .arg(imageId)
+                                     .arg(target.row()));
                 }
             }
+        } else {
+            Logger::warn(QStringLiteral("tier.list.image.drop rejected imageId=%1 targetValid=%2 reason=noTarget")
+                             .arg(imageId)
+                             .arg(target.isValid()));
         }
     }
 
@@ -1741,17 +2010,19 @@ void TierListView::stopReorderAnimations() {
     }
 }
 
-void TierListView::beginImageDragVisuals(const QString& imageId) {
+void TierListView::beginImageDragVisuals(const QString& imageId, bool synchronousFeedback) {
     if (imageId.isEmpty()) {
         return;
     }
     if (m_imageDragActive && m_imageDragId == imageId) {
+        m_imageDragSynchronousFeedback = m_imageDragSynchronousFeedback || synchronousFeedback;
         return;
     }
 
     finishImageDragVisuals();
     m_imageDragActive = true;
     m_imageDragId = imageId;
+    m_imageDragSynchronousFeedback = synchronousFeedback;
     stopDockHoverAnimation();
     m_dockHoverProgress = 0.0;
     m_dockHoverRow = -1;
@@ -1759,30 +2030,37 @@ void TierListView::beginImageDragVisuals(const QString& imageId) {
     m_imageDragSourceRow = -1;
     m_imageDropInsertionIndex = -1;
     m_imagePlaceholderRect = {};
+    m_imageDragOriginalRects.clear();
 
     TierListModel* model = tierModel();
     TierListDelegate* delegate = tierDelegate();
     if (model && delegate) {
         for (int row = 0; row < model->rowCount(); ++row) {
             const QModelIndex index = model->index(row, 0);
+            const QRect rowRect = visualRect(index);
             const QStringList imageIds = index.data(TierListModel::ImageIdsRole).toStringList();
-            const int imageIndex = static_cast<int>(imageIds.indexOf(imageId));
-            if (imageIndex < 0) {
-                continue;
+            const QVector<QRect> imageRects = delegate->tileRects(index, rowRect);
+            for (int i = 0; i < imageIds.size() && i < imageRects.size(); ++i) {
+                m_imageDragOriginalRects.insert(imageIds.at(i), QRectF(imageRects.at(i)));
             }
 
-            m_imageDragSourceRow = row;
-            m_imageDropIndex = QPersistentModelIndex(index);
-            m_imageDropInsertionIndex = imageIndex;
-            m_imagePlaceholderRect = delegate->imageRectForId(index, visualRect(index), imageId);
-            break;
+            const int imageIndex = static_cast<int>(imageIds.indexOf(imageId));
+            if (imageIndex >= 0 && m_imageDragSourceRow < 0) {
+                m_imageDragSourceRow = row;
+                m_imageDropIndex = QPersistentModelIndex(index);
+                m_imageDropInsertionIndex = imageIndex;
+                m_imagePlaceholderRect = m_imageDragOriginalRects.value(imageId);
+            }
         }
     }
 
-    Logger::debug(QStringLiteral("tier.list.image.visual.begin imageId=%1 sourceRow=%2 sourceIndex=%3")
+    Logger::debug(QStringLiteral("tier.list.image.visual.begin imageId=%1 sourceRow=%2 sourceIndex=%3 capturedOrigins=%4 feedback=%5")
                       .arg(m_imageDragId)
                       .arg(m_imageDragSourceRow)
-                      .arg(m_imageDropInsertionIndex));
+                      .arg(m_imageDropInsertionIndex)
+                      .arg(m_imageDragOriginalRects.size())
+                      .arg(m_imageDragSynchronousFeedback ? QStringLiteral("sync")
+                                                          : QStringLiteral("animated")));
     viewport()->update();
 }
 
@@ -1799,6 +2077,8 @@ void TierListView::finishImageDragVisuals() {
     m_imagePreviewTargetRow = -1;
     m_imageDropInsertionIndex = -1;
     m_imagePlaceholderRect = {};
+    m_imageDragOriginalRects.clear();
+    m_imageDragSynchronousFeedback = false;
     clearImageDropState();
     refreshLayoutMetrics();
     viewport()->update();
@@ -1822,6 +2102,10 @@ void TierListView::updateImageDropIntentAt(const QPoint& viewportPoint) {
     }
 
     if (!target.isValid()) {
+        Logger::debug(QStringLiteral("tier.list.image.drag.intent.clear imageId=%1 pos=(%2,%3) reason=noTarget")
+                          .arg(m_imageDragId)
+                          .arg(viewportPoint.x())
+                          .arg(viewportPoint.y()));
         updateImageDropIntent({}, -1);
         return;
     }
@@ -1872,6 +2156,36 @@ void TierListView::updateImageDropIntent(const QModelIndex& target, int insertio
     }
     for (auto it = targets.cbegin(); it != targets.cend(); ++it) {
         imageIds.insert(it.key());
+    }
+
+    if (m_imageDragSynchronousFeedback) {
+        // Mission lift starts from a delayed press + transition animation, not from the normal
+        // mouseMove path. During the native drag loop, keep feedback deterministic by applying
+        // the freshly computed layout immediately instead of relying on QVariantAnimation ticks.
+        stopImageAnimations();
+        for (const QString& imageId : std::as_const(imageIds)) {
+            const QPointF offset = targets.value(imageId, QPointF());
+            if (qAbs(offset.x()) < 0.5 && qAbs(offset.y()) < 0.5) {
+                m_imageTileOffsets.remove(imageId);
+            } else {
+                m_imageTileOffsets.insert(imageId, offset);
+            }
+        }
+        m_imagePlaceholderRect = placeholderRect;
+        m_imageDropIndex = QPersistentModelIndex(target);
+        m_imageDropInsertionIndex = insertionIndex;
+        Logger::debug(QStringLiteral("tier.list.image.drag.intent.sync imageId=%1 row=%2 index=%3 placeholder=(%4,%5,%6,%7) affectedKeys=%8")
+                          .arg(m_imageDragId)
+                          .arg(target.row())
+                          .arg(insertionIndex)
+                          .arg(qRound(placeholderRect.x()))
+                          .arg(qRound(placeholderRect.y()))
+                          .arg(qRound(placeholderRect.width()))
+                          .arg(qRound(placeholderRect.height()))
+                          .arg(imageIds.size()));
+        viewport()->update();
+        viewport()->repaint();
+        return;
     }
 
     for (const QString& imageId : std::as_const(imageIds)) {
@@ -2099,6 +2413,8 @@ QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& targ
 
     const int targetRow = target.row();
     const int rows = model->rowCount();
+    int affectedImages = 0;
+    int missingBaseRects = 0;
     for (int row = 0; row < rows; ++row) {
         if (row != targetRow && row != m_imageDragSourceRow) {
             continue;
@@ -2107,10 +2423,10 @@ QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& targ
         const QModelIndex index = model->index(row, 0);
         const QRect rowRect = visualRect(index);
         const QStringList originalIds = index.data(TierListModel::ImageIdsRole).toStringList();
-        const QVector<QRect> originalRects = delegate->tileRects(index, rowRect);
-        QHash<QString, QRect> originalRectById;
-        for (int i = 0; i < originalIds.size() && i < originalRects.size(); ++i) {
-            originalRectById.insert(originalIds.at(i), originalRects.at(i));
+        const QVector<QRect> baseRects = delegate->tileRects(index, rowRect);
+        QHash<QString, QRectF> baseRectById;
+        for (int i = 0; i < originalIds.size() && i < baseRects.size(); ++i) {
+            baseRectById.insert(originalIds.at(i), QRectF(baseRects.at(i)));
         }
 
         QStringList visualIds = originalIds;
@@ -2139,12 +2455,28 @@ QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& targ
                 }
                 continue;
             }
-            const QRect original = originalRectById.value(id);
-            if (original.isValid()) {
-                offsets.insert(id, QPointF(targetRects.at(i).topLeft() - original.topLeft()));
+            const QRectF baseRect = baseRectById.value(id);
+            if (baseRect.isValid()) {
+                const QPointF offset = QPointF(targetRects.at(i).topLeft()) - baseRect.topLeft();
+                if (!qFuzzyIsNull(offset.x()) || !qFuzzyIsNull(offset.y())) {
+                    ++affectedImages;
+                }
+                offsets.insert(id, offset);
+            } else {
+                ++missingBaseRects;
             }
         }
     }
+
+    Logger::debug(QStringLiteral(
+                      "tier.list.image.drag.layout imageId=%1 sourceRow=%2 targetRow=%3 index=%4 affected=%5 missingBaseRects=%6 placeholderValid=%7")
+                      .arg(m_imageDragId)
+                      .arg(m_imageDragSourceRow)
+                      .arg(targetRow)
+                      .arg(insertionIndex)
+                      .arg(affectedImages)
+                      .arg(missingBaseRects)
+                      .arg(placeholderRect && placeholderRect->isValid()));
 
     return offsets;
 }
@@ -2357,6 +2689,11 @@ void TierListView::updateDockHover(const QPoint& viewportPoint) {
     if (m_dockHoverImageId != imageId || m_dockHoverRow != index.row()) {
         m_dockHoverImageId = imageId;
         m_dockHoverRow = index.row();
+        if (m_activeImageId != imageId || m_activeImageIndex != index) {
+            m_activeImageId = imageId;
+            m_activeImageIndex = index;
+            emit imageSelected(imageId);
+        }
         Logger::debug(QStringLiteral("tier.list.image.hover imageId=%1 row=%2 pos=(%3,%4)")
                           .arg(imageId)
                           .arg(index.row())
@@ -2441,6 +2778,8 @@ void TierListView::animateMissionTransition(qreal targetProgress) {
         m_missionTransitionProgress = targetProgress;
         if (targetProgress <= 0.001) {
             m_missionNormalRects.clear();
+            m_missionFromGallery = false;
+            m_missionGallerySourceRect = {};
             m_missionHoverImageId.clear();
             m_missionHoverProgress = 0.0;
         }
@@ -2465,6 +2804,15 @@ void TierListView::updateMissionHover(const QPoint& viewportPoint) {
         animateMissionHover(0.0);
         return;
     }
+    if (!m_missionLiftImageId.isEmpty()) {
+        if (m_activeImageId != m_missionLiftImageId || m_activeImageIndex.isValid()) {
+            m_activeImageId = m_missionLiftImageId;
+            m_activeImageIndex = QPersistentModelIndex();
+            emit imageSelected(m_missionLiftImageId);
+        }
+        viewport()->update();
+        return;
+    }
 
     const QString imageId = missionImageAt(viewportPoint);
     m_missionHoverPosition = viewportPoint;
@@ -2477,6 +2825,11 @@ void TierListView::updateMissionHover(const QPoint& viewportPoint) {
         stopMissionHoverAnimation();
         m_missionHoverProgress = 0.0;
         m_missionHoverImageId = imageId;
+        if (m_activeImageId != imageId || m_activeImageIndex.isValid()) {
+            m_activeImageId = imageId;
+            m_activeImageIndex = QPersistentModelIndex();
+            emit imageSelected(imageId);
+        }
         QRectF baseRect;
         QRectF targetRect;
         ensureMissionControlLayout();
@@ -2558,6 +2911,314 @@ void TierListView::stopMissionHoverAnimation() {
     }
 }
 
+void TierListView::scheduleMissionImageLift(const QString& imageId, const QPoint& viewportPoint) {
+    const int serial = ++m_missionPressSerial;
+    QTimer::singleShot(260, this, [this, imageId, viewportPoint, serial]() {
+        startMissionImageLiftDrag(imageId, viewportPoint, serial);
+    });
+}
+
+void TierListView::scheduleBlankMissionControl(const QPoint& viewportPoint) {
+    const int serial = ++m_blankPressSerial;
+    QTimer::singleShot(420, this, [this, viewportPoint, serial]() {
+        if (serial != m_blankPressSerial || m_pressKind != PressKind::BlankArea ||
+            m_missionControlActive || !(QApplication::mouseButtons() & Qt::LeftButton)) {
+            return;
+        }
+
+        ++m_blankPressSerial;
+        resetPressState();
+        runBlankAreaAction(m_blankLongPressAction, "long-press", viewportPoint);
+    });
+}
+
+bool TierListView::runBlankAreaAction(BlankAreaAction action, const char* trigger,
+                                      const QPoint& viewportPoint) {
+    Logger::info(QStringLiteral("tier.list.blank.action trigger=%1 action=%2 pos=(%3,%4)")
+                     .arg(QString::fromLatin1(trigger),
+                          blankAreaActionLogName(action))
+                     .arg(viewportPoint.x())
+                     .arg(viewportPoint.y()));
+
+    switch (action) {
+    case BlankAreaAction::TierMissionControl:
+        setMissionControlActive(true);
+        return true;
+    case BlankAreaAction::GalleryMissionControl:
+        emit galleryMissionControlRequested();
+        return true;
+    case BlankAreaAction::None:
+    default:
+        return false;
+    }
+}
+
+void TierListView::updateBlankAreaToolTip(const QPoint& viewportPoint) {
+    const QString hint = blankAreaHintText();
+    if (hint.isEmpty() || m_missionControlActive || m_missionTransitionProgress > 0.001) {
+        viewport()->setToolTip({});
+        return;
+    }
+
+    TierListDelegate* delegate = tierDelegate();
+    const QModelIndex index = indexAt(viewportPoint);
+    if (!delegate || !index.isValid()) {
+        viewport()->setToolTip({});
+        return;
+    }
+
+    const QRect rowRect = visualRect(index);
+    const bool overEmptyTierArea = !delegate->labelRect(rowRect).contains(viewportPoint) &&
+                                   delegate->imageIdAt(index, rowRect, viewportPoint).isEmpty();
+    viewport()->setToolTip(overEmptyTierArea ? hint : QString());
+}
+
+QString TierListView::blankAreaHintText() const {
+    auto actionText = [](BlankAreaAction action) -> QString {
+        switch (action) {
+        case BlankAreaAction::TierMissionControl:
+            return tr("Open Tier Overview");
+        case BlankAreaAction::GalleryMissionControl:
+            return tr("Open Gallery Overview");
+        case BlankAreaAction::None:
+        default:
+            return {};
+        }
+    };
+
+    QStringList hints;
+    const QString doubleClick = actionText(m_blankDoubleClickAction);
+    if (!doubleClick.isEmpty()) {
+        hints.append(tr("Double-click: %1").arg(doubleClick));
+    }
+    const QString longPress = actionText(m_blankLongPressAction);
+    if (!longPress.isEmpty()) {
+        hints.append(tr("Long press: %1").arg(longPress));
+    }
+    return hints.join(QStringLiteral("  "));
+}
+
+void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoint& viewportPoint,
+                                             int pressSerial) {
+    if (pressSerial != m_missionPressSerial || imageId.isEmpty() || !m_missionControlActive ||
+        !(QApplication::mouseButtons() & Qt::LeftButton)) {
+        return;
+    }
+
+    const QRect sourceRect = missionImageRect(imageId);
+    if (!sourceRect.isValid()) {
+        Logger::warn(QStringLiteral("tier.list.mission.lift.rejected imageId=%1 reason=invalidSource")
+                         .arg(imageId));
+        return;
+    }
+
+    TierListDelegate* delegate = tierDelegate();
+    QWidget* host = window() ? window() : this;
+    if (!delegate || !host) {
+        return;
+    }
+
+    const QRect targetViewportRect = tierRowImageRectForLift(imageId);
+    const QSize targetSize = targetViewportRect.isValid() ? targetViewportRect.size()
+                                                          : QSize(kInitialLayoutLineHeight,
+                                                                  kInitialLayoutLineHeight);
+    const qreal dpr = viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
+    QPixmap imagePixmap = delegate->fullPixmapForImageId(imageId);
+    if (imagePixmap.isNull()) {
+        imagePixmap = delegate->pixmapForImageId(imageId, targetSize * dpr);
+    }
+
+    const QRect sourceHostRect(host->mapFromGlobal(viewport()->mapToGlobal(sourceRect.topLeft())),
+                               sourceRect.size());
+    auto* overlay = new QLabel(host);
+    overlay->setAttribute(Qt::WA_TransparentForMouseEvents);
+    overlay->setScaledContents(false);
+    overlay->setGeometry(sourceHostRect);
+    overlay->raise();
+    overlay->show();
+
+    auto renderOverlay = [overlay, imagePixmap, dpr](const QRect& geometry) {
+        if (!overlay) {
+            return;
+        }
+        overlay->setGeometry(geometry);
+        overlay->setPixmap(centeredDragPixmap(imagePixmap, geometry.size(), dpr));
+    };
+    renderOverlay(sourceHostRect);
+
+    m_missionLiftImageId = imageId;
+    if (m_activeImageId != imageId || m_activeImageIndex.isValid()) {
+        m_activeImageId = imageId;
+        m_activeImageIndex = QPersistentModelIndex();
+        emit imageSelected(imageId);
+    }
+    ++m_missionPressSerial;
+    resetPressState();
+    if (m_missionFromGallery) {
+        setGalleryMissionControlActive(false, {});
+    } else {
+        setMissionControlActive(false);
+    }
+
+    auto* animation = new QVariantAnimation(this);
+    animation->setDuration(kMissionTransitionMs + 40);
+    animation->setEasingCurve(QEasingCurve::OutCubic);
+    animation->setStartValue(0.0);
+    animation->setEndValue(1.0);
+    QPointer<QLabel> overlayGuard(overlay);
+    connect(animation, &QVariantAnimation::valueChanged, this,
+            [host, sourceHostRect, targetSize, renderOverlay](const QVariant& value) {
+                const qreal t = missionMacHoverEase(value.toReal());
+                const QPoint cursor = host->mapFromGlobal(QCursor::pos());
+                const QRect targetRect(cursor.x() - targetSize.width() / 2,
+                                       cursor.y() - targetSize.height() / 2,
+                                       targetSize.width(), targetSize.height());
+                const QRect currentRect(
+                    qRound(sourceHostRect.x() + (targetRect.x() - sourceHostRect.x()) * t),
+                    qRound(sourceHostRect.y() + (targetRect.y() - sourceHostRect.y()) * t),
+                    qRound(sourceHostRect.width() + (targetRect.width() - sourceHostRect.width()) * t),
+                    qRound(sourceHostRect.height() + (targetRect.height() - sourceHostRect.height()) * t));
+                renderOverlay(currentRect);
+            });
+    connect(animation, &QVariantAnimation::finished, this,
+            [this, animation, overlayGuard, imageId, imagePixmap, targetSize, dpr]() {
+                animation->deleteLater();
+                if (!(QApplication::mouseButtons() & Qt::LeftButton)) {
+                    if (overlayGuard) {
+                        overlayGuard->deleteLater();
+                    }
+                    m_missionLiftImageId.clear();
+                    viewport()->update();
+                    return;
+                }
+
+                if (overlayGuard) {
+                    overlayGuard->hide();
+                    overlayGuard->deleteLater();
+                }
+
+                completeMissionExitForLift();
+                beginImageDragVisuals(imageId, true);
+                // Mission lift starts from a long-press animation rather than from a normal
+                // mouseMove. Use synchronous drag feedback so placeholder and affected tiles are
+                // always painted by dragMoveEvent inside the native drag loop.
+                viewport()->update();
+
+                auto* drag = new QDrag(this);
+                drag->setMimeData(TierDragController::createMimeData(imageId));
+                const QPixmap dragPixmap = centeredDragPixmap(imagePixmap, targetSize, dpr);
+                if (!dragPixmap.isNull()) {
+                    drag->setPixmap(dragPixmap);
+                    drag->setHotSpot(QPoint(targetSize.width() / 2, targetSize.height() / 2));
+                }
+
+                setCursor(Qt::ClosedHandCursor);
+                Logger::info(QStringLiteral("tier.list.mission.lift.drag.start imageId=%1 target=(%2,%3)")
+                                 .arg(imageId)
+                                 .arg(targetSize.width())
+                                 .arg(targetSize.height()));
+                const Qt::DropAction result = drag->exec(Qt::MoveAction);
+                Logger::info(QStringLiteral("tier.list.mission.lift.drag.finish imageId=%1 result=%2")
+                                 .arg(imageId)
+                                 .arg(static_cast<int>(result)));
+                finishImageDragVisuals();
+                m_missionLiftImageId.clear();
+                unsetCursor();
+            });
+    Logger::info(QStringLiteral("tier.list.mission.lift.start imageId=%1 source=(%2,%3,%4,%5) target=(%6,%7,%8,%9)")
+                     .arg(imageId)
+                     .arg(sourceRect.x())
+                     .arg(sourceRect.y())
+                     .arg(sourceRect.width())
+                     .arg(sourceRect.height())
+                     .arg(targetViewportRect.x())
+                     .arg(targetViewportRect.y())
+                     .arg(targetViewportRect.width())
+                     .arg(targetViewportRect.height()));
+    animation->start();
+    Q_UNUSED(viewportPoint);
+}
+
+QRect TierListView::tierRowImageRectForLift(const QString& imageId) const {
+    TierListModel* model = tierModel();
+    TierListDelegate* delegate = tierDelegate();
+    if (!model || !delegate) {
+        const QSize fallbackSize(kInitialLayoutLineHeight, kInitialLayoutLineHeight);
+        return QRect(QPoint(), fallbackSize);
+    }
+
+    // Use the delegate's live geometry first. It already accounts for row units, adaptive
+    // label width, content width caps, and the exact tile size currently painted on screen.
+    if (!imageId.isEmpty()) {
+        for (int row = 0; row < model->rowCount(); ++row) {
+            const QModelIndex index = model->index(row, 0);
+            const QStringList imageIds = index.data(TierListModel::ImageIdsRole).toStringList();
+            if (!imageIds.contains(imageId)) {
+                continue;
+            }
+
+            const QRect rect = delegate->imageRectForId(index, visualRect(index), imageId);
+            if (rect.isValid()) {
+                Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 row=%2 rect=(%3,%4,%5,%6) source=existing")
+                                  .arg(imageId)
+                                  .arg(row)
+                                  .arg(rect.x())
+                                  .arg(rect.y())
+                                  .arg(rect.width())
+                                  .arg(rect.height()));
+                return rect;
+            }
+        }
+    }
+
+    // Gallery mission images may not belong to a row yet. Use the first row's one-item
+    // projection so the lifted drag pixmap still matches the tier list's current row scale.
+    for (int row = 0; row < model->rowCount(); ++row) {
+        const QModelIndex index = model->index(row, 0);
+        const QRect rowRect = visualRect(index);
+        if (!index.isValid() || !rowRect.isValid()) {
+            continue;
+        }
+        const QVector<QRect> rects = delegate->tileRectsForCount(index, rowRect, 1);
+        if (!rects.isEmpty() && rects.constFirst().isValid()) {
+            const QRect rect = delegate->tileImageRect(rects.constFirst());
+            Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 row=%2 rect=(%3,%4,%5,%6) source=fallback-row")
+                              .arg(imageId)
+                              .arg(row)
+                              .arg(rect.x())
+                              .arg(rect.y())
+                              .arg(rect.width())
+                              .arg(rect.height()));
+            return rect;
+        }
+    }
+
+    const int rows = qMax(1, model->rowCount());
+    const int side = qBound(34, qMax(1, viewport()->height() / rows), 512);
+    const QRect rect(QPoint(), QSize(side, side));
+    Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 rect=(%2,%3,%4,%5) source=fallback-viewport")
+                      .arg(imageId)
+                      .arg(rect.x())
+                      .arg(rect.y())
+                      .arg(rect.width())
+                      .arg(rect.height()));
+    return rect;
+}
+
+void TierListView::completeMissionExitForLift() {
+    stopMissionTransitionAnimation();
+    stopMissionHoverAnimation();
+    m_missionControlActive = false;
+    m_missionFromGallery = false;
+    m_missionTransitionProgress = 0.0;
+    m_missionNormalRects.clear();
+    m_missionGallerySourceRect = {};
+    m_missionHoverImageId.clear();
+    m_missionHoverProgress = 0.0;
+    Logger::debug(QStringLiteral("tier.list.mission.lift.exit.complete"));
+    viewport()->update();
+}
+
 void TierListView::invalidateMissionControlLayout() const {
     m_missionLayoutDirty = true;
 }
@@ -2566,6 +3227,16 @@ QStringList TierListView::missionImageIds() const {
     QStringList imageIds;
     TierListModel* model = tierModel();
     if (!model || !model->project()) {
+        return imageIds;
+    }
+
+    if (m_missionFromGallery) {
+        imageIds.reserve(model->project()->images.size());
+        for (const TierImage& image : model->project()->images) {
+            if (!image.id.isEmpty() && !image.assignedTierRowId.has_value()) {
+                imageIds.append(image.id);
+            }
+        }
         return imageIds;
     }
 
@@ -2602,7 +3273,8 @@ void TierListView::ensureMissionControlLayout() const {
     QVector<MissionInput> inputs;
     inputs.reserve(imageIds.size());
     const QHash<QString, QRectF> preferredRects =
-        m_missionNormalRects.isEmpty() ? normalImageRects() : m_missionNormalRects;
+        m_missionFromGallery ? QHash<QString, QRectF>()
+                             : (m_missionNormalRects.isEmpty() ? normalImageRects() : m_missionNormalRects);
     const qreal fallbackLongSide =
         qBound<qreal>(42.0, qMin(viewport()->width(), viewport()->height()) / 9.0, 96.0);
 
@@ -2665,6 +3337,23 @@ QHash<QString, QRectF> TierListView::normalImageRects() const {
 }
 
 QRectF TierListView::interpolatedMissionRect(const QString& imageId, const QRectF& targetRect) const {
+    if (m_missionFromGallery) {
+        const QRectF sourceRect = galleryMissionSourceRect();
+        const QRectF centerRect = galleryMissionCenterRect(targetRect);
+        const qreal p = missionMacHoverEase(qBound<qreal>(0.0, m_missionTransitionProgress, 1.0));
+        constexpr qreal kStackPhase = 0.38;
+        const auto interpolate = [](const QRectF& from, const QRectF& to, qreal t) {
+            return QRectF(from.x() + (to.x() - from.x()) * t,
+                          from.y() + (to.y() - from.y()) * t,
+                          from.width() + (to.width() - from.width()) * t,
+                          from.height() + (to.height() - from.height()) * t);
+        };
+        if (p < kStackPhase) {
+            return interpolate(sourceRect, centerRect, p / kStackPhase);
+        }
+        return interpolate(centerRect, targetRect, (p - kStackPhase) / (1.0 - kStackPhase));
+    }
+
     QRectF sourceRect = m_missionNormalRects.value(imageId);
     if (!sourceRect.isValid()) {
         sourceRect = targetRect;
@@ -2675,6 +3364,23 @@ QRectF TierListView::interpolatedMissionRect(const QString& imageId, const QRect
                   sourceRect.y() + (targetRect.y() - sourceRect.y()) * p,
                   sourceRect.width() + (targetRect.width() - sourceRect.width()) * p,
                   sourceRect.height() + (targetRect.height() - sourceRect.height()) * p);
+}
+
+QRectF TierListView::galleryMissionSourceRect() const {
+    if (m_missionGallerySourceRect.isValid()) {
+        return m_missionGallerySourceRect;
+    }
+    return missionRectAroundCenter(QRectF(viewport()->rect()).center(), QSizeF(36.0, 36.0));
+}
+
+QRectF TierListView::galleryMissionCenterRect(const QRectF& targetRect) const {
+    const QRectF viewportRect(viewport()->rect());
+    const qreal longSide = qBound<qreal>(
+        34.0,
+        qMax(targetRect.width(), targetRect.height()) * 0.46,
+        qBound<qreal>(48.0, qMin(viewportRect.width(), viewportRect.height()) / 8.5, 92.0));
+    const qreal aspect = qMax<qreal>(0.05, targetRect.width() / qMax<qreal>(1.0, targetRect.height()));
+    return missionRectAroundCenter(viewportRect.center(), missionSizeForLongSide(aspect, longSide));
 }
 
 QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
@@ -2732,21 +3438,13 @@ QRect TierListView::missionImageRect(const QString& imageId) const {
     return {};
 }
 
-QPixmap TierListView::missionPixmapForImage(const QString& imageId, bool fullQuality) {
+QPixmap TierListView::missionPixmapForImage(const QString& imageId, QSize targetPixelSize, bool fullQuality) {
     TierListDelegate* delegate = tierDelegate();
     if (!delegate) {
         return {};
     }
-    if (fullQuality) {
-        if (!m_missionFullPixmapCache.contains(imageId)) {
-            m_missionFullPixmapCache.insert(imageId, delegate->fullPixmapForImageId(imageId));
-        }
-        const QPixmap full = m_missionFullPixmapCache.value(imageId);
-        if (!full.isNull()) {
-            return full;
-        }
-    }
-    return delegate->pixmapForImageId(imageId);
+    Q_UNUSED(fullQuality);
+    return delegate->pixmapForImageId(imageId, targetPixelSize);
 }
 
 void TierListView::paintMissionControl(QPainter* painter) {
@@ -2762,7 +3460,8 @@ void TierListView::paintMissionControl(QPainter* painter) {
     const QVector<MissionTile> tiles = missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
     if (tiles.isEmpty()) {
         painter->setPen(palette().color(QPalette::Mid));
-        painter->drawText(viewport()->rect(), Qt::AlignCenter, tr("No images in tier list"));
+        painter->drawText(viewport()->rect(), Qt::AlignCenter,
+                          m_missionFromGallery ? tr("No imported images") : tr("No images in tier list"));
         return;
     }
 
@@ -2773,13 +3472,19 @@ void TierListView::paintMissionControl(QPainter* painter) {
     painter->setClipPath(boardClip);
 
     for (const MissionTile& tile : tiles) {
+        if (!m_missionLiftImageId.isEmpty() && tile.imageId == m_missionLiftImageId) {
+            continue;
+        }
         const QRectF rect = tile.rect;
         if (!rect.isValid()) {
             continue;
         }
 
         const bool fullQuality = tile.imageId == m_missionHoverImageId && m_missionHoverProgress > 0.001;
-        QPixmap pixmap = missionPixmapForImage(tile.imageId, fullQuality);
+        const qreal deviceRatio = viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
+        const QSize targetPixelSize(qCeil(rect.width() * deviceRatio),
+                                    qCeil(rect.height() * deviceRatio));
+        QPixmap pixmap = missionPixmapForImage(tile.imageId, targetPixelSize, fullQuality);
         painter->save();
         QPainterPath tileClip;
         const qreal radius = missionTileCornerRadius(rect);
@@ -2940,7 +3645,7 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
     contentClip.addRect(contentBounds);
     painter->save();
     painter->setClipPath(outerClip.intersected(contentClip));
-    painter->fillRect(contentBounds, palette().color(QPalette::Base));
+    painter->fillRect(contentBounds, palette().color(QPalette::AlternateBase));
 
     const QSizeF targetSize = contentBounds.size();
     const QSize sourceSize = pixmap.size();

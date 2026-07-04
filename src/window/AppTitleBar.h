@@ -32,6 +32,7 @@ public:
     void setTierFocusMode(bool enabled);
     void retranslateUi();
     QSize focusRevealSizeHint() const;
+    QRect galleryButtonGlobalRect() const;
 
 signals:
     void newRequested();
@@ -39,6 +40,7 @@ signals:
     void saveRequested();
     void saveAsRequested();
     void backgroundRequested(const QRect& globalButtonRect);
+    void galleryRequested(const QRect& globalButtonRect);
     void resetRowsRequested();
     void tierFocusModeRequested();
     void projectTitleEdited(const QString& title);
@@ -63,6 +65,7 @@ private:
     QToolButton* m_openButton{nullptr};
     QToolButton* m_saveButton{nullptr};
     QToolButton* m_backgroundButton{nullptr};
+    QToolButton* m_galleryButton{nullptr};
     QToolButton* m_resetButton{nullptr};
     QToolButton* m_focusButton{nullptr};
     QWidget* m_buttonGroup{nullptr};

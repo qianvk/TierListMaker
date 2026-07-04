@@ -29,21 +29,6 @@ QRect centeredCropSourceRect(const QPixmap& pixmap, const QSize& targetSize) {
     return QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
 }
 
-QPixmap centerCroppedDragPixmap(const QPixmap& pixmap, const QSize& logicalSize, qreal devicePixelRatio) {
-    if (pixmap.isNull() || logicalSize.isEmpty()) {
-        return {};
-    }
-
-    QPixmap result(logicalSize * devicePixelRatio);
-    result.setDevicePixelRatio(devicePixelRatio);
-    result.fill(Qt::transparent);
-
-    QPainter painter(&result);
-    painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-    const QRect target(QPoint(0, 0), logicalSize);
-    painter.drawPixmap(target, pixmap, centeredCropSourceRect(pixmap, target.size()));
-    return result;
-}
 } // namespace
 
 QString TierDragController::imageMimeType() {
@@ -162,7 +147,15 @@ void ImageTileWidget::mouseMoveEvent(QMouseEvent* event) {
     drag->setMimeData(TierDragController::createMimeData(imageId));
     QPixmap dragPixmap = pixmap();
     if (!dragPixmap.isNull()) {
-        drag->setPixmap(centerCroppedDragPixmap(dragPixmap, rect().size(), devicePixelRatioF()));
+        QPixmap result(rect().size() * devicePixelRatioF());
+        result.setDevicePixelRatio(devicePixelRatioF());
+        result.fill(Qt::transparent);
+        QPainter painter(&result);
+        painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
+        painter.drawPixmap(QRect(QPoint(0, 0), rect().size()), dragPixmap,
+                           m_image ? m_image->thumbnailSourceRect(dragPixmap.size(), rect().size())
+                                   : centeredCropSourceRect(dragPixmap, rect().size()));
+        drag->setPixmap(result);
         drag->setHotSpot(event->pos());
     }
     setCursor(Qt::ClosedHandCursor);
@@ -223,7 +216,9 @@ void ImageTileWidget::paintEvent(QPaintEvent*) {
     painter.setClipRect(imageRect);
     QPixmap p = pixmap();
     if (!p.isNull()) {
-        painter.drawPixmap(imageRect, p, centeredCropSourceRect(p, imageRect.size()));
+        painter.drawPixmap(imageRect, p,
+                           m_image ? m_image->thumbnailSourceRect(p.size(), imageRect.size())
+                                   : centeredCropSourceRect(p, imageRect.size()));
     }
     painter.restore();
 

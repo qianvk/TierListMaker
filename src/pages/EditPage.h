@@ -8,17 +8,15 @@
 #include "settings/AppSettings.h"
 #include "tier/TierProject.h"
 
+#include <QPointer>
 #include <QWidget>
 
-class QEvent;
-class QGraphicsOpacityEffect;
 class QTimer;
-class QVariantAnimation;
 class QVBoxLayout;
 
 namespace tlm {
 
-class ImagePoolWidget;
+class ImageGalleryPopover;
 class PreviewOverlay;
 class TierBoardWidget;
 
@@ -51,6 +49,8 @@ public slots:
     bool confirmSaveIfDirty();
     void setTierFocusMode(bool enabled);
     void toggleMissionControlMode();
+    void toggleGallery(const QRect& anchorGlobalRect = QRect());
+    void toggleGalleryMissionControlMode(const QRect& sourceGlobalRect = QRect());
 
 signals:
     void titleChanged(const QString& title);
@@ -58,9 +58,9 @@ signals:
     void resetRowsAvailableChanged(bool available);
     void projectSaved();
     void projectOpened(const QString& filePath);
+    void galleryMissionControlRequested();
 
 protected:
-    bool eventFilter(QObject* watched, QEvent* event) override;
     void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
@@ -72,14 +72,14 @@ private:
     void showError(const QString& title, const Error& error);
     QString chooseSavePath();
     void moveImageToRow(const QString& imageId, const QString& rowId, int index);
-    void moveImageToPool(const QString& imageId, int index);
     void moveRowToIndex(const QString& rowId, int destinationIndex);
+    void editImage(const QString& imageId);
+    void removeImageFromTierRow(const QString& imageId);
+    void removeImageFromGallery(const QString& imageId);
     void editTierRow(const QString& rowId);
     bool saveProjectToPath(const QString& filePath);
     void removeImageFromRows(const QString& imageId);
-    void updatePoolOrdering(const QString& movedImageId, int requestedIndex, bool wasAlreadyInPool);
     void layoutOverlays();
-    void setPoolOverlayVisible(bool visible);
     bool hasImagesInRows() const;
     QPixmap pixmapForImage(const QString& imageId) const;
 
@@ -94,16 +94,10 @@ private:
 
     QVBoxLayout* m_rootLayout{nullptr};
     TierBoardWidget* m_board{nullptr};
-    ImagePoolWidget* m_pool{nullptr};
-    QWidget* m_poolHoverZone{nullptr};
-    QGraphicsOpacityEffect* m_poolOpacity{nullptr};
-    QVariantAnimation* m_poolAnimation{nullptr};
+    QPointer<ImageGalleryPopover> m_galleryPopover;
     PreviewOverlay* m_previewOverlay{nullptr};
     QTimer* m_autosaveTimer{nullptr};
     bool m_tierFocusMode{false};
-    bool m_poolOverlayVisible{false};
-    bool m_poolDetachedForFocus{false};
-    bool m_poolDragActive{false};
     bool m_backgroundPreviewActive{false};
 };
 

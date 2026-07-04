@@ -83,22 +83,6 @@ int imagesPerLineForTileSide(int viewportWidth, int tileSide, int labelWidth) {
 int imagesPerLineForWidth(int viewportWidth) {
     return imagesPerLineForTileSide(viewportWidth, kNominalTileExtent, kMinimumLabelWidth);
 }
-
-QRect centeredCropSourceRect(const QPixmap& pixmap, const QSize& targetSize) {
-    if (pixmap.isNull() || targetSize.isEmpty()) {
-        return {};
-    }
-
-    const QSize sourceSize = pixmap.size();
-    const qreal targetRatio = static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
-    const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
-    if (sourceRatio > targetRatio) {
-        const int cropWidth = qRound(sourceSize.height() * targetRatio);
-        return QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
-    }
-    const int cropHeight = qRound(sourceSize.width() / targetRatio);
-    return QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
-}
 } // namespace
 
 TierListDelegate::TierListDelegate(QObject* parent) : QStyledItemDelegate(parent) {}
@@ -108,6 +92,10 @@ void TierListDelegate::setContext(const TierProject* project, const AssetManager
     m_project = project;
     m_assetManager = assetManager;
     m_thumbnailCache = thumbnailCache;
+    m_selectedImageId = std::move(selectedImageId);
+}
+
+void TierListDelegate::setSelectedImageId(QString selectedImageId) {
     m_selectedImageId = std::move(selectedImageId);
 }
 
@@ -223,6 +211,11 @@ QPixmap TierListDelegate::pixmapForImageId(const QString& imageId) const {
     return image ? pixmapForImage(*image) : QPixmap();
 }
 
+QPixmap TierListDelegate::pixmapForImageId(const QString& imageId, QSize targetPixelSize) const {
+    const TierImage* image = m_project ? m_project->imageById(imageId) : nullptr;
+    return image ? pixmapForImage(*image, targetPixelSize) : QPixmap();
+}
+
 QPixmap TierListDelegate::fullPixmapForImageId(const QString& imageId) const {
     const TierImage* image = m_project ? m_project->imageById(imageId) : nullptr;
     if (!image || !m_assetManager || !m_project) {
@@ -314,7 +307,9 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
             paintOption.rect.translate(0, qRound(offset));
         }
     }
-    const qreal missionProgress = view ? view->missionTransitionProgress() : 0.0;
+    const qreal missionProgress = (view && !view->isGalleryMissionLayerVisible())
+                                      ? view->missionTransitionProgress()
+                                      : 0.0;
 
     painter->save();
     painter->setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing |
@@ -427,13 +422,17 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
         const QRectF imageRect = tile.paintRect;
         const bool selected = tile.selected;
 
-        QPixmap pixmap = pixmapForImage(*image);
+        const qreal deviceRatio = option.widget ? option.widget->devicePixelRatioF() : qApp->devicePixelRatio();
+        const QSize targetPixelSize(qCeil(imageRect.width() * deviceRatio),
+                                    qCeil(imageRect.height() * deviceRatio));
+        QPixmap pixmap = pixmapForImage(*image, targetPixelSize);
         painter->save();
         const QRectF drawBounds = imageRect;
         painter->setClipRect(drawBounds);
         painter->fillRect(drawBounds, option.palette.alternateBase());
         if (!pixmap.isNull()) {
-            painter->drawPixmap(drawBounds, pixmap, centeredCropSourceRect(pixmap, drawBounds.size().toSize()));
+            painter->drawPixmap(drawBounds, pixmap,
+                                image->thumbnailSourceRect(pixmap.size(), drawBounds.size().toSize()));
         }
         painter->restore();
 
@@ -457,14 +456,17 @@ QStringList TierListDelegate::imageIdsForIndex(const QModelIndex& index) const {
     return index.data(TierListModel::ImageIdsRole).toStringList();
 }
 
-QPixmap TierListDelegate::pixmapForImage(const TierImage& image) const {
+QPixmap TierListDelegate::pixmapForImage(const TierImage& image, QSize targetPixelSize) const {
     if (m_thumbnailCache) {
-        if (m_thumbnailCache->hasThumbnail(image.id)) {
-            return m_thumbnailCache->thumbnail(image.id);
-        }
         if (m_project && m_assetManager) {
-            m_thumbnailCache->requestThumbnail(image.id, m_assetManager->resolvedImagePath(*m_project, image),
-                                               QSize(160, 160));
+            if (!m_thumbnailCache->hasThumbnail(image.id, targetPixelSize)) {
+                m_thumbnailCache->requestThumbnail(image.id, m_assetManager->resolvedImagePath(*m_project, image),
+                                                   targetPixelSize.isEmpty() ? QSize(192, 192) : targetPixelSize);
+            }
+        }
+        const QPixmap cached = m_thumbnailCache->thumbnail(image.id, targetPixelSize);
+        if (!cached.isNull()) {
+            return cached;
         }
     }
     return QPixmap(QStringLiteral(":/icons/image.svg"));

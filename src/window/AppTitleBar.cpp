@@ -57,7 +57,7 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
     titleFont.setBold(true);
     titleFont.setPointSize(titleFont.pointSize() + 5);
     m_titleEdit->setFont(titleFont);
-    m_titleEdit->setMinimumWidth(160);
+    m_titleEdit->setMinimumWidth(48);
     m_titleEdit->setMaximumWidth(520);
     m_titleEdit->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
     m_titleEdit->installEventFilter(this);
@@ -71,6 +71,7 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
     m_openButton = makeButton(tr("Open"), QStringLiteral(":/icons/folder.svg"), this);
     m_saveButton = makeButton(tr("Save"), QStringLiteral(":/icons/save.svg"), this);
     m_backgroundButton = makeButton(tr("Background"), QStringLiteral(":/icons/image.svg"), this);
+    m_galleryButton = makeButton(tr("Gallery"), QStringLiteral(":/icons/gallery.svg"), this);
     m_resetButton = makeButton(tr("Reset Rows"), QStringLiteral(":/icons/reset.svg"), this);
     m_focusButton = makeButton(tr("Enter Tier Focus"), QStringLiteral(":/icons/focus.svg"), this);
     m_buttonGroup = new QWidget(this);
@@ -84,7 +85,7 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
     auto* buttonsLayout = new QHBoxLayout(m_buttonGroup);
     buttonsLayout->setContentsMargins(0, 0, 0, 0);
     buttonsLayout->setSpacing(2);
-    for (QToolButton* button : {m_newButton, m_openButton, m_saveButton, m_backgroundButton, m_resetButton,
+    for (QToolButton* button : {m_newButton, m_openButton, m_saveButton, m_backgroundButton, m_galleryButton, m_resetButton,
                                 m_focusButton}) {
         button->installEventFilter(this);
         buttonsLayout->addWidget(button);
@@ -96,6 +97,8 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
     connect(m_saveButton, &QToolButton::clicked, this, &AppTitleBar::saveRequested);
     connect(m_backgroundButton, &QToolButton::clicked, this,
             [this]() { emit backgroundRequested(globalRectFor(m_backgroundButton)); });
+    connect(m_galleryButton, &QToolButton::clicked, this,
+            [this]() { emit galleryRequested(globalRectFor(m_galleryButton)); });
     connect(m_resetButton, &QToolButton::clicked, this, &AppTitleBar::resetRowsRequested);
     connect(m_focusButton, &QToolButton::clicked, this, &AppTitleBar::tierFocusModeRequested);
     connect(m_titleEdit, &QLineEdit::textChanged, this, &AppTitleBar::updateTitleWidth);
@@ -129,6 +132,9 @@ void AppTitleBar::retranslateUi() {
     }
     if (m_backgroundButton) {
         m_backgroundButton->setToolTip(tr("Background"));
+    }
+    if (m_galleryButton) {
+        m_galleryButton->setToolTip(tr("Gallery"));
     }
     if (m_resetButton) {
         m_resetButton->setToolTip(tr("Reset Rows"));
@@ -252,16 +258,25 @@ void AppTitleBar::updateTitleWidth() {
     if (!m_titleEdit) {
         return;
     }
-    const int textWidth = QFontMetrics(m_titleEdit->font()).horizontalAdvance(m_titleEdit->text());
+    const QString measuredText = m_titleEdit->text().isEmpty() ? m_titleEdit->placeholderText()
+                                                               : m_titleEdit->text();
+    const int textWidth = QFontMetrics(m_titleEdit->font()).horizontalAdvance(measuredText);
     const int reservedRight = (m_buttonGroup && m_buttonGroup->isVisible()) ? m_buttonGroup->width() + 28 : 18;
-    const int available = qMax(190, width() - reservedRight * 2);
-    m_titleEdit->setFixedWidth(qBound(190, textWidth + 50, qMin(520, available)));
+    constexpr int kMinimumReadableTitleWidth = 56;
+    constexpr int kTitleHorizontalPadding = 34;
+    const int available = qMax(kMinimumReadableTitleWidth, width() - reservedRight * 2);
+    m_titleEdit->setFixedWidth(qBound(kMinimumReadableTitleWidth, textWidth + kTitleHorizontalPadding,
+                                      qMin(520, available)));
     updateTitleGeometry();
 }
 
 QSize AppTitleBar::focusRevealSizeHint() const {
     const int toolbarWidth = m_buttonGroup ? m_buttonGroup->sizeHint().width() : 260;
     return QSize(toolbarWidth + 36, 54);
+}
+
+QRect AppTitleBar::galleryButtonGlobalRect() const {
+    return globalRectFor(m_galleryButton);
 }
 
 bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {

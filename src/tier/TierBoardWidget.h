@@ -2,6 +2,7 @@
 
 #include "assets/AssetManager.h"
 #include "assets/ThumbnailCache.h"
+#include "settings/AppSettings.h"
 #include "tier/TierProject.h"
 
 #include <QMetaObject>
@@ -22,16 +23,23 @@ public:
 
     void setData(const TierProject* project, const AssetManager* assetManager,
                  ThumbnailCache* thumbnailCache, const QString& selectedImageId);
+    void setSelectedImageId(const QString& selectedImageId);
     void refreshVisuals();
     QRect imageSourceRect(const QString& imageId) const;
     void toggleMissionControlMode();
+    void toggleGalleryMissionControlMode(const QRect& sourceGlobalRect);
     void setMissionControlMode(bool active);
     bool isMissionControlModeActive() const;
+    void setBlankAreaActions(BlankAreaAction doubleClickAction, BlankAreaAction longPressAction);
 
 signals:
     void imageDropped(const QString& imageId, const QString& rowId, int index);
     void imageSelected(const QString& imageId);
     void imagePreviewRequested(const QString& imageId, const QRect& sourceRect);
+    void galleryMissionControlRequested();
+    void imageEditRequested(const QString& imageId);
+    void imageRemoveFromTierRowRequested(const QString& imageId);
+    void imageRemoveFromGalleryRequested(const QString& imageId);
     void rowEditRequested(const QString& rowId);
     void rowMovedToIndex(const QString& rowId, int destinationIndex);
 

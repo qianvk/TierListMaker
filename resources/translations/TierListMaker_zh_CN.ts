@@ -372,8 +372,8 @@
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="239"/>
-        <source>Reset rows to S/A/B/C/D and move images to the pool?</source>
-        <translation>将行重置为 S/A/B/C/D，并把图片移回图片池？</translation>
+        <source>Reset rows to S/A/B/C/D and remove row assignments from images?</source>
+        <translation>将行重置为 S/A/B/C/D，并清除图片的行归属？</translation>
     </message>
     <message>
         <source>Background image opacity: %1%</source>
@@ -417,8 +417,8 @@
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="1039"/>
-        <source>Delete this row and move its images to the pool?</source>
-        <translation>删除此行并将其中图片移回图片池？</translation>
+        <source>Delete this row and remove its image assignments?</source>
+        <translation>删除此行并清除其中图片的行归属？</translation>
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="890"/>
@@ -431,18 +431,6 @@
     <message>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)</source>
         <translation type="vanished">图片 (*.png *.jpg *.jpeg *.bmp *.gif *.webp)</translation>
-    </message>
-</context>
-<context>
-    <name>tlm::ImagePoolWidget</name>
-    <message>
-        <source>Image Pool</source>
-        <translation type="vanished">图片池</translation>
-    </message>
-    <message>
-        <location filename="../../src/tier/ImagePoolWidget.cpp" line="180"/>
-        <source>Import Images</source>
-        <translation>导入图片</translation>
     </message>
 </context>
 <context>
@@ -556,6 +544,31 @@ The project may not have published update metadata yet.</source>
         <location filename="../../src/pages/PreferencesPage.cpp" line="400"/>
         <source>Image import behavior</source>
         <translation>图片导入方式</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="405"/>
+        <source>Open Gallery Overview</source>
+        <translation>打开图库总览</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="406"/>
+        <source>Open Tier Overview</source>
+        <translation>打开 tier 总览</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="407"/>
+        <source>Do Nothing</source>
+        <translation>不执行操作</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="419"/>
+        <source>Empty tier area double-click</source>
+        <translation>Tier 空白区域双击</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="430"/>
+        <source>Empty tier area long press</source>
+        <translation>Tier 空白区域长按</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="402"/>
@@ -939,6 +952,26 @@ https://github.com/qianvk/vkframeless</translation>
         <location filename="../../src/tier/TierListView.cpp" line="2209"/>
         <source>No images in tier list</source>
         <translation>tier list 中没有图片</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2878"/>
+        <source>Open Tier Overview</source>
+        <translation>打开 tier 总览</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2880"/>
+        <source>Open Gallery Overview</source>
+        <translation>打开图库总览</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2891"/>
+        <source>Double-click: %1</source>
+        <translation>双击：%1</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2895"/>
+        <source>Long press: %1</source>
+        <translation>长按：%1</translation>
     </message>
 </context>
 <context>

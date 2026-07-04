@@ -83,6 +83,13 @@ Result<QByteArray> ProjectSerializer::serialize(const TierProject& project) cons
                            {QStringLiteral("height"), image.height},
                            {QStringLiteral("thumbnailPath"), image.thumbnailPath},
                            {QStringLiteral("order"), image.order}};
+        if (image.hasCropRect()) {
+            object.insert(QStringLiteral("crop"),
+                          QJsonObject{{QStringLiteral("x"), image.cropRect.x()},
+                                      {QStringLiteral("y"), image.cropRect.y()},
+                                      {QStringLiteral("width"), image.cropRect.width()},
+                                      {QStringLiteral("height"), image.cropRect.height()}});
+        }
         if (image.assignedTierRowId.has_value()) {
             object.insert(QStringLiteral("assignedTierRowId"), *image.assignedTierRowId);
         } else {
@@ -162,6 +169,13 @@ Result<TierProject> ProjectSerializer::deserialize(const QByteArray& data, const
         image.height = object.value(QStringLiteral("height")).toInt();
         image.thumbnailPath = object.value(QStringLiteral("thumbnailPath")).toString();
         image.order = object.value(QStringLiteral("order")).toInt();
+        const QJsonObject crop = object.value(QStringLiteral("crop")).toObject();
+        if (!crop.isEmpty()) {
+            image.cropRect = QRectF(crop.value(QStringLiteral("x")).toDouble(),
+                                    crop.value(QStringLiteral("y")).toDouble(),
+                                    crop.value(QStringLiteral("width")).toDouble(),
+                                    crop.value(QStringLiteral("height")).toDouble());
+        }
         const QJsonValue assigned = object.value(QStringLiteral("assignedTierRowId"));
         if (assigned.isString() && !assigned.toString().isEmpty()) {
             image.assignedTierRowId = assigned.toString();
@@ -179,4 +193,3 @@ Result<TierProject> ProjectSerializer::deserialize(const QByteArray& data, const
 }
 
 } // namespace tlm
-

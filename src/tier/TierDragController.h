@@ -23,7 +23,7 @@ public:
     static QString rowIdFromMimeData(const QMimeData* mimeData);
 };
 
-/** Small draggable thumbnail tile used by the image pool. */
+/** Small draggable thumbnail tile that emits the shared image MIME payload. */
 class ImageTileWidget : public QFrame {
     Q_OBJECT
 

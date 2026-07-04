@@ -48,6 +48,31 @@ ImageImportBehavior importFromString(const QString& value) {
     }
     return ImageImportBehavior::CopyIntoProject;
 }
+
+QString blankAreaActionToString(BlankAreaAction action) {
+    switch (action) {
+    case BlankAreaAction::TierMissionControl:
+        return QStringLiteral("tierMissionControl");
+    case BlankAreaAction::GalleryMissionControl:
+        return QStringLiteral("galleryMissionControl");
+    case BlankAreaAction::None:
+    default:
+        return QStringLiteral("none");
+    }
+}
+
+BlankAreaAction blankAreaActionFromString(const QString& value, BlankAreaAction fallback) {
+    if (value == QStringLiteral("tierMissionControl")) {
+        return BlankAreaAction::TierMissionControl;
+    }
+    if (value == QStringLiteral("galleryMissionControl")) {
+        return BlankAreaAction::GalleryMissionControl;
+    }
+    if (value == QStringLiteral("none")) {
+        return BlankAreaAction::None;
+    }
+    return fallback;
+}
 } // namespace
 
 AppSettings::AppSettings(QObject* parent)
@@ -140,6 +165,42 @@ bool AppSettings::shouldRunAutoUpdateCheck(const QDateTime& now) const {
     }
     constexpr qint64 kAutoUpdateIntervalSecs = 24 * 60 * 60;
     return lastCheck.secsTo(now.toUTC()) >= kAutoUpdateIntervalSecs;
+}
+
+BlankAreaAction AppSettings::blankDoubleClickAction() const {
+    return blankAreaActionFromString(
+        m_settings.value(settings_keys::blankDoubleClickAction.toString(),
+                         QStringLiteral("galleryMissionControl"))
+            .toString(),
+        BlankAreaAction::GalleryMissionControl);
+}
+
+void AppSettings::setBlankDoubleClickAction(BlankAreaAction action) {
+    if (blankDoubleClickAction() == action) {
+        return;
+    }
+    m_settings.setValue(settings_keys::blankDoubleClickAction.toString(),
+                        blankAreaActionToString(action));
+    emit blankDoubleClickActionChanged(action);
+    emit changed();
+}
+
+BlankAreaAction AppSettings::blankLongPressAction() const {
+    return blankAreaActionFromString(
+        m_settings.value(settings_keys::blankLongPressAction.toString(),
+                         QStringLiteral("tierMissionControl"))
+            .toString(),
+        BlankAreaAction::TierMissionControl);
+}
+
+void AppSettings::setBlankLongPressAction(BlankAreaAction action) {
+    if (blankLongPressAction() == action) {
+        return;
+    }
+    m_settings.setValue(settings_keys::blankLongPressAction.toString(),
+                        blankAreaActionToString(action));
+    emit blankLongPressActionChanged(action);
+    emit changed();
 }
 
 QString AppSettings::defaultExportFormat() const {

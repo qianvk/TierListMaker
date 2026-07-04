@@ -87,8 +87,10 @@ set(TLM_APP_SOURCES
     src/pages/ProjectsPage.h
     src/preview/PreviewOverlay.cpp
     src/preview/PreviewOverlay.h
-    src/tier/ImagePoolWidget.cpp
-    src/tier/ImagePoolWidget.h
+    src/tier/ImageGalleryPopover.cpp
+    src/tier/ImageGalleryPopover.h
+    src/tier/ImageEditDialog.cpp
+    src/tier/ImageEditDialog.h
     src/tier/TierBoardWidget.cpp
     src/tier/TierBoardWidget.h
     src/tier/TierDragController.cpp

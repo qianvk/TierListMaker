@@ -399,6 +399,36 @@ QWidget* PreferencesPage::createGeneralPage() {
             });
     settingsLayout->addWidget(createSettingRow(tr("Image import behavior"), importBehavior, page));
 
+    const auto addBlankAreaActionItems = [](QComboBox* combo) {
+        combo->addItem(tr("Open Gallery Overview"), static_cast<int>(BlankAreaAction::GalleryMissionControl));
+        combo->addItem(tr("Open Tier Overview"), static_cast<int>(BlankAreaAction::TierMissionControl));
+        combo->addItem(tr("Do Nothing"), static_cast<int>(BlankAreaAction::None));
+    };
+    const auto setBlankAreaActionIndex = [](QComboBox* combo, BlankAreaAction action) {
+        const int index = combo->findData(static_cast<int>(action));
+        combo->setCurrentIndex(qMax(0, index));
+    };
+
+    auto* blankDoubleClick = new QComboBox(page);
+    addBlankAreaActionItems(blankDoubleClick);
+    setBlankAreaActionIndex(blankDoubleClick, m_settings->blankDoubleClickAction());
+    connect(blankDoubleClick, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this, blankDoubleClick](int index) {
+                m_settings->setBlankDoubleClickAction(
+                    static_cast<BlankAreaAction>(blankDoubleClick->itemData(index).toInt()));
+            });
+    settingsLayout->addWidget(createSettingRow(tr("Empty tier area double-click"), blankDoubleClick, page));
+
+    auto* blankLongPress = new QComboBox(page);
+    addBlankAreaActionItems(blankLongPress);
+    setBlankAreaActionIndex(blankLongPress, m_settings->blankLongPressAction());
+    connect(blankLongPress, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this, blankLongPress](int index) {
+                m_settings->setBlankLongPressAction(
+                    static_cast<BlankAreaAction>(blankLongPress->itemData(index).toInt()));
+            });
+    settingsLayout->addWidget(createSettingRow(tr("Empty tier area long press"), blankLongPress, page));
+
     auto* autosave = new QCheckBox(tr("Enable autosave"), page);
     autosave->setChecked(m_settings->autosaveEnabled());
     settingsLayout->addWidget(createSettingRow(tr("Save behavior"), autosave, page));

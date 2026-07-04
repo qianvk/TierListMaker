@@ -8,7 +8,7 @@ class QWidget;
 
 namespace tlm {
 
-/** Simple wrapping layout used for image pools and compact tile groups. */
+/** Simple wrapping layout used for compact tile groups. */
 class FlowLayout : public QLayout {
 public:
     explicit FlowLayout(QWidget* parent = nullptr, int margin = -1, int hSpacing = -1, int vSpacing = -1);

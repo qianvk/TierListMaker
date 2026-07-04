@@ -2,22 +2,19 @@
 
 #include "logging/Logger.h"
 #include "preview/PreviewOverlay.h"
-#include "tier/ImagePoolWidget.h"
+#include "tier/ImageEditDialog.h"
+#include "tier/ImageGalleryPopover.h"
 #include "tier/TierBoardWidget.h"
 
 #include <QColorDialog>
-#include <QCursor>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
-#include <QEasingCurve>
-#include <QEvent>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QGuiApplication>
 #include <QGraphicsDropShadowEffect>
-#include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -32,7 +29,6 @@
 #include <QSizePolicy>
 #include <QTimer>
 #include <QVBoxLayout>
-#include <QVariantAnimation>
 
 #include <algorithm>
 #include <optional>
@@ -236,7 +232,7 @@ void EditPage::renameProject(const QString& name) {
 
 void EditPage::resetRows() {
     if (QMessageBox::question(this, tr("Reset Rows"),
-                              tr("Reset rows to S/A/B/C/D and move images to the pool?")) != QMessageBox::Yes) {
+                              tr("Reset rows to S/A/B/C/D and remove row assignments from images?")) != QMessageBox::Yes) {
         return;
     }
     m_project.resetDefaultRows();
@@ -556,8 +552,8 @@ void EditPage::previewSelectedImage() {
     const QPixmap pixmap = pixmapForImage(m_selectedImageId);
     if (!pixmap.isNull()) {
         QRect source = m_board ? m_board->imageSourceRect(m_selectedImageId) : QRect();
-        if (!source.isValid() && m_pool) {
-            source = m_pool->imageSourceRect(m_selectedImageId);
+        if (!source.isValid() && m_galleryPopover) {
+            source = m_galleryPopover->imageSourceRect(m_selectedImageId);
         }
         if (!source.isValid()) {
             const QRect fallback(width() / 2 - 20, height() / 2 - 20, 40, 40);
@@ -603,41 +599,18 @@ void EditPage::setTierFocusMode(bool enabled) {
             m_rootLayout->setContentsMargins(0, 0, 0, 0);
             m_rootLayout->setSpacing(0);
         }
-        if (m_poolHoverZone) {
-            m_poolHoverZone->show();
+        if (m_galleryPopover) {
+            m_galleryPopover->close();
         }
-        if (m_pool) {
-            m_pool->hide();
-        }
-        if (m_poolOpacity) {
-            m_poolOpacity->setOpacity(0.0);
-        }
-        m_poolOverlayVisible = false;
-        layoutOverlays();
     } else {
-        if (m_poolAnimation) {
-            m_poolAnimation->stop();
-            m_poolAnimation->deleteLater();
-            m_poolAnimation = nullptr;
-        }
         if (m_rootLayout) {
             m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kContentTitleBarHeight,
                                              kTierBoardOuterMargin, kTierBoardOuterMargin);
             m_rootLayout->setSpacing(0);
         }
-        if (m_poolHoverZone) {
-            m_poolHoverZone->show();
-        }
-        if (m_poolOpacity) {
-            m_poolOpacity->setOpacity(0.0);
-        }
-        if (m_pool) {
-            m_pool->hide();
-        }
-        m_poolOverlayVisible = false;
-        layoutOverlays();
     }
 
+    layoutOverlays();
     updateGeometry();
     update();
 }
@@ -648,79 +621,59 @@ void EditPage::toggleMissionControlMode() {
     }
 }
 
-void EditPage::layoutOverlays() {
-    constexpr int kRevealZoneHeight = 34;
-    const int poolHeight = m_pool ? m_pool->preferredOverlayHeight(width(), height()) : qBound(138, height() / 5, 190);
-    if (m_pool) {
-        m_pool->setGeometry(0, std::max(0, height() - poolHeight), width(), poolHeight);
-        if (m_pool->isVisible()) {
-            m_pool->raise();
-        }
+void EditPage::toggleGallery(const QRect& anchorGlobalRect) {
+    if (m_galleryPopover) {
+        Logger::debug(QStringLiteral("tier.gallery.popover.close reason=toggle"));
+        m_galleryPopover->close();
+        return;
     }
-    if (m_poolHoverZone) {
-        m_poolHoverZone->setGeometry(0, std::max(0, height() - kRevealZoneHeight), width(),
-                                     kRevealZoneHeight);
-        if (!m_pool || !m_pool->isVisible()) {
-            m_poolHoverZone->raise();
+
+    auto* popover = new ImageGalleryPopover(this);
+    popover->setAttribute(Qt::WA_DeleteOnClose);
+    popover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
+    connect(popover, &QObject::destroyed, this, [this]() { m_galleryPopover = nullptr; });
+    connect(popover, &ImageGalleryPopover::importRequested, this, [this]() {
+        if (m_galleryPopover) {
+            m_galleryPopover->close();
         }
-    }
-    if (m_previewOverlay) {
-        m_previewOverlay->raise();
+        importImagesFromDialog();
+    });
+    connect(popover, &ImageGalleryPopover::imageFilesDropped, this, &EditPage::importImages);
+    connect(popover, &ImageGalleryPopover::dragActiveChanged, this, [](bool active) {
+        Logger::debug(QStringLiteral("tier.gallery.drag.active active=%1").arg(active));
+    });
+    connect(popover, &ImageGalleryPopover::imageSelected, this, [this](const QString& imageId) {
+        m_selectedImageId = imageId;
+        refreshUi();
+    });
+    connect(popover, &ImageGalleryPopover::imagePreviewRequested, this,
+            [this](const QString& imageId, const QRect& source) {
+                m_selectedImageId = imageId;
+                const QPixmap pixmap = pixmapForImage(imageId);
+                if (!pixmap.isNull()) {
+                    m_previewOverlay->openPreview(source, pixmap);
+                }
+                refreshUi();
+            });
+    connect(popover, &ImageGalleryPopover::imageEditRequested, this, &EditPage::editImage);
+    connect(popover, &ImageGalleryPopover::imageRemoveRequested, this, &EditPage::removeImageFromGallery);
+
+    m_galleryPopover = popover;
+    popover->placeBelow(anchorGlobalRect);
+    popover->show();
+    Logger::info(QStringLiteral("tier.gallery.popover.open images=%1").arg(m_project.images.size()));
+}
+
+void EditPage::toggleGalleryMissionControlMode(const QRect& sourceGlobalRect) {
+    if (m_board) {
+        m_board->toggleGalleryMissionControlMode(sourceGlobalRect);
     }
 }
 
-void EditPage::setPoolOverlayVisible(bool visible) {
-    if (!m_pool || !m_poolOpacity) {
-        return;
+void EditPage::layoutOverlays() {
+    if (m_previewOverlay) {
+        m_previewOverlay->raise();
     }
-    if (m_poolOverlayVisible == visible && m_pool->isVisible() == visible) {
-        return;
-    }
-
-    m_poolOverlayVisible = visible;
-    layoutOverlays();
-    if (visible) {
-        m_pool->show();
-        m_pool->raise();
-        if (m_previewOverlay) {
-            m_previewOverlay->raise();
-        }
-    }
-
-    if (m_poolAnimation) {
-        m_poolAnimation->stop();
-        m_poolAnimation->deleteLater();
-        m_poolAnimation = nullptr;
-    }
-
-    auto* animation = new QVariantAnimation(this);
-    m_poolAnimation = animation;
-    animation->setDuration(visible ? 180 : 140);
-    animation->setEasingCurve(QEasingCurve::OutCubic);
-    animation->setStartValue(m_poolOpacity->opacity());
-    animation->setEndValue(visible ? 1.0 : 0.0);
-    connect(animation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
-        if (m_poolOpacity) {
-            m_poolOpacity->setOpacity(value.toReal());
-        }
-    });
-    connect(animation, &QVariantAnimation::finished, this, [this, animation, visible]() {
-        if (m_poolAnimation == animation) {
-            m_poolAnimation = nullptr;
-        }
-        if (m_poolOpacity) {
-            m_poolOpacity->setOpacity(visible ? 1.0 : 0.0);
-        }
-        if (!visible && m_pool) {
-            m_pool->hide();
-            if (m_poolHoverZone) {
-                m_poolHoverZone->raise();
-            }
-        }
-        animation->deleteLater();
-    });
-    animation->start();
-    Logger::debug(QStringLiteral("tier.edit.focus.pool.reveal visible=%1").arg(visible));
 }
 
 void EditPage::keyPressEvent(QKeyEvent* event) {
@@ -745,34 +698,6 @@ void EditPage::resizeEvent(QResizeEvent* event) {
     layoutOverlays();
 }
 
-bool EditPage::eventFilter(QObject* watched, QEvent* event) {
-    if (watched == m_poolHoverZone) {
-        if (event->type() == QEvent::Enter) {
-            setPoolOverlayVisible(true);
-            return true;
-        }
-        if (event->type() == QEvent::Leave) {
-            const QPoint localCursor = mapFromGlobal(QCursor::pos());
-            if (!m_poolDragActive && (!m_pool || !m_pool->geometry().contains(localCursor))) {
-                setPoolOverlayVisible(false);
-            }
-            return true;
-        }
-    }
-
-    if (watched == m_pool) {
-        if (event->type() == QEvent::Enter) {
-            setPoolOverlayVisible(true);
-        } else if (event->type() == QEvent::Leave) {
-            const QPoint localCursor = mapFromGlobal(QCursor::pos());
-            if (!m_poolDragActive && (!m_poolHoverZone || !m_poolHoverZone->geometry().contains(localCursor))) {
-                setPoolOverlayVisible(false);
-            }
-        }
-    }
-    return QWidget::eventFilter(watched, event);
-}
-
 void EditPage::buildUi() {
     m_rootLayout = new QVBoxLayout(this);
     m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kContentTitleBarHeight,
@@ -786,25 +711,21 @@ void EditPage::buildUi() {
     boardShadow->setOffset(0, 0);
     boardShadow->setColor(QColor(0, 0, 0, 247));
     m_board->setGraphicsEffect(boardShadow);
-    m_pool = new ImagePoolWidget(this);
-    m_pool->setMouseTracking(true);
-    m_pool->installEventFilter(this);
-    m_poolOpacity = new QGraphicsOpacityEffect(m_pool);
-    m_poolOpacity->setOpacity(1.0);
-    m_pool->setGraphicsEffect(m_poolOpacity);
     m_rootLayout->addWidget(m_board, 1);
-    m_pool->hide();
-    m_poolOpacity->setOpacity(0.0);
-    m_poolOverlayVisible = false;
-    m_poolDetachedForFocus = true;
-
-    m_poolHoverZone = new QWidget(this);
-    m_poolHoverZone->setObjectName(QStringLiteral("PoolHoverZone"));
-    m_poolHoverZone->setMouseTracking(true);
-    m_poolHoverZone->installEventFilter(this);
-    m_poolHoverZone->setCursor(Qt::ArrowCursor);
-    m_poolHoverZone->setStyleSheet(QStringLiteral("QWidget#PoolHoverZone{background:transparent;}"));
-    m_poolHoverZone->show();
+    if (m_settings) {
+        const auto applyBlankAreaActions = [this]() {
+            if (!m_board || !m_settings) {
+                return;
+            }
+            m_board->setBlankAreaActions(m_settings->blankDoubleClickAction(),
+                                         m_settings->blankLongPressAction());
+        };
+        applyBlankAreaActions();
+        connect(m_settings, &AppSettings::blankDoubleClickActionChanged, this,
+                [applyBlankAreaActions](BlankAreaAction) { applyBlankAreaActions(); });
+        connect(m_settings, &AppSettings::blankLongPressActionChanged, this,
+                [applyBlankAreaActions](BlankAreaAction) { applyBlankAreaActions(); });
+    }
 
     m_previewOverlay = new PreviewOverlay(this);
     m_previewOverlay->setGeometry(rect());
@@ -812,9 +733,24 @@ void EditPage::buildUi() {
     connect(m_board, &TierBoardWidget::imageDropped, this, &EditPage::moveImageToRow);
     connect(m_board, &TierBoardWidget::rowMovedToIndex, this, &EditPage::moveRowToIndex);
     connect(m_board, &TierBoardWidget::rowEditRequested, this, &EditPage::editTierRow);
+    connect(m_board, &TierBoardWidget::galleryMissionControlRequested, this,
+            &EditPage::galleryMissionControlRequested);
+    connect(m_board, &TierBoardWidget::imageEditRequested, this, &EditPage::editImage);
+    connect(m_board, &TierBoardWidget::imageRemoveFromTierRowRequested, this,
+            &EditPage::removeImageFromTierRow);
+    connect(m_board, &TierBoardWidget::imageRemoveFromGalleryRequested, this,
+            &EditPage::removeImageFromGallery);
     connect(m_board, &TierBoardWidget::imageSelected, this, [this](const QString& imageId) {
+        if (m_selectedImageId == imageId) {
+            return;
+        }
         m_selectedImageId = imageId;
-        refreshUi();
+        if (m_board) {
+            m_board->setSelectedImageId(imageId);
+        }
+        if (m_galleryPopover) {
+            m_galleryPopover->setSelectedImageId(imageId);
+        }
     });
     connect(m_board, &TierBoardWidget::imagePreviewRequested, this,
             [this](const QString& imageId, const QRect& source) {
@@ -825,38 +761,14 @@ void EditPage::buildUi() {
                 }
             });
 
-    connect(m_pool, &ImagePoolWidget::imageDroppedToPool, this, &EditPage::moveImageToPool);
-    connect(m_pool, &ImagePoolWidget::imageFilesDropped, this, &EditPage::importImages);
-    connect(m_pool, &ImagePoolWidget::importRequested, this, &EditPage::importImagesFromDialog);
-    connect(m_pool, &ImagePoolWidget::dragActiveChanged, this, [this](bool active) {
-        m_poolDragActive = active;
-        if (active) {
-            setPoolOverlayVisible(true);
-        } else if (m_pool && m_poolHoverZone) {
-            const QPoint localCursor = mapFromGlobal(QCursor::pos());
-            if (!m_pool->geometry().contains(localCursor) && !m_poolHoverZone->geometry().contains(localCursor)) {
-                setPoolOverlayVisible(false);
-            }
-        }
-    });
-    connect(m_pool, &ImagePoolWidget::imageSelected, this, [this](const QString& imageId) {
-        m_selectedImageId = imageId;
-        refreshUi();
-    });
-    connect(m_pool, &ImagePoolWidget::imagePreviewRequested, this,
-            [this](const QString& imageId, const QRect& source) {
-                m_selectedImageId = imageId;
-                const QPixmap pixmap = pixmapForImage(imageId);
-                if (!pixmap.isNull()) {
-                    m_previewOverlay->openPreview(source, pixmap);
-                }
-            });
     layoutOverlays();
 }
 
 void EditPage::refreshUi() {
     m_board->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
-    m_pool->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
+    if (m_galleryPopover) {
+        m_galleryPopover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
+    }
     emit titleChanged(displayTitle());
     emit dirtyChanged(m_project.dirty);
     emit resetRowsAvailableChanged(hasImagesInRows());
@@ -929,21 +841,86 @@ void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int 
     refreshUi();
 }
 
-void EditPage::moveImageToPool(const QString& imageId, int index) {
+void EditPage::editImage(const QString& imageId) {
     TierImage* image = m_project.imageById(imageId);
     if (!image) {
-        Logger::warn(QStringLiteral("tier.edit.image.move.to.pool rejected imageId=%1 imageFound=false").arg(imageId));
+        Logger::warn(QStringLiteral("tier.edit.image.edit rejected imageId=%1 reason=missing").arg(imageId));
         return;
     }
-    const bool wasAlreadyInPool = !image->assignedTierRowId.has_value();
+
+    const QPixmap pixmap = pixmapForImage(imageId);
+    if (pixmap.isNull()) {
+        Logger::warn(QStringLiteral("tier.edit.image.edit rejected imageId=%1 reason=invalidPixmap").arg(imageId));
+        return;
+    }
+
+    ImageEditDialog dialog(*image, pixmap, this);
+    if (dialog.exec() != QDialog::Accepted) {
+        Logger::debug(QStringLiteral("tier.edit.image.edit.cancel imageId=%1").arg(imageId));
+        return;
+    }
+
+    const QString nextName = dialog.displayName().isEmpty() ? image->originalFileName : dialog.displayName();
+    const QRectF nextCrop = dialog.cropRect();
+    const bool changed = image->displayName != nextName ||
+                         qAbs(image->cropRect.x() - nextCrop.x()) > 0.0005 ||
+                         qAbs(image->cropRect.y() - nextCrop.y()) > 0.0005 ||
+                         qAbs(image->cropRect.width() - nextCrop.width()) > 0.0005 ||
+                         qAbs(image->cropRect.height() - nextCrop.height()) > 0.0005;
+    if (!changed) {
+        Logger::debug(QStringLiteral("tier.edit.image.edit.noop imageId=%1").arg(imageId));
+        return;
+    }
+
+    image->displayName = nextName;
+    image->cropRect = nextCrop;
+    m_selectedImageId = imageId;
+    Logger::info(QStringLiteral("tier.edit.image.edit.apply imageId=%1 name=\"%2\" crop=(%3,%4,%5,%6)")
+                     .arg(imageId, nextName)
+                     .arg(nextCrop.x(), 0, 'f', 4)
+                     .arg(nextCrop.y(), 0, 'f', 4)
+                     .arg(nextCrop.width(), 0, 'f', 4)
+                     .arg(nextCrop.height(), 0, 'f', 4));
+    markDirty();
+    refreshUi();
+}
+
+void EditPage::removeImageFromTierRow(const QString& imageId) {
+    TierImage* image = m_project.imageById(imageId);
+    if (!image) {
+        Logger::warn(QStringLiteral("tier.edit.image.remove.from.row rejected imageId=%1 reason=missing").arg(imageId));
+        return;
+    }
+
+    const QString previousRowId = image->assignedTierRowId.value_or(QString());
     removeImageFromRows(imageId);
     image->assignedTierRowId.reset();
-    updatePoolOrdering(imageId, index, wasAlreadyInPool);
+    m_project.normalizeOrdering();
     m_selectedImageId = imageId;
-    Logger::info(QStringLiteral("tier.edit.image.move.to.pool imageId=%1 index=%2 wasAlreadyInPool=%3")
+    Logger::info(QStringLiteral("tier.edit.image.remove.from.row imageId=%1 previousRowId=%2")
+                     .arg(imageId, previousRowId));
+    markDirty();
+    refreshUi();
+}
+
+void EditPage::removeImageFromGallery(const QString& imageId) {
+    const qsizetype before = m_project.images.size();
+    removeImageFromRows(imageId);
+    m_project.images.erase(std::remove_if(m_project.images.begin(), m_project.images.end(),
+                                          [&](const TierImage& image) { return image.id == imageId; }),
+                           m_project.images.end());
+    if (m_project.images.size() == before) {
+        Logger::warn(QStringLiteral("tier.edit.image.remove.from.gallery rejected imageId=%1 reason=missing")
+                         .arg(imageId));
+        return;
+    }
+    if (m_selectedImageId == imageId) {
+        m_selectedImageId.clear();
+    }
+    m_project.normalizeOrdering();
+    Logger::info(QStringLiteral("tier.edit.image.remove.from.gallery imageId=%1 remaining=%2")
                      .arg(imageId)
-                     .arg(index)
-                     .arg(wasAlreadyInPool));
+                     .arg(m_project.images.size()));
     markDirty();
     refreshUi();
 }
@@ -1036,7 +1013,7 @@ void EditPage::editTierRow(const QString& rowId) {
             return;
         }
         if (QMessageBox::question(&dialog, tr("Delete Row"),
-                                  tr("Delete this row and move its images to the pool?")) != QMessageBox::Yes) {
+                                  tr("Delete this row and remove its image assignments?")) != QMessageBox::Yes) {
             return;
         }
         if (TierRow* deleted = m_project.rowById(rowId)) {
@@ -1132,33 +1109,6 @@ bool EditPage::hasImagesInRows() const {
     return std::any_of(m_project.rows.cbegin(), m_project.rows.cend(), [](const TierRow& row) {
         return !row.imageIds.isEmpty();
     });
-}
-
-void EditPage::updatePoolOrdering(const QString& movedImageId, int requestedIndex, bool wasAlreadyInPool) {
-    QVector<TierImage*> pool = m_project.unassignedImages();
-    if (wasAlreadyInPool) {
-        const int previousIndex = [&]() {
-            for (int i = 0; i < pool.size(); ++i) {
-                if (pool.at(i)->id == movedImageId) {
-                    return i;
-                }
-            }
-            return -1;
-        }();
-        if (previousIndex >= 0 && previousIndex < requestedIndex) {
-            --requestedIndex;
-        }
-    }
-
-    pool.erase(std::remove_if(pool.begin(), pool.end(),
-                              [&](const TierImage* image) { return image->id == movedImageId; }),
-               pool.end());
-    requestedIndex = qBound(0, requestedIndex, static_cast<int>(pool.size()));
-    TierImage* moved = m_project.imageById(movedImageId);
-    pool.insert(requestedIndex, moved);
-    for (int i = 0; i < pool.size(); ++i) {
-        pool[i]->order = i;
-    }
 }
 
 QPixmap EditPage::pixmapForImage(const QString& imageId) const {

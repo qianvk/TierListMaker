@@ -223,7 +223,7 @@
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="239"/>
-        <source>Reset rows to S/A/B/C/D and move images to the pool?</source>
+        <source>Reset rows to S/A/B/C/D and remove row assignments from images?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -371,7 +371,7 @@
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="1039"/>
-        <source>Delete this row and move its images to the pool?</source>
+        <source>Delete this row and remove its image assignments?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -383,14 +383,6 @@
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="1108"/>
         <source>Recent Projects</source>
-        <translation type="unfinished"></translation>
-    </message>
-</context>
-<context>
-    <name>tlm::ImagePoolWidget</name>
-    <message>
-        <location filename="../../src/tier/ImagePoolWidget.cpp" line="180"/>
-        <source>Import Images</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -495,6 +487,31 @@ The project may not have published update metadata yet.</source>
         <location filename="../../src/pages/PreferencesPage.cpp" line="400"/>
         <source>Image import behavior</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="405"/>
+        <source>Open Gallery Overview</source>
+        <translation>Open Gallery Overview</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="406"/>
+        <source>Open Tier Overview</source>
+        <translation>Open Tier Overview</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="407"/>
+        <source>Do Nothing</source>
+        <translation>Do Nothing</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="419"/>
+        <source>Empty tier area double-click</source>
+        <translation>Empty tier area double-click</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="430"/>
+        <source>Empty tier area long press</source>
+        <translation>Empty tier area long press</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="402"/>
@@ -796,6 +813,26 @@ https://github.com/qianvk/TierListMaker</source>
         <location filename="../../src/tier/TierListView.cpp" line="2209"/>
         <source>No images in tier list</source>
         <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2878"/>
+        <source>Open Tier Overview</source>
+        <translation>Open Tier Overview</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2880"/>
+        <source>Open Gallery Overview</source>
+        <translation>Open Gallery Overview</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2891"/>
+        <source>Double-click: %1</source>
+        <translation>Double-click: %1</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="2895"/>
+        <source>Long press: %1</source>
+        <translation>Long press: %1</translation>
     </message>
 </context>
 </TS>
