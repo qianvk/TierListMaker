@@ -161,6 +161,9 @@ target_link_libraries(TierListMaker
         Qt6::Svg
         VKFrameless::VKFrameless
 )
+if(WIN32)
+    target_link_libraries(TierListMaker PRIVATE dwmapi)
+endif()
 target_compile_definitions(TierListMaker PRIVATE
     TLM_APP_VERSION="${PROJECT_VERSION}"
     TLM_GIT_COMMIT="${TLM_GIT_COMMIT}"

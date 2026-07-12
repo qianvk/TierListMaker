@@ -500,7 +500,18 @@ bool ImageGalleryPopover::eventFilter(QObject* watched, QEvent* event) {
     if (!isVisible() || m_outsideDismissSuspended) {
         return false;
     }
-    if (event->type() != QEvent::MouseButtonPress) {
+
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+    if (event->type() == QEvent::WindowDeactivate) {
+        Logger::debug(QStringLiteral("tier.gallery.popover.close reason=window-deactivate"));
+        close();
+        return false;
+    }
+#endif
+
+    if (event->type() != QEvent::MouseButtonPress &&
+        event->type() != QEvent::MouseButtonDblClick &&
+        event->type() != QEvent::NonClientAreaMouseButtonPress) {
         return false;
     }
 
@@ -511,7 +522,11 @@ bool ImageGalleryPopover::eventFilter(QObject* watched, QEvent* event) {
 
     Logger::debug(QStringLiteral("tier.gallery.popover.close reason=outside-click"));
     close();
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+    return true;
+#else
     return false;
+#endif
 }
 
 void ImageGalleryPopover::showEvent(QShowEvent* event) {
@@ -665,10 +680,14 @@ void ImageGalleryPopover::requestThumbnails() {
 }
 
 bool ImageGalleryPopover::shouldDismissForGlobalPosition(const QPoint& globalPosition) const {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     if (m_anchorGlobalRect.isValid() && m_anchorGlobalRect.adjusted(-3, -3, 3, 3).contains(globalPosition)) {
         // Let the gallery toolbar button deliver its clicked() signal; EditPage will close the popover.
         return false;
     }
+#else
+    Q_UNUSED(m_anchorGlobalRect);
+#endif
     return !geometry().contains(globalPosition);
 }
 

@@ -17,7 +17,8 @@ namespace tlm {
 namespace {
 constexpr int kMinimumLabelWidth = 82;
 constexpr int kMaximumLabelWidth = 190;
-constexpr int kOuterRadius = 16;
+constexpr int kDefaultOuterRadius = 16;
+constexpr int kWindowsOuterRadius = 8;
 constexpr int kTileMargin = 0;
 constexpr int kTileSpacing = 0;
 constexpr int kNominalTileExtent = 84;
@@ -48,6 +49,14 @@ bool imagesVisible(const TierProject* project) {
     return !project || !project->canvas.value(QStringLiteral("previewImagesHidden")).toBool(false);
 }
 
+int platformOuterRadius() {
+#if defined(Q_OS_WIN)
+    return kWindowsOuterRadius;
+#else
+    return kDefaultOuterRadius;
+#endif
+}
+
 QPainterPath rowClipPath(const QRect& rect, bool firstRow, bool lastRow) {
     const QRectF rowRect = QRectF(rect).adjusted(0.5, 0.0, -0.5, 0.0);
     if (!firstRow && !lastRow) {
@@ -57,15 +66,16 @@ QPainterPath rowClipPath(const QRect& rect, bool firstRow, bool lastRow) {
     }
 
     QPainterPath rounded;
-    rounded.addRoundedRect(rowRect, kOuterRadius, kOuterRadius);
+    const int radius = platformOuterRadius();
+    rounded.addRoundedRect(rowRect, radius, radius);
 
     QPainterPath squareMask;
     if (!firstRow) {
-        squareMask.addRect(QRectF(rowRect.left(), rowRect.top(), rowRect.width(), kOuterRadius + 1));
+        squareMask.addRect(QRectF(rowRect.left(), rowRect.top(), rowRect.width(), radius + 1));
     }
     if (!lastRow) {
-        squareMask.addRect(QRectF(rowRect.left(), rowRect.bottom() - kOuterRadius - 1,
-                                  rowRect.width(), kOuterRadius + 1));
+        squareMask.addRect(QRectF(rowRect.left(), rowRect.bottom() - radius - 1,
+                                  rowRect.width(), radius + 1));
     }
     return rounded.united(squareMask);
 }
@@ -117,7 +127,7 @@ int TierListDelegate::minimumLabelWidth() {
 }
 
 int TierListDelegate::outerRadius() {
-    return kOuterRadius;
+    return platformOuterRadius();
 }
 
 int TierListDelegate::rowUnitsForImageCount(int imageCount, int viewportWidth) {

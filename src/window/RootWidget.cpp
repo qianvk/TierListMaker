@@ -41,6 +41,7 @@ constexpr int kSidebarMaximumWidth = 420;
 constexpr int kSplitterHandleWidth = 0;
 constexpr int kTitleBarHeight = 54;
 constexpr int kSidebarToggleInset = 14;
+constexpr int kTitleBarControlGap = 10;
 
 Qt::KeyboardModifier physicalControlModifier() {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
@@ -177,7 +178,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     m_sidebarToggleButton->setObjectName(QStringLiteral("SidebarToggleButton"));
     m_sidebarToggleButton->setToolTip(tr("Collapse sidebar"));
     connect(m_sidebarToggleButton, &QAbstractButton::clicked, this,
-            [this]() { setSidebarCollapsed(!m_sidebarCollapsed); });
+            [this](bool checked) { setSidebarCollapsed(checked); });
 
     if (updater) {
         connect(updater, &AppUpdater::updateNotificationChanged, this,
@@ -247,6 +248,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     switchToPage(AppPage::Edit);
     layoutTitleBars();
     layoutSidebarToggleButton();
+    updateTitleBarLeadingReservation();
     QTimer::singleShot(0, this, [this]() { synchronizeInitialLayout(); });
 }
 
@@ -501,8 +503,12 @@ void RootWidget::layoutTitleBars() {
         const int contentWidth = m_content ? std::max(0, m_content->width()) : width();
         if (m_tierFocusMode) {
             const int revealWidth = std::min(contentWidth, m_titleBar->focusRevealSizeHint().width());
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
             m_titleBar->setGeometry(std::max(0, contentWidth - revealWidth), 0, revealWidth,
                                     kTitleBarHeight);
+#else
+            m_titleBar->setGeometry(0, 0, revealWidth, kTitleBarHeight);
+#endif
         } else {
             m_titleBar->setGeometry(0, 0, contentWidth, kTitleBarHeight);
         }
@@ -511,6 +517,7 @@ void RootWidget::layoutTitleBars() {
     if (m_sidebarToggleButton) {
         m_sidebarToggleButton->raise();
     }
+    updateTitleBarLeadingReservation();
 }
 
 void RootWidget::layoutSidebarToggleButton() {
@@ -529,6 +536,7 @@ void RootWidget::layoutSidebarToggleButton() {
     const int y = std::max(0, (kTitleBarHeight - m_sidebarToggleButton->height()) / 2);
     m_sidebarToggleButton->move(x, y);
     m_sidebarToggleButton->raise();
+    updateTitleBarLeadingReservation();
 }
 
 void RootWidget::layoutPreferenceBadge() {
@@ -545,6 +553,26 @@ void RootWidget::setUpdateBadgeVisible(bool visible) {
     }
     m_preferencesBadge->setVisible(visible);
     layoutPreferenceBadge();
+}
+
+void RootWidget::updateTitleBarLeadingReservation() {
+    if (!m_titleBar) {
+        return;
+    }
+
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    m_titleBar->setLeadingReservedWidth(0);
+#else
+    if (!m_sidebarToggleButton || !m_content || !m_sidebarToggleButton->isVisible() ||
+        m_tierFocusMode) {
+        m_titleBar->setLeadingReservedWidth(0);
+        return;
+    }
+
+    const int toggleRightInContent = m_sidebarToggleButton->geometry().right() + 1 - m_content->x();
+    const int reservedWidth = toggleRightInContent > 0 ? toggleRightInContent + kTitleBarControlGap : 0;
+    m_titleBar->setLeadingReservedWidth(reservedWidth);
+#endif
 }
 
 int RootWidget::minimumSidebarToggleX() const {
