@@ -77,6 +77,7 @@ private:
     void layoutTitleBars();
     void layoutSidebarToggleButton();
     void layoutPreferenceBadge();
+    void updateTitleBarLeadingReservation();
     void setUpdateBadgeVisible(bool visible);
     int minimumSidebarToggleX() const;
     void setTierFocusMode(bool enabled);

@@ -10,6 +10,8 @@ class QGraphicsOpacityEffect;
 class QKeyEvent;
 class QLineEdit;
 class QMouseEvent;
+class QPaintEvent;
+class QPainter;
 class QResizeEvent;
 class QToolButton;
 class QVariantAnimation;
@@ -23,6 +25,7 @@ class AppTitleBar : public vkframeless::WindowTitleBar {
 
 public:
     explicit AppTitleBar(QWidget* parent = nullptr);
+    ~AppTitleBar() override;
 
     void setDocumentTitle(const QString& title);
     void setTitleEditable(bool editable);
@@ -30,6 +33,7 @@ public:
     void setSaveActionEnabled(bool enabled);
     void setResetRowsActionEnabled(bool enabled);
     void setTierFocusMode(bool enabled);
+    void setLeadingReservedWidth(int width);
     void retranslateUi();
     QSize focusRevealSizeHint() const;
     QRect galleryButtonGlobalRect() const;
@@ -49,6 +53,7 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
     void changeEvent(QEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -57,8 +62,17 @@ private:
     void rememberTitleEditBaseline();
     QRect globalRectFor(QWidget* widget) const;
     void setToolbarReveal(qreal targetOpacity);
+    void updateLayoutMargins();
     void updateTitleWidth();
     void updateTitleGeometry();
+#if defined(Q_OS_WIN)
+    QRect windowsCaptionButtonVisualRect() const;
+    void paintWindowsNativeCaptionButtons(QPainter* painter) const;
+#endif
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+    void installTitleEditOutsideClickFilter();
+    void removeTitleEditOutsideClickFilter();
+#endif
 
     QLineEdit* m_titleEdit{nullptr};
     QToolButton* m_newButton{nullptr};
@@ -76,6 +90,10 @@ private:
     bool m_titleEditable{true};
     bool m_submittingTitle{false};
     bool m_cancelingTitleEdit{false};
+    int m_leadingReservedWidth{0};
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+    bool m_titleEditOutsideClickFilterInstalled{false};
+#endif
     QString m_titleEditBaseline;
 };
 

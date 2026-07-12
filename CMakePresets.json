@@ -23,6 +23,27 @@
       }
     },
     {
+      "name": "windows",
+      "displayName": "Windows Debug",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-debug",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.10.1/msvc2022_64",
+        "TLM_BUILD_TESTS": "ON"
+      }
+    },
+    {
       "name": "release",
       "displayName": "Release",
       "generator": "Ninja",
@@ -35,6 +56,27 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_PREFIX_PATH": "$env{HOME}/Qt/6.10.1/macos",
+        "TLM_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "windows-release",
+      "displayName": "Windows Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/windows-release",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_PREFIX_PATH": "C:/Qt/6.10.1/msvc2022_64",
         "TLM_BUILD_TESTS": "ON"
       }
     }
@@ -57,6 +99,24 @@
         "C_INCLUDE_PATH": null,
         "CPLUS_INCLUDE_PATH": null
       }
+    },
+    {
+      "name": "windows",
+      "configurePreset": "windows",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      }
+    },
+    {
+      "name": "windows-release",
+      "configurePreset": "windows-release",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null
+      }
     }
   ],
   "testPresets": [
@@ -67,6 +127,19 @@
         "CPATH": null,
         "C_INCLUDE_PATH": null,
         "CPLUS_INCLUDE_PATH": null
+      },
+      "output": {
+        "outputOnFailure": true
+      }
+    },
+    {
+      "name": "windows",
+      "configurePreset": "windows",
+      "environment": {
+        "CPATH": null,
+        "C_INCLUDE_PATH": null,
+        "CPLUS_INCLUDE_PATH": null,
+        "PATH": "C:/Qt/6.10.1/msvc2022_64/bin;$penv{PATH}"
       },
       "output": {
         "outputOnFailure": true

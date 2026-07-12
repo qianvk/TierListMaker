@@ -1,7 +1,12 @@
 #include "window/AppTitleBar.h"
 
+#include <vkframeless/FramelessWindow.h>
+
+#include <QApplication>
+#include <QCursor>
 #include <QEasingCurve>
 #include <QEvent>
+#include <QFont>
 #include <QFontMetrics>
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
@@ -9,6 +14,7 @@
 #include <QKeyEvent>
 #include <QLineEdit>
 #include <QMouseEvent>
+#include <QPainter>
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QSizePolicy>
@@ -16,9 +22,30 @@
 #include <QVariantAnimation>
 #include <QWidget>
 
+#include <algorithm>
+
+#if defined(Q_OS_WIN)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#include <dwmapi.h>
+#endif
+
 namespace tlm {
 
 namespace {
+constexpr int kTitleBarHorizontalMargin = 18;
+constexpr int kTitleBarSpacing = 6;
+
+#if defined(Q_OS_WIN)
+constexpr int kWindows11CaptionIconSize = 10;
+constexpr QChar kWindowsChromeMinimize(0xe921);
+constexpr QChar kWindowsChromeMaximize(0xe922);
+constexpr QChar kWindowsChromeRestore(0xe923);
+constexpr QChar kWindowsChromeClose(0xe8bb);
+#endif
+
 QToolButton* makeButton(const QString& text, const QString& iconPath, QWidget* parent) {
     auto* button = new QToolButton(parent);
     button->setToolTip(text);
@@ -36,6 +63,138 @@ QToolButton* makeButton(const QString& text, const QString& iconPath, QWidget* p
         "QToolButton:disabled:hover{background:transparent;}"));
     return button;
 }
+
+int nativeSystemButtonWidth(const QWidget* widget) {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    Q_UNUSED(widget);
+    return 0;
+#else
+    const auto* frameless = widget ? qobject_cast<const vkframeless::FramelessWindow*>(widget->window()) : nullptr;
+    return frameless ? frameless->systemButtonReservedWidth() : 0;
+#endif
+}
+
+int systemButtonReservedWidth(const QWidget* widget) {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    Q_UNUSED(widget);
+    return 18;
+#else
+    return nativeSystemButtonWidth(widget) + 18;
+#endif
+}
+
+#if defined(Q_OS_WIN)
+UINT dpiForWidget(const QWidget* widget) {
+    if (widget && widget->window()) {
+        HWND hwnd = reinterpret_cast<HWND>(widget->window()->winId());
+        if (hwnd)
+            return ::GetDpiForWindow(hwnd);
+    }
+    return USER_DEFAULT_SCREEN_DPI;
+}
+
+int logicalSystemMetric(const QWidget* widget, int metric) {
+    const UINT dpi = dpiForWidget(widget);
+    return ::MulDiv(::GetSystemMetricsForDpi(metric, dpi), USER_DEFAULT_SCREEN_DPI, dpi);
+}
+
+int logicalPixelsFromPhysical(const QWidget* widget, int value) {
+    return ::MulDiv(value, USER_DEFAULT_SCREEN_DPI, dpiForWidget(widget));
+}
+
+QRect nativeCaptionButtonBoundsPhysical(const QWidget* widget) {
+    if (!widget || !widget->window()) {
+        return {};
+    }
+
+    HWND hwnd = reinterpret_cast<HWND>(widget->window()->winId());
+    RECT windowRect = {0, 0, 0, 0};
+    if (!hwnd || !::GetWindowRect(hwnd, &windowRect)) {
+        return {};
+    }
+
+    RECT bounds = {0, 0, 0, 0};
+    if (SUCCEEDED(::DwmGetWindowAttribute(hwnd,
+                                          DWMWA_CAPTION_BUTTON_BOUNDS,
+                                          &bounds,
+                                          sizeof(bounds))) &&
+        bounds.right > bounds.left && bounds.bottom > bounds.top) {
+        const int windowWidth = static_cast<int>(windowRect.right - windowRect.left);
+        const int windowHeight = static_cast<int>(windowRect.bottom - windowRect.top);
+        const bool windowRelative = bounds.left >= 0 && bounds.top >= 0 &&
+                                    bounds.right <= windowWidth && bounds.bottom <= windowHeight;
+        if (!windowRelative) {
+            ::OffsetRect(&bounds, -windowRect.left, -windowRect.top);
+        }
+        return QRect(QPoint(bounds.left, bounds.top),
+                     QSize(bounds.right - bounds.left, bounds.bottom - bounds.top));
+    }
+
+    const UINT dpi = dpiForWidget(widget);
+    const int width = ::GetSystemMetricsForDpi(SM_CXSIZE, dpi) * 3;
+    const int height = ::GetSystemMetricsForDpi(SM_CYSIZE, dpi);
+    const int windowWidth = static_cast<int>(windowRect.right - windowRect.left);
+    return QRect(std::max(0, windowWidth - width), 0, width, height);
+}
+
+QRect widgetLogicalCaptionButtonRect(const QWidget* widget) {
+    const QRect nativeBounds = nativeCaptionButtonBoundsPhysical(widget);
+    if (!widget || !widget->window() || !nativeBounds.isValid()) {
+        return {};
+    }
+
+    const QPoint widgetWindowPos = widget->mapTo(widget->window(), QPoint(0, 0));
+    return QRect(logicalPixelsFromPhysical(widget, nativeBounds.x()) - widgetWindowPos.x(),
+                 logicalPixelsFromPhysical(widget, nativeBounds.y()) - widgetWindowPos.y(),
+                 logicalPixelsFromPhysical(widget, nativeBounds.width()),
+                 logicalPixelsFromPhysical(widget, nativeBounds.height()));
+}
+
+QFont windows11CaptionIconFont() {
+    QFont font;
+    font.setFamilies({QStringLiteral("Segoe Fluent Icons"), QStringLiteral("Segoe MDL2 Assets")});
+    font.setPixelSize(kWindows11CaptionIconSize);
+    font.setStyleStrategy(QFont::PreferNoShaping);
+    return font;
+}
+
+QChar windows11CaptionGlyph(int index, bool maximized) {
+    switch (index) {
+    case 0:
+        return kWindowsChromeMinimize;
+    case 1:
+        return maximized ? kWindowsChromeRestore : kWindowsChromeMaximize;
+    case 2:
+        return kWindowsChromeClose;
+    default:
+        return QChar();
+    }
+}
+
+bool isDarkWindowPalette(const QWidget* widget) {
+    const QColor windowColor = widget ? widget->palette().color(QPalette::Window) : QColor(Qt::white);
+    return windowColor.lightness() < 128;
+}
+
+QColor windows11CaptionHoverColor(bool closeButton, bool pressed, bool darkPalette) {
+    if (closeButton) {
+        return pressed ? QColor(153, 27, 18) : QColor(196, 43, 28);
+    }
+
+    const int alpha = pressed ? 30 : 18;
+    return darkPalette ? QColor(255, 255, 255, alpha) : QColor(0, 0, 0, alpha);
+}
+
+QColor windows11CaptionGlyphColor(bool closeButton, bool hovered, bool activeWindow, bool darkPalette) {
+    if (closeButton && hovered) {
+        return QColor(Qt::white);
+    }
+    if (!activeWindow) {
+        return darkPalette ? QColor(150, 150, 150) : QColor(120, 120, 120);
+    }
+    return darkPalette ? QColor(255, 255, 255) : QColor(32, 32, 32);
+}
+#endif
 } // namespace
 
 AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) {
@@ -45,8 +204,11 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
     setBackgroundColor(palette().color(QPalette::Base));
 
     auto* layout = contentLayout();
-    layout->setContentsMargins(18, 0, 18, 0);
-    layout->setSpacing(6);
+    updateLayoutMargins();
+    layout->setSpacing(kTitleBarSpacing);
+    while (QLayoutItem* item = layout->takeAt(0)) {
+        delete item;
+    }
 
     m_titleEdit = new QLineEdit(this);
     m_titleEdit->setObjectName(QStringLiteral("ProjectTitleEdit"));
@@ -65,8 +227,6 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
         "QLineEdit#ProjectTitleEdit{background:transparent;border:none;"
         "border-radius:0px;padding:4px 10px;color:palette(window-text);selection-background-color:#7aa2f7;"
         "selection-color:white;}"));
-    layout->addStretch(1);
-
     m_newButton = makeButton(tr("New"), QStringLiteral(":/icons/plus.svg"), this);
     m_openButton = makeButton(tr("Open"), QStringLiteral(":/icons/folder.svg"), this);
     m_saveButton = makeButton(tr("Save"), QStringLiteral(":/icons/save.svg"), this);
@@ -90,7 +250,13 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
         button->installEventFilter(this);
         buttonsLayout->addWidget(button);
     }
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    layout->addStretch(1);
     layout->addWidget(m_buttonGroup);
+#else
+    layout->addWidget(m_buttonGroup);
+    layout->addStretch(1);
+#endif
 
     connect(m_newButton, &QToolButton::clicked, this, &AppTitleBar::newRequested);
     connect(m_openButton, &QToolButton::clicked, this, &AppTitleBar::openRequested);
@@ -115,6 +281,12 @@ AppTitleBar::AppTitleBar(QWidget* parent) : vkframeless::WindowTitleBar(parent) 
 
     rememberTitleEditBaseline();
     updateTitleGeometry();
+}
+
+AppTitleBar::~AppTitleBar() {
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+    removeTitleEditOutsideClickFilter();
+#endif
 }
 
 void AppTitleBar::retranslateUi() {
@@ -213,6 +385,16 @@ void AppTitleBar::setTierFocusMode(bool enabled) {
     setToolbarReveal(enabled ? 0.0 : 1.0);
 }
 
+void AppTitleBar::setLeadingReservedWidth(int width) {
+    const int next = qMax(0, width);
+    if (m_leadingReservedWidth == next) {
+        return;
+    }
+    m_leadingReservedWidth = next;
+    updateLayoutMargins();
+    updateTitleWidth();
+}
+
 void AppTitleBar::submitTitleEdit(bool clearFocus) {
     if (m_submittingTitle || !m_titleEdit || !m_titleEditable) {
         return;
@@ -261,10 +443,18 @@ void AppTitleBar::updateTitleWidth() {
     const QString measuredText = m_titleEdit->text().isEmpty() ? m_titleEdit->placeholderText()
                                                                : m_titleEdit->text();
     const int textWidth = QFontMetrics(m_titleEdit->font()).horizontalAdvance(measuredText);
-    const int reservedRight = (m_buttonGroup && m_buttonGroup->isVisible()) ? m_buttonGroup->width() + 28 : 18;
+    const int actionWidth = (m_buttonGroup && m_buttonGroup->isVisible()) ? m_buttonGroup->width() + 28 : 18;
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    const int reservedLeft = 18;
+    const int reservedRight = actionWidth;
+#else
+    const int reservedLeft = m_leadingReservedWidth + actionWidth;
+    const int reservedRight = systemButtonReservedWidth(this);
+#endif
     constexpr int kMinimumReadableTitleWidth = 56;
     constexpr int kTitleHorizontalPadding = 34;
-    const int available = qMax(kMinimumReadableTitleWidth, width() - reservedRight * 2);
+    const int reserved = qMax(reservedLeft, reservedRight);
+    const int available = qMax(kMinimumReadableTitleWidth, width() - reserved * 2);
     m_titleEdit->setFixedWidth(qBound(kMinimumReadableTitleWidth, textWidth + kTitleHorizontalPadding,
                                       qMin(520, available)));
     updateTitleGeometry();
@@ -280,6 +470,17 @@ QRect AppTitleBar::galleryButtonGlobalRect() const {
 }
 
 bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+    if (m_titleEditOutsideClickFilterInstalled && m_titleEdit && m_titleEdit->hasFocus() &&
+        (event->type() == QEvent::MouseButtonPress ||
+         event->type() == QEvent::NonClientAreaMouseButtonPress)) {
+        const auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        const QRect titleRect(m_titleEdit->mapToGlobal(QPoint(0, 0)), m_titleEdit->size());
+        if (!titleRect.contains(mouseEvent->globalPosition().toPoint())) {
+            submitTitleEdit(true);
+        }
+    }
+#endif
     if (event->type() == QEvent::MouseButtonPress && watched != m_titleEdit && m_titleEdit &&
         m_titleEdit->hasFocus()) {
         submitTitleEdit(true);
@@ -287,8 +488,14 @@ bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
     if (watched == m_titleEdit) {
         if (event->type() == QEvent::FocusIn) {
             rememberTitleEditBaseline();
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+            installTitleEditOutsideClickFilter();
+#endif
         } else if (event->type() == QEvent::FocusOut && !m_submittingTitle && !m_cancelingTitleEdit) {
             submitTitleEdit(false);
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+            removeTitleEditOutsideClickFilter();
+#endif
         } else if (event->type() == QEvent::ShortcutOverride) {
             auto* keyEvent = static_cast<QKeyEvent*>(event);
             if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter ||
@@ -327,6 +534,14 @@ void AppTitleBar::mousePressEvent(QMouseEvent* event) {
     vkframeless::WindowTitleBar::mousePressEvent(event);
 }
 
+void AppTitleBar::paintEvent(QPaintEvent* event) {
+    vkframeless::WindowTitleBar::paintEvent(event);
+#if defined(Q_OS_WIN)
+    QPainter painter(this);
+    paintWindowsNativeCaptionButtons(&painter);
+#endif
+}
+
 void AppTitleBar::resizeEvent(QResizeEvent* event) {
     vkframeless::WindowTitleBar::resizeEvent(event);
     updateTitleWidth();
@@ -355,6 +570,78 @@ void AppTitleBar::updateTitleGeometry() {
         m_buttonGroup->raise();
     }
 }
+
+void AppTitleBar::updateLayoutMargins() {
+    auto* layout = contentLayout();
+    if (!layout) {
+        return;
+    }
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    layout->setContentsMargins(kTitleBarHorizontalMargin, 0, kTitleBarHorizontalMargin, 0);
+#else
+    layout->setContentsMargins(kTitleBarHorizontalMargin + m_leadingReservedWidth, 0,
+                               kTitleBarHorizontalMargin, 0);
+#endif
+}
+
+#if defined(Q_OS_WIN)
+QRect AppTitleBar::windowsCaptionButtonVisualRect() const {
+    QRect area = widgetLogicalCaptionButtonRect(this);
+    if (area.isValid()) {
+        return area.intersected(rect());
+    }
+
+    const int buttonAreaWidth = nativeSystemButtonWidth(this);
+    if (buttonAreaWidth <= 0) {
+        return {};
+    }
+
+    const int height = qMax(1, logicalSystemMetric(this, SM_CYSIZE));
+    return QRect(qMax(0, width() - buttonAreaWidth), 0, buttonAreaWidth,
+                 qMin(qMax(1, this->height()), height));
+}
+
+void AppTitleBar::paintWindowsNativeCaptionButtons(QPainter* painter) const {
+    const QRect area = windowsCaptionButtonVisualRect();
+    if (!painter || !area.isValid()) {
+        return;
+    }
+
+    QWidget* topLevel = window();
+    if (!topLevel) {
+        return;
+    }
+
+    const QPoint cursorPos = mapFromGlobal(QCursor::pos());
+    const int buttonWidth = qMax(1, area.width() / 3);
+    const bool maximized = topLevel->isMaximized() || topLevel->isFullScreen();
+    const bool activeWindow = topLevel->isActiveWindow();
+    const bool mousePressed = (::GetKeyState(VK_LBUTTON) & 0x8000) != 0;
+    const bool darkPalette = isDarkWindowPalette(this);
+
+    painter->save();
+    painter->setClipRect(area);
+    painter->setFont(windows11CaptionIconFont());
+
+    for (int index = 0; index < 3; ++index) {
+        const int x = area.left() + buttonWidth * index;
+        const int width = (index == 2) ? area.right() + 1 - x : buttonWidth;
+        const QRect buttonRect(x, area.top(), width, area.height());
+        const bool closeButton = index == 2;
+        const bool hovered = buttonRect.contains(cursorPos);
+        const bool pressed = hovered && mousePressed;
+
+        if (hovered) {
+            painter->fillRect(buttonRect, windows11CaptionHoverColor(closeButton, pressed, darkPalette));
+        }
+
+        painter->setPen(windows11CaptionGlyphColor(closeButton, hovered, activeWindow, darkPalette));
+        painter->drawText(buttonRect, Qt::AlignCenter, QString(windows11CaptionGlyph(index, maximized)));
+    }
+
+    painter->restore();
+}
+#endif
 
 void AppTitleBar::setToolbarReveal(qreal targetOpacity) {
     if (!m_buttonGroupOpacity) {
@@ -388,5 +675,23 @@ void AppTitleBar::setToolbarReveal(qreal targetOpacity) {
     });
     animation->start();
 }
+
+#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
+void AppTitleBar::installTitleEditOutsideClickFilter() {
+    if (m_titleEditOutsideClickFilterInstalled || !qApp) {
+        return;
+    }
+    qApp->installEventFilter(this);
+    m_titleEditOutsideClickFilterInstalled = true;
+}
+
+void AppTitleBar::removeTitleEditOutsideClickFilter() {
+    if (!m_titleEditOutsideClickFilterInstalled || !qApp) {
+        return;
+    }
+    qApp->removeEventFilter(this);
+    m_titleEditOutsideClickFilterInstalled = false;
+}
+#endif
 
 } // namespace tlm
