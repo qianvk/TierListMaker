@@ -6,13 +6,13 @@
 
 class QListView;
 class QComboBox;
+class QLineEdit;
 class QPushButton;
 
 namespace tlm {
 
 class ProjectRepository;
 class RecentProjectsModel;
-class SearchField;
 
 /** Recent-project browser with search, sorting, missing markers, and file actions. */
 class ProjectsPage : public QWidget {
@@ -36,7 +36,7 @@ private:
 
     ProjectRepository* m_repository{nullptr};
     RecentProjectsStore* m_recentProjects{nullptr};
-    SearchField* m_search{nullptr};
+    QLineEdit* m_search{nullptr};
     QComboBox* m_sort{nullptr};
     QListView* m_view{nullptr};
     RecentProjectsModel* m_model{nullptr};

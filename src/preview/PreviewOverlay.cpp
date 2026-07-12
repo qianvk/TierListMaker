@@ -1,5 +1,7 @@
 #include "preview/PreviewOverlay.h"
 
+#include "theme/Theme.h"
+
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -30,7 +32,8 @@ void PreviewOverlay::openPreview(const QRect& sourceRectInWindow, const QPixmap&
         return;
     }
     m_pixmap = pixmap;
-    m_sourceGeometry = QRect(mapFrom(window(), sourceRectInWindow.topLeft()), sourceRectInWindow.size());
+    m_sourceGeometry =
+        QRect(mapFrom(window(), sourceRectInWindow.topLeft()), sourceRectInWindow.size());
     m_open = true;
     setGeometry(parentWidget() ? parentWidget()->rect() : geometry());
     show();
@@ -56,7 +59,7 @@ void PreviewOverlay::paintEvent(QPaintEvent*) {
     QPainterPath path;
     path.addRoundedRect(m_previewGeometry, 16, 16);
     painter.setClipPath(path);
-    painter.fillRect(m_previewGeometry, QColor(QStringLiteral("#111111")));
+    painter.fillRect(m_previewGeometry, activeThemeTokens().elevatedBackground);
     painter.drawPixmap(m_previewGeometry, m_pixmap);
 }
 

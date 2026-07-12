@@ -25,6 +25,8 @@
 #include <QToolTip>
 #include <QWidget>
 
+#include <vkui/Widgets.h>
+
 #include <cmath>
 
 namespace tlm {
@@ -35,17 +37,15 @@ qreal relativeLuminance(const QColor& color) {
         value /= 255.0;
         return value <= 0.03928 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
     };
-    return 0.2126 * channel(color.redF() * 255.0) +
-           0.7152 * channel(color.greenF() * 255.0) +
+    return 0.2126 * channel(color.redF() * 255.0) + 0.7152 * channel(color.greenF() * 255.0) +
            0.0722 * channel(color.blueF() * 255.0);
 }
 
 class TextOnlyToolTipLabel final : public QLabel {
 public:
     explicit TextOnlyToolTipLabel(QWidget* parent = nullptr)
-        : QLabel(parent, Qt::Tool | Qt::FramelessWindowHint |
-                            Qt::WindowDoesNotAcceptFocus |
-                            Qt::NoDropShadowWindowHint) {
+        : QLabel(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus |
+                             Qt::NoDropShadowWindowHint) {
         setAttribute(Qt::WA_TranslucentBackground);
         setAttribute(Qt::WA_ShowWithoutActivating);
         setAttribute(Qt::WA_TransparentForMouseEvents);
@@ -148,7 +148,8 @@ private:
         m_owner = owner;
         const QPalette ownerPalette = owner ? owner->palette() : qApp->palette();
         m_tip->setPalette(ownerPalette);
-        m_tip->setReferencePalette(ownerPalette, owner ? owner->backgroundRole() : QPalette::Window);
+        m_tip->setReferencePalette(ownerPalette,
+                                   owner ? owner->backgroundRole() : QPalette::Window);
         m_tip->setText(text);
         m_tip->adjustSize();
 
@@ -178,6 +179,7 @@ private:
 Application::Application(int& argc, char** argv) : QApplication(argc, argv) {
     configureApplication();
     configureFont();
+    vkui::installVkUi(*this);
 
     m_logger = std::make_unique<Logger>();
     m_logger->installMessageHandler();
@@ -217,8 +219,6 @@ void Application::configureApplication() {
     setApplicationVersion(QStringLiteral(TLM_APP_VERSION));
     setWindowIcon(QIcon(QStringLiteral(":/images/app-icon.png")));
     setQuitOnLastWindowClosed(true);
-    setStyleSheet(QStringLiteral(
-        "QToolTip{background:transparent;border:0px;padding:0px;color:palette(window-text);font-weight:700;}"));
     installEventFilter(new TextOnlyToolTipFilter(this));
 }
 

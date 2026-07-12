@@ -11,5 +11,5 @@ add_tlm_unit_test(tst_AssetManager tst_AssetManager.cpp)
 add_tlm_unit_test(tst_ThemeManager tst_ThemeManager.cpp)
 
 qt_add_executable(tst_Resources tst_Resources.cpp "${PROJECT_SOURCE_DIR}/resources/resources.qrc")
-target_link_libraries(tst_Resources PRIVATE Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
+target_link_libraries(tst_Resources PRIVATE VkUI::Core Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Test)
 add_test(NAME tst_Resources COMMAND tst_Resources)

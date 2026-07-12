@@ -43,10 +43,9 @@ QRectF normalizedCrop(QRectF rect, const QSize& sourceSize) {
     const qreal requestedPixelSide = qMin(rect.width() * sourceW, rect.height() * sourceH);
     const qreal maxPixelSide = qMin(sourceW, sourceH);
     const qreal pixelSide = qBound<qreal>(maxPixelSide * 0.08, requestedPixelSide, maxPixelSide);
-    rect = QRectF(center.x() - (pixelSide / sourceW) / 2.0,
-                  center.y() - (pixelSide / sourceH) / 2.0,
-                  pixelSide / sourceW,
-                  pixelSide / sourceH);
+    rect =
+        QRectF(center.x() - (pixelSide / sourceW) / 2.0, center.y() - (pixelSide / sourceH) / 2.0,
+               pixelSide / sourceW, pixelSide / sourceH);
     rect.moveLeft(qBound<qreal>(0.0, rect.left(), 1.0 - rect.width()));
     rect.moveTop(qBound<qreal>(0.0, rect.top(), 1.0 - rect.height()));
     return rect;
@@ -63,7 +62,9 @@ public:
         setCursor(Qt::OpenHandCursor);
     }
 
-    QRectF cropRect() const { return normalizedCrop(m_cropRect, m_pixmap.size()); }
+    QRectF cropRect() const {
+        return normalizedCrop(m_cropRect, m_pixmap.size());
+    }
 
 protected:
     void paintEvent(QPaintEvent*) override {
@@ -128,7 +129,8 @@ protected:
 
         const QPointF delta = event->pos() - m_dragStart;
         QRectF next = m_dragStartCrop;
-        // The image moves under a fixed crop frame, so the sampled crop moves opposite to the cursor.
+        // The image moves under a fixed crop frame, so the sampled crop moves opposite to the
+        // cursor.
         next.translate(-delta.x() * m_dragStartCrop.width() / frame.width(),
                        -delta.y() * m_dragStartCrop.height() / frame.height());
         m_cropRect = normalizedCrop(next, m_pixmap.size());
@@ -171,10 +173,8 @@ private:
             return {};
         }
         const QRectF crop = normalizedCrop(m_cropRect, m_pixmap.size());
-        return QRectF(crop.x() * m_pixmap.width(),
-                      crop.y() * m_pixmap.height(),
-                      crop.width() * m_pixmap.width(),
-                      crop.height() * m_pixmap.height());
+        return QRectF(crop.x() * m_pixmap.width(), crop.y() * m_pixmap.height(),
+                      crop.width() * m_pixmap.width(), crop.height() * m_pixmap.height());
     }
 
     QPixmap m_pixmap;
@@ -184,21 +184,13 @@ private:
 };
 
 ImageEditDialog::ImageEditDialog(const TierImage& image, const QPixmap& pixmap, QWidget* parent)
-    : QDialog(parent),
-      m_nameEdit(new QLineEdit(this)),
-      m_cropEditor(new CropEditorWidget(pixmap, image.hasCropRect() ? image.cropRect : defaultCropRect(pixmap.size()),
-                                        this)) {
+    : QDialog(parent), m_nameEdit(new QLineEdit(this)),
+      m_cropEditor(new CropEditorWidget(
+          pixmap, image.hasCropRect() ? image.cropRect : defaultCropRect(pixmap.size()), this)) {
     setWindowTitle(tr("Edit Image"));
     setModal(true);
     setMinimumWidth(440);
     setObjectName(QStringLiteral("ImageEditDialog"));
-    setStyleSheet(QStringLiteral(
-        "QDialog#ImageEditDialog{background:palette(base);}"
-        "QLineEdit{background:palette(alternate-base);color:palette(window-text);"
-        "border:1px solid palette(mid);border-radius:8px;padding:7px 9px;}"
-        "QPushButton{border:1px solid palette(mid);border-radius:8px;padding:7px 14px;"
-        "background:palette(alternate-base);color:palette(window-text);}"
-        "QPushButton:hover{background:palette(midlight);}"));
 
     auto* layout = new QVBoxLayout(this);
     layout->setContentsMargins(18, 18, 18, 18);

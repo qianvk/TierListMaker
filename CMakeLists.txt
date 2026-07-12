@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 3.21)
+cmake_minimum_required(VERSION 3.24)
 
 project(TierListMaker
     VERSION 0.1.0
     DESCRIPTION "A native Qt 6 desktop tier-list editor"
-    HOMEPAGE_URL "https://github.com/example/TierListMaker"
+    HOMEPAGE_URL "https://github.com/qianvk/TierListMaker"
     LANGUAGES CXX
 )
 
@@ -107,10 +107,6 @@ set(TLM_APP_SOURCES
     src/widgets/EmptyStateWidget.h
     src/widgets/FlowLayout.cpp
     src/widgets/FlowLayout.h
-    src/widgets/RoundedButton.cpp
-    src/widgets/RoundedButton.h
-    src/widgets/SearchField.cpp
-    src/widgets/SearchField.h
     src/widgets/SectionHeader.cpp
     src/widgets/SectionHeader.h
     src/window/AppTitleBar.cpp
@@ -132,6 +128,15 @@ if(APPLE)
     )
 endif()
 
+if(WIN32)
+    configure_file(
+        resources/windows/TierListMaker.rc.in
+        "${CMAKE_CURRENT_BINARY_DIR}/generated/TierListMaker.rc"
+        @ONLY
+    )
+    list(APPEND TLM_APP_SOURCES "${CMAKE_CURRENT_BINARY_DIR}/generated/TierListMaker.rc")
+endif()
+
 if(APPLE)
     list(APPEND TLM_CORE_SOURCES src/platform/PlatformMac.mm)
 elseif(WIN32)
@@ -148,6 +153,7 @@ target_link_libraries(tierlistmaker_core
         Qt6::Gui
         Qt6::Widgets
         Qt6::Concurrent
+        VkUI::Core
 )
 tlm_apply_project_options(tierlistmaker_core)
 tlm_apply_compiler_warnings(tierlistmaker_core)
@@ -159,7 +165,8 @@ target_link_libraries(TierListMaker
         tierlistmaker_core
         Qt6::Network
         Qt6::Svg
-        VKFrameless::VKFrameless
+        QWindowKit::Widgets
+        VkUI::Widgets
 )
 if(WIN32)
     target_link_libraries(TierListMaker PRIVATE dwmapi)

@@ -1,17 +1,16 @@
 #pragma once
 
-#include <vkframeless/WindowTitleBar.h>
-
 #include <QRect>
 #include <QSize>
+#include <QWidget>
 
 class QEvent;
 class QGraphicsOpacityEffect;
+class QHBoxLayout;
 class QKeyEvent;
 class QLineEdit;
 class QMouseEvent;
 class QPaintEvent;
-class QPainter;
 class QResizeEvent;
 class QToolButton;
 class QVariantAnimation;
@@ -20,7 +19,7 @@ class QWidget;
 namespace tlm {
 
 /** Frameless draggable title bar containing document title and primary commands. */
-class AppTitleBar : public vkframeless::WindowTitleBar {
+class AppTitleBar : public QWidget {
     Q_OBJECT
 
 public:
@@ -43,8 +42,8 @@ signals:
     void openRequested();
     void saveRequested();
     void saveAsRequested();
-    void backgroundRequested(const QRect& globalButtonRect);
-    void galleryRequested(const QRect& globalButtonRect);
+    void backgroundRequested(QWidget* anchor);
+    void galleryRequested(QWidget* anchor);
     void resetRowsRequested();
     void tierFocusModeRequested();
     void projectTitleEdited(const QString& title);
@@ -65,16 +64,13 @@ private:
     void updateLayoutMargins();
     void updateTitleWidth();
     void updateTitleGeometry();
-#if defined(Q_OS_WIN)
-    QRect windowsCaptionButtonVisualRect() const;
-    void paintWindowsNativeCaptionButtons(QPainter* painter) const;
-#endif
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     void installTitleEditOutsideClickFilter();
     void removeTitleEditOutsideClickFilter();
 #endif
 
     QLineEdit* m_titleEdit{nullptr};
+    QHBoxLayout* m_contentLayout{nullptr};
     QToolButton* m_newButton{nullptr};
     QToolButton* m_openButton{nullptr};
     QToolButton* m_saveButton{nullptr};

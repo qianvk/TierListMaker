@@ -1,11 +1,9 @@
 #include "pages/PreferencesPage.h"
 
 #include "platform/Platform.h"
-#include "widgets/RoundedButton.h"
+#include "theme/Theme.h"
 #include "widgets/SectionHeader.h"
 
-#include <QApplication>
-#include <QCheckBox>
 #include <QComboBox>
 #include <QEasingCurve>
 #include <QEvent>
@@ -26,6 +24,10 @@
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 
+#include <vkui/core/VkIcon.h>
+#include <vkui/widgets/VkComboBox.h>
+#include <vkui/widgets/controls/VkSwitch.h>
+
 #ifndef TLM_APP_VERSION
 #define TLM_APP_VERSION "0.1.0"
 #endif
@@ -37,11 +39,9 @@
 namespace tlm {
 
 namespace {
-constexpr auto kPreferenceControlProperty = "tlmPreferenceControl";
 constexpr int kUpdateBadgeRole = Qt::UserRole + 41;
 
-template <typename Enum>
-int enumIndex(Enum value) {
+template <typename Enum> int enumIndex(Enum value) {
     return static_cast<int>(value);
 }
 
@@ -57,15 +57,14 @@ public:
         const QRect r = option.rect.adjusted(6, 3, -6, -3);
         const bool selected = option.state.testFlag(QStyle::State_Selected);
         const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
+        const ThemeTokens& colors = activeThemeTokens();
         if (selected || hovered) {
-            QColor fill = selected ? option.palette.highlight().color() : option.palette.midlight().color();
-            fill.setAlpha(selected ? 70 : 35);
             painter->setPen(Qt::NoPen);
-            painter->setBrush(fill);
+            painter->setBrush(selected ? colors.selection : colors.controlFillHovered);
             painter->drawRoundedRect(r, 8, 8);
         }
 
-        painter->setPen(option.palette.color(QPalette::WindowText));
+        painter->setPen(colors.primaryText);
         painter->drawText(r.adjusted(14, 0, -30, 0), Qt::AlignVCenter | Qt::AlignLeft,
                           index.data(Qt::DisplayRole).toString());
 
@@ -73,7 +72,7 @@ public:
             const int d = 8;
             const QRect badge(r.right() - d - 12, r.center().y() - d / 2, d, d);
             painter->setPen(Qt::NoPen);
-            painter->setBrush(QColor(QStringLiteral("#ff4f5f")));
+            painter->setBrush(colors.destructive);
             painter->drawEllipse(badge);
         }
         painter->restore();
@@ -88,37 +87,17 @@ void configureAdaptiveField(QWidget* widget) {
     if (!widget) {
         return;
     }
+    if (qobject_cast<vkui::VkSwitch*>(widget)) {
+        widget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+        return;
+    }
+    if (auto* comboBox = qobject_cast<QComboBox*>(widget)) {
+        comboBox->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+        vkui::setComboBoxElideMode(*comboBox, Qt::ElideRight);
+    }
     widget->setMinimumWidth(164);
     widget->setMaximumWidth(260);
     widget->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
-}
-
-void applyPreferenceControlStyle(QWidget* widget) {
-    if (!widget) {
-        return;
-    }
-
-    widget->setStyleSheet({});
-    QPalette palette = QApplication::palette(widget);
-    if (palette.color(QPalette::Base).lightness() < 96) {
-        const QColor control = palette.color(QPalette::AlternateBase);
-        palette.setColor(QPalette::Base, control);
-        palette.setColor(QPalette::Button, control);
-        palette.setColor(QPalette::Window, control);
-        palette.setColor(QPalette::Text, palette.color(QPalette::WindowText));
-        palette.setColor(QPalette::ButtonText, palette.color(QPalette::WindowText));
-    }
-    // Palette-only updates keep native geometry, indicator marks, and popup metrics
-    // identical across appearances while still letting dark colors take effect.
-    widget->setPalette(palette);
-}
-
-void markPreferenceControl(QWidget* widget) {
-    if (!widget) {
-        return;
-    }
-    widget->setProperty(kPreferenceControlProperty, true);
-    applyPreferenceControlStyle(widget);
 }
 
 void setSettingRowExpanded(QWidget* row, bool expanded, bool animated) {
@@ -154,12 +133,13 @@ void setSettingRowExpanded(QWidget* row, bool expanded, bool animated) {
                          effect->setOpacity(progress);
                          row->setMaximumHeight(qMax(0, qRound(expandedHeight * progress)));
                      });
-    QObject::connect(animation, &QVariantAnimation::finished, row, [row, effect, expanded, animation]() {
-        effect->setOpacity(expanded ? 1.0 : 0.0);
-        row->setMaximumHeight(expanded ? QWIDGETSIZE_MAX : 0);
-        row->setVisible(expanded);
-        animation->deleteLater();
-    });
+    QObject::connect(animation, &QVariantAnimation::finished, row,
+                     [row, effect, expanded, animation]() {
+                         effect->setOpacity(expanded ? 1.0 : 0.0);
+                         row->setMaximumHeight(expanded ? QWIDGETSIZE_MAX : 0);
+                         row->setVisible(expanded);
+                         animation->deleteLater();
+                     });
     animation->start();
 }
 
@@ -178,17 +158,14 @@ QWidget* createSettingRow(const QString& title, QWidget* control, QWidget* paren
     layout->addStretch(1);
 
     configureAdaptiveField(control);
-    markPreferenceControl(control);
     layout->addWidget(control, 0, Qt::AlignRight);
     return row;
 }
 } // namespace
 
-PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languageManager, AppUpdater* updater,
-                                 QWidget* parent)
-    : QWidget(parent),
-      m_settings(settings),
-      m_languageManager(languageManager),
+PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languageManager,
+                                 AppUpdater* updater, QWidget* parent)
+    : QWidget(parent), m_settings(settings), m_languageManager(languageManager),
       m_updater(updater) {
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(22, 18, 22, 18);
@@ -201,9 +178,11 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
     m_nav->setMaximumWidth(300);
     m_nav->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     m_nav->setFrameShape(QFrame::NoFrame);
+    m_nav->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     m_nav->setCurrentRow(0);
     m_nav->setItemDelegate(new PreferencesNavDelegate(m_nav));
-    m_nav->setStyleSheet(QStringLiteral("QListWidget{background:transparent;outline:0;border:none;}"));
+    m_nav->setStyleSheet(
+        QStringLiteral("QListWidget{background:transparent;outline:0;border:none;}"));
 
     m_stack = new QStackedWidget(this);
     m_stack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
@@ -229,14 +208,16 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
             }
         });
         connect(m_updater, &AppUpdater::updateAvailable, this, &PreferencesPage::applyUpdateResult);
-        connect(m_updater, &AppUpdater::noUpdateAvailable, this, &PreferencesPage::applyUpdateResult);
+        connect(m_updater, &AppUpdater::noUpdateAvailable, this,
+                &PreferencesPage::applyUpdateResult);
         connect(m_updater, &AppUpdater::checkFailed, this, &PreferencesPage::applyUpdateFailure);
         connect(m_updater, &AppUpdater::updateNotificationChanged, this,
                 &PreferencesPage::setUpdateNotificationVisible);
         setUpdateNotificationVisible(m_updater->hasUpdateAvailable());
     }
     if (m_languageManager) {
-        connect(m_languageManager, &LanguageManager::languageChanged, this, &PreferencesPage::retranslateUi);
+        connect(m_languageManager, &LanguageManager::languageChanged, this,
+                &PreferencesPage::retranslateUi);
     }
     updateNavWidth();
     QTimer::singleShot(0, this, &PreferencesPage::updateNavWidth);
@@ -244,7 +225,8 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
 
 void PreferencesPage::changeEvent(QEvent* event) {
     QWidget::changeEvent(event);
-    if (event->type() == QEvent::PaletteChange || event->type() == QEvent::ApplicationPaletteChange) {
+    if (event->type() == QEvent::PaletteChange ||
+        event->type() == QEvent::ApplicationPaletteChange) {
         refreshPreferenceControlStyles();
     }
 }
@@ -312,12 +294,7 @@ void PreferencesPage::updateNavWidth() {
 }
 
 void PreferencesPage::refreshPreferenceControlStyles() {
-    const auto controls = findChildren<QWidget*>();
-    for (QWidget* widget : controls) {
-        if (widget && widget->property(kPreferenceControlProperty).toBool()) {
-            applyPreferenceControlStyle(widget);
-        }
-    }
+    update();
 }
 
 void PreferencesPage::applyUpdateResult(const UpdateCheckResult& result) {
@@ -326,10 +303,11 @@ void PreferencesPage::applyUpdateResult(const UpdateCheckResult& result) {
     if (m_updateStatusLabel) {
         if (result.updateAvailable) {
             const QString changelog = result.changelog.trimmed();
-            m_updateStatusLabel->setText(
-                tr("Version %1 is available. Current version: %2%3")
-                    .arg(result.latestVersion, result.currentVersion,
-                         changelog.isEmpty() ? QString() : QStringLiteral("\n\n%1").arg(changelog)));
+            m_updateStatusLabel->setText(tr("Version %1 is available. Current version: %2%3")
+                                             .arg(result.latestVersion, result.currentVersion,
+                                                  changelog.isEmpty()
+                                                      ? QString()
+                                                      : QStringLiteral("\n\n%1").arg(changelog)));
         } else {
             m_updateStatusLabel->setText(
                 tr("TierListMaker is up to date. Current version: %1").arg(result.currentVersion));
@@ -373,13 +351,14 @@ QWidget* PreferencesPage::createGeneralPage() {
     language->addItem(tr("English"), QStringLiteral("en"));
     language->addItem(tr("Simplified Chinese"), QStringLiteral("zh_CN"));
     language->setCurrentIndex(qMax(0, language->findData(m_settings->language())));
-    connect(language, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this, language](int index) {
-        const QString code = language->itemData(index).toString();
-        m_settings->setLanguage(code);
-        if (m_languageManager) {
-            m_languageManager->setLanguage(code);
-        }
-    });
+    connect(language, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this, language](int index) {
+                const QString code = language->itemData(index).toString();
+                m_settings->setLanguage(code);
+                if (m_languageManager) {
+                    m_languageManager->setLanguage(code);
+                }
+            });
     settingsLayout->addWidget(createSettingRow(tr("Language"), language, page));
 
     auto* appearance = new QComboBox(page);
@@ -390,8 +369,8 @@ QWidget* PreferencesPage::createGeneralPage() {
     settingsLayout->addWidget(createSettingRow(tr("Appearance"), appearance, page));
 
     auto* importBehavior = new QComboBox(page);
-    importBehavior->addItems(
-        {tr("Copy images into project folder"), tr("Reference original path"), tr("Ask every time")});
+    importBehavior->addItems({tr("Copy images into project folder"), tr("Reference original path"),
+                              tr("Ask every time")});
     importBehavior->setCurrentIndex(enumIndex(m_settings->importBehavior()));
     connect(importBehavior, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             [this](int index) {
@@ -400,8 +379,10 @@ QWidget* PreferencesPage::createGeneralPage() {
     settingsLayout->addWidget(createSettingRow(tr("Image import behavior"), importBehavior, page));
 
     const auto addBlankAreaActionItems = [](QComboBox* combo) {
-        combo->addItem(tr("Open Gallery Overview"), static_cast<int>(BlankAreaAction::GalleryMissionControl));
-        combo->addItem(tr("Open Tier Overview"), static_cast<int>(BlankAreaAction::TierMissionControl));
+        combo->addItem(tr("Open Gallery Overview"),
+                       static_cast<int>(BlankAreaAction::GalleryMissionControl));
+        combo->addItem(tr("Open Tier Overview"),
+                       static_cast<int>(BlankAreaAction::TierMissionControl));
         combo->addItem(tr("Do Nothing"), static_cast<int>(BlankAreaAction::None));
     };
     const auto setBlankAreaActionIndex = [](QComboBox* combo, BlankAreaAction action) {
@@ -417,7 +398,8 @@ QWidget* PreferencesPage::createGeneralPage() {
                 m_settings->setBlankDoubleClickAction(
                     static_cast<BlankAreaAction>(blankDoubleClick->itemData(index).toInt()));
             });
-    settingsLayout->addWidget(createSettingRow(tr("Empty tier area double-click"), blankDoubleClick, page));
+    settingsLayout->addWidget(
+        createSettingRow(tr("Empty tier area double-click"), blankDoubleClick, page));
 
     auto* blankLongPress = new QComboBox(page);
     addBlankAreaActionItems(blankLongPress);
@@ -427,9 +409,11 @@ QWidget* PreferencesPage::createGeneralPage() {
                 m_settings->setBlankLongPressAction(
                     static_cast<BlankAreaAction>(blankLongPress->itemData(index).toInt()));
             });
-    settingsLayout->addWidget(createSettingRow(tr("Empty tier area long press"), blankLongPress, page));
+    settingsLayout->addWidget(
+        createSettingRow(tr("Empty tier area long press"), blankLongPress, page));
 
-    auto* autosave = new QCheckBox(tr("Enable autosave"), page);
+    auto* autosave = new vkui::VkSwitch(page);
+    autosave->setAccessibleName(tr("Enable autosave"));
     autosave->setChecked(m_settings->autosaveEnabled());
     settingsLayout->addWidget(createSettingRow(tr("Save behavior"), autosave, page));
 
@@ -439,17 +423,19 @@ QWidget* PreferencesPage::createGeneralPage() {
     autosaveInterval->setValue(m_settings->autosaveIntervalMinutes());
     connect(autosaveInterval, QOverload<int>::of(&QSpinBox::valueChanged), m_settings,
             &AppSettings::setAutosaveIntervalMinutes);
-    QWidget* autosaveIntervalRow = createSettingRow(tr("Autosave interval"), autosaveInterval, page);
+    QWidget* autosaveIntervalRow =
+        createSettingRow(tr("Autosave interval"), autosaveInterval, page);
     settingsLayout->addWidget(autosaveIntervalRow);
     setSettingRowExpanded(autosaveIntervalRow, autosave->isChecked(), false);
-    connect(autosave, &QCheckBox::toggled, this, [this, autosaveIntervalRow](bool enabled) {
+    connect(autosave, &QAbstractButton::toggled, this, [this, autosaveIntervalRow](bool enabled) {
         m_settings->setAutosaveEnabled(enabled);
         setSettingRowExpanded(autosaveIntervalRow, enabled, true);
     });
 
-    auto* autoUpdate = new QCheckBox(tr("Enable automatic update checks"), page);
+    auto* autoUpdate = new vkui::VkSwitch(page);
+    autoUpdate->setAccessibleName(tr("Enable automatic update checks"));
     autoUpdate->setChecked(m_settings->autoUpdateEnabled());
-    connect(autoUpdate, &QCheckBox::toggled, this, [this](bool enabled) {
+    connect(autoUpdate, &QAbstractButton::toggled, this, [this](bool enabled) {
         m_settings->setAutoUpdateEnabled(enabled);
         if (enabled && m_updater && !m_updater->isChecking()) {
             m_updater->checkForUpdates();
@@ -471,22 +457,26 @@ QWidget* PreferencesPage::createUpdatePage() {
     layout->setSpacing(12);
     layout->addWidget(new SectionHeader(tr("Updates"), page));
     auto* endpoint = new QLabel(
-        tr("Update definition:\n%1").arg(AppUpdater::defaultUpdateDefinitionUrl().toString()), page);
+        tr("Update definition:\n%1").arg(AppUpdater::defaultUpdateDefinitionUrl().toString()),
+        page);
     endpoint->setWordWrap(true);
     endpoint->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(endpoint);
 
-    m_updateStatusLabel = new QLabel(
-        tr("Manual checks run when you click Check Now. Automatic checks run at most once per day when "
-           "enabled. No update is downloaded or executed automatically."),
-        page);
+    m_updateStatusLabel =
+        new QLabel(tr("Manual checks run when you click Check Now. Automatic checks run at most "
+                      "once per day when "
+                      "enabled. No update is downloaded or executed automatically."),
+                   page);
     m_updateStatusLabel->setWordWrap(true);
     m_updateStatusLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_updateStatusLabel);
 
     auto* actions = new QHBoxLayout;
-    m_checkUpdateButton = new RoundedButton(tr("Check Now"), page);
-    m_openUpdateButton = new RoundedButton(tr("Open Release Page"), page);
+    m_checkUpdateButton =
+        new QPushButton(vkui::icon(vkui::VkSymbol::Download), tr("Check Now"), page);
+    m_openUpdateButton =
+        new QPushButton(vkui::icon(vkui::VkSymbol::Share), tr("Open Release Page"), page);
     m_openUpdateButton->setEnabled(m_updater && m_updater->hasUpdateAvailable());
     actions->addWidget(m_checkUpdateButton);
     actions->addWidget(m_openUpdateButton);
@@ -519,18 +509,20 @@ QWidget* PreferencesPage::createAboutPage() {
     layout->setContentsMargins(16, 0, 0, 0);
     layout->setSpacing(12);
     layout->addWidget(new SectionHeader(tr("About"), page));
-    auto* text = new QLabel(
-        tr("TierListMaker\nVersion: %1\nLicense: MIT\nQt: %2\nVKFrameless: linked dependency\nBuild: %3\nGit: "
-           "%4\nPlatform: %5\nCopyright: 2026 TierListMaker contributors\n\nLinks:\nhttps://github.com/"
-           "qianvk/TierListMaker")
-            .arg(QStringLiteral(TLM_APP_VERSION), QString::fromLatin1(qVersion()),
+    auto* text =
+        new QLabel(tr("TierListMaker\nVersion: %1\nLicense: MIT\nQt: %2\nQWindowKit (dev) and "
+                      "VkUI: linked dependencies\nBuild: %3\nGit: "
+                      "%4\nPlatform: %5\nCopyright: 2026 TierListMaker "
+                      "contributors\n\nLinks:\nhttps://github.com/"
+                      "qianvk/TierListMaker")
+                       .arg(QStringLiteral(TLM_APP_VERSION), QString::fromLatin1(qVersion()),
 #ifdef NDEBUG
-                 QStringLiteral("Release"),
+                            QStringLiteral("Release"),
 #else
-                 QStringLiteral("Debug"),
+                            QStringLiteral("Debug"),
 #endif
-                 QStringLiteral(TLM_GIT_COMMIT), platform::platformName()),
-        page);
+                            QStringLiteral(TLM_GIT_COMMIT), platform::platformName()),
+                   page);
     text->setTextInteractionFlags(Qt::TextSelectableByMouse);
     text->setWordWrap(true);
     layout->addWidget(text);

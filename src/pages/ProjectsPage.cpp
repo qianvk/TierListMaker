@@ -1,12 +1,12 @@
 #include "pages/ProjectsPage.h"
 
 #include "logging/Logger.h"
-#include "platform/Platform.h"
 #include "persistence/ProjectRepository.h"
-#include "widgets/RoundedButton.h"
-#include "widgets/SearchField.h"
+#include "platform/Platform.h"
+#include "theme/Theme.h"
 
 #include <QAbstractListModel>
+#include <QAction>
 #include <QComboBox>
 #include <QCoreApplication>
 #include <QDateTime>
@@ -18,6 +18,7 @@
 #include <QInputDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLineEdit>
 #include <QListView>
 #include <QMessageBox>
 #include <QPainter>
@@ -29,6 +30,9 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+
+#include <vkui/core/VkIcon.h>
+#include <vkui/widgets/VkComboBox.h>
 
 namespace tlm {
 
@@ -65,7 +69,8 @@ QString backgroundPathFromProjectFile(const QString& projectPath) {
         return {};
     }
     const QJsonObject projectObject = document.object().value(QStringLiteral("project")).toObject();
-    return projectObject.value(QStringLiteral("canvas")).toObject()
+    return projectObject.value(QStringLiteral("canvas"))
+        .toObject()
         .value(QStringLiteral("backgroundImagePath"))
         .toString();
 }
@@ -158,25 +163,24 @@ private:
         m_entries.clear();
         for (const RecentProjectEntry& entry : m_all) {
             const QString haystack = entry.name + QStringLiteral("\n") + entry.filePath;
-            if (m_filter.trimmed().isEmpty() ||
-                haystack.contains(m_filter, Qt::CaseInsensitive)) {
+            if (m_filter.trimmed().isEmpty() || haystack.contains(m_filter, Qt::CaseInsensitive)) {
                 m_entries.append(entry);
             }
         }
-        std::sort(m_entries.begin(), m_entries.end(), [this](const RecentProjectEntry& lhs,
-                                                             const RecentProjectEntry& rhs) {
-            switch (m_sortMode) {
-            case Name:
-                return lhs.name.localeAwareCompare(rhs.name) < 0;
-            case Created:
-                return lhs.createdAt > rhs.createdAt;
-            case Path:
-                return lhs.filePath.localeAwareCompare(rhs.filePath) < 0;
-            case LastEdited:
-            default:
-                return lhs.updatedAt > rhs.updatedAt;
-            }
-        });
+        std::sort(m_entries.begin(), m_entries.end(),
+                  [this](const RecentProjectEntry& lhs, const RecentProjectEntry& rhs) {
+                      switch (m_sortMode) {
+                      case Name:
+                          return lhs.name.localeAwareCompare(rhs.name) < 0;
+                      case Created:
+                          return lhs.createdAt > rhs.createdAt;
+                      case Path:
+                          return lhs.filePath.localeAwareCompare(rhs.filePath) < 0;
+                      case LastEdited:
+                      default:
+                          return lhs.updatedAt > rhs.updatedAt;
+                      }
+                  });
         endResetModel();
     }
 
@@ -198,19 +202,18 @@ public:
         const QRect r = option.rect.adjusted(8, 6, -8, -6);
         const bool selected = option.state.testFlag(QStyle::State_Selected);
         const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
-        const bool dark = option.palette.color(QPalette::Base).lightness() < 96;
-        QColor fill = selected ? option.palette.highlight().color()
-                               : option.palette.color(hovered ? QPalette::Midlight : QPalette::AlternateBase);
-        fill.setAlpha(selected ? (dark ? 156 : 96) : (hovered ? (dark ? 118 : 210) : (dark ? 210 : 188)));
-        QColor border = selected ? option.palette.highlight().color() : option.palette.color(QPalette::Mid);
-        border.setAlpha(selected ? (dark ? 220 : 150) : (dark ? 140 : 90));
+        const ThemeTokens& colors = activeThemeTokens();
+        const QColor fill = selected
+                                ? colors.selection
+                                : (hovered ? colors.controlFillHovered : colors.elevatedBackground);
+        const QColor border = selected ? colors.accent : colors.border;
         painter->setPen(QPen(border, 1));
         painter->setBrush(fill);
         painter->drawRoundedRect(r, 10, 10);
 
         const QRect thumb(r.left() + 12, r.top() + 12, 74, 54);
         painter->setPen(Qt::NoPen);
-        painter->setBrush(option.palette.color(QPalette::AlternateBase));
+        painter->setBrush(colors.controlFill);
         painter->drawRoundedRect(thumb, 8, 8);
 
         const QString coverPath = index.data(CoverPathRole).toString();
@@ -223,15 +226,19 @@ public:
             painter->setClipPath(clip);
             const QSize targetSize = thumb.size();
             const QSize sourceSize = cover.size();
-            const qreal targetRatio = static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
-            const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
+            const qreal targetRatio =
+                static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
+            const qreal sourceRatio =
+                static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
             QRect sourceRect;
             if (sourceRatio > targetRatio) {
                 const int cropWidth = qRound(sourceSize.height() * targetRatio);
-                sourceRect = QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
+                sourceRect =
+                    QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
             } else {
                 const int cropHeight = qRound(sourceSize.width() / targetRatio);
-                sourceRect = QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
+                sourceRect = QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(),
+                                   cropHeight);
             }
             painter->drawPixmap(thumb, cover, sourceRect);
             painter->setClipping(false);
@@ -240,7 +247,7 @@ public:
             monogramFont.setBold(true);
             monogramFont.setPointSize(monogramFont.pointSize() + 5);
             painter->setFont(monogramFont);
-            painter->setPen(option.palette.color(QPalette::WindowText));
+            painter->setPen(colors.primaryText);
             painter->drawText(thumb, Qt::AlignCenter, QStringLiteral("TLM"));
         }
 
@@ -254,15 +261,12 @@ public:
         titleFont.setBold(true);
         titleFont.setPointSize(titleFont.pointSize() + 1);
         painter->setFont(titleFont);
-        painter->setPen(selected && dark ? option.palette.color(QPalette::HighlightedText)
-                                         : option.palette.color(QPalette::WindowText));
-        painter->drawText(textRect, Qt::AlignLeft | Qt::AlignTop,
-                          painter->fontMetrics().elidedText(name, Qt::ElideRight, textRect.width()));
+        painter->setPen(colors.primaryText);
+        painter->drawText(
+            textRect, Qt::AlignLeft | Qt::AlignTop,
+            painter->fontMetrics().elidedText(name, Qt::ElideRight, textRect.width()));
         painter->setFont(option.font);
-        QColor metaColor = exists ? option.palette.color(QPalette::PlaceholderText) : QColor(QStringLiteral("#f7768e"));
-        if (selected && dark && exists) {
-            metaColor = QColor(QStringLiteral("#d7defd"));
-        }
+        const QColor metaColor = exists ? colors.tertiaryText : colors.destructive;
         painter->setPen(metaColor);
         const QString meta =
             QCoreApplication::translate("tlm::ProjectsPage",
@@ -272,10 +276,12 @@ public:
                      index.data(RowCountRole).toString(), index.data(ImageCountRole).toString(),
                      exists ? QString()
                             : QCoreApplication::translate("tlm::ProjectsPage", "  |  Missing"));
-        painter->drawText(textRect.adjusted(0, 24, 0, 0), Qt::AlignLeft | Qt::AlignTop,
-                          painter->fontMetrics().elidedText(meta, Qt::ElideRight, textRect.width()));
-        painter->drawText(textRect.adjusted(0, 46, 0, 0), Qt::AlignLeft | Qt::AlignTop,
-                          painter->fontMetrics().elidedText(path, Qt::ElideMiddle, textRect.width()));
+        painter->drawText(
+            textRect.adjusted(0, 24, 0, 0), Qt::AlignLeft | Qt::AlignTop,
+            painter->fontMetrics().elidedText(meta, Qt::ElideRight, textRect.width()));
+        painter->drawText(
+            textRect.adjusted(0, 46, 0, 0), Qt::AlignLeft | Qt::AlignTop,
+            painter->fontMetrics().elidedText(path, Qt::ElideMiddle, textRect.width()));
         painter->restore();
     }
 
@@ -284,16 +290,24 @@ public:
     }
 };
 
-ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* recentProjects, QWidget* parent)
+ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* recentProjects,
+                           QWidget* parent)
     : QWidget(parent), m_repository(repository), m_recentProjects(recentProjects) {
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(22, 18, 22, 18);
     root->setSpacing(12);
 
     auto* top = new QHBoxLayout;
-    m_search = new SearchField(this);
+    m_search = new QLineEdit(this);
+    m_search->setClearButtonEnabled(true);
+    m_search->setPlaceholderText(tr("Search"));
+    m_search->addAction(vkui::icon(vkui::VkSymbol::Search, vkui::VkIconRole::Secondary),
+                        QLineEdit::LeadingPosition);
     m_sort = new QComboBox(this);
     m_sort->addItems({tr("Last Edited"), tr("Name"), tr("Created"), tr("Path")});
+    m_sort->setSizeAdjustPolicy(QComboBox::AdjustToContents);
+    m_sort->setMaximumWidth(260);
+    vkui::setComboBoxElideMode(*m_sort, Qt::ElideRight);
     top->addWidget(m_search, 1);
     top->addWidget(m_sort);
     root->addLayout(top);
@@ -309,13 +323,15 @@ ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* r
     root->addWidget(m_view, 1);
 
     auto* actions = new QHBoxLayout;
-    m_openButton = new RoundedButton(tr("Open"), this);
-    m_renameButton = new RoundedButton(tr("Rename"), this);
-    m_coverButton = new RoundedButton(tr("Choose Cover"), this);
-    m_revealButton = new RoundedButton(tr("Reveal"), this);
-    m_duplicateButton = new RoundedButton(tr("Duplicate"), this);
-    m_removeButton = new RoundedButton(tr("Remove"), this);
-    m_deleteFileButton = new RoundedButton(tr("Delete File"), this);
+    m_openButton = new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Open"), this);
+    m_renameButton = new QPushButton(vkui::icon(vkui::VkSymbol::Rename), tr("Rename"), this);
+    m_coverButton = new QPushButton(vkui::icon(vkui::VkSymbol::Image), tr("Choose Cover"), this);
+    m_revealButton = new QPushButton(vkui::icon(vkui::VkSymbol::Reveal), tr("Reveal"), this);
+    m_duplicateButton =
+        new QPushButton(vkui::icon(vkui::VkSymbol::Duplicate), tr("Duplicate"), this);
+    m_removeButton = new QPushButton(vkui::icon(vkui::VkSymbol::Remove), tr("Remove"), this);
+    m_deleteFileButton = new QPushButton(
+        vkui::icon(vkui::VkSymbol::Trash, vkui::VkIconRole::Destructive), tr("Delete File"), this);
     for (auto* button : {m_openButton, m_renameButton, m_coverButton, m_revealButton,
                          m_duplicateButton, m_removeButton, m_deleteFileButton}) {
         actions->addWidget(button);
@@ -345,12 +361,14 @@ ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* r
         if (path.isEmpty()) {
             return;
         }
-        const QString name = QInputDialog::getText(this, tr("Rename Recent Project"), tr("Display name:"));
+        const QString name =
+            QInputDialog::getText(this, tr("Rename Recent Project"), tr("Display name:"));
         if (!name.trimmed().isEmpty()) {
             m_recentProjects->renameDisplayName(path, name.trimmed());
         }
     });
-    connect(m_coverButton, &QPushButton::clicked, this, &ProjectsPage::chooseCoverForSelectedProject);
+    connect(m_coverButton, &QPushButton::clicked, this,
+            &ProjectsPage::chooseCoverForSelectedProject);
     connect(m_revealButton, &QPushButton::clicked, this,
             [this]() { platform::revealInFileManager(selectedPath()); });
     connect(m_removeButton, &QPushButton::clicked, this, [this]() {
@@ -401,7 +419,7 @@ void ProjectsPage::focusSearch() {
 
 void ProjectsPage::retranslateUi() {
     if (m_search) {
-        m_search->setPlaceholderText(QCoreApplication::translate("tlm::SearchField", "Search"));
+        m_search->setPlaceholderText(tr("Search"));
     }
     if (m_sort) {
         const int current = m_sort->currentIndex();
@@ -448,17 +466,18 @@ void ProjectsPage::chooseCoverForSelectedProject() {
 
     auto projectResult = m_repository->openProject(projectPath);
     if (!projectResult) {
-        QMessageBox::warning(this, tr("Cover Image"),
-                             projectResult.error().details.isEmpty()
-                                 ? projectResult.error().message
-                                 : QStringLiteral("%1\n\n%2").arg(projectResult.error().message,
-                                                                   projectResult.error().details));
+        QMessageBox::warning(
+            this, tr("Cover Image"),
+            projectResult.error().details.isEmpty()
+                ? projectResult.error().message
+                : QStringLiteral("%1\n\n%2")
+                      .arg(projectResult.error().message, projectResult.error().details));
         return;
     }
 
     QString filter = tr("Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;All Files (*)");
-    const QString imagePath = QFileDialog::getOpenFileName(this, tr("Choose Project Cover"),
-                                                           QFileInfo(projectPath).absolutePath(), filter);
+    const QString imagePath = QFileDialog::getOpenFileName(
+        this, tr("Choose Project Cover"), QFileInfo(projectPath).absolutePath(), filter);
     if (imagePath.isEmpty()) {
         return;
     }
@@ -469,11 +488,12 @@ void ProjectsPage::chooseCoverForSelectedProject() {
     project.dirty = true;
     auto saveResult = m_repository->saveProject(project, projectPath);
     if (!saveResult) {
-        QMessageBox::warning(this, tr("Cover Image"),
-                             saveResult.error().details.isEmpty()
-                                 ? saveResult.error().message
-                                 : QStringLiteral("%1\n\n%2").arg(saveResult.error().message,
-                                                                   saveResult.error().details));
+        QMessageBox::warning(
+            this, tr("Cover Image"),
+            saveResult.error().details.isEmpty()
+                ? saveResult.error().message
+                : QStringLiteral("%1\n\n%2")
+                      .arg(saveResult.error().message, saveResult.error().details));
         return;
     }
 

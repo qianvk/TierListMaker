@@ -1,17 +1,20 @@
-#include <QFile>
 #include <QtTest>
+
+#include <vkui/core/VkIcon.h>
 
 class tst_Resources : public QObject {
     Q_OBJECT
 
 private slots:
-    void iconsUsePublicAliases() {
-        const QStringList icons = {QStringLiteral("plus.svg"),   QStringLiteral("folder.svg"),
-                                   QStringLiteral("save.svg"),   QStringLiteral("import.svg"),
-                                   QStringLiteral("export.svg"), QStringLiteral("edit.svg"),
-                                   QStringLiteral("preferences.svg")};
-        for (const QString& icon : icons) {
-            QVERIFY2(QFile::exists(QStringLiteral(":/icons/") + icon), qPrintable(icon));
+    void iconsComeFromVkUi() {
+        const QList symbols = {vkui::VkSymbol::Plus,     vkui::VkSymbol::Folder,
+                               vkui::VkSymbol::Document, vkui::VkSymbol::Upload,
+                               vkui::VkSymbol::Download, vkui::VkSymbol::Edit,
+                               vkui::VkSymbol::Settings};
+        for (const vkui::VkSymbol symbol : symbols) {
+            const QIcon icon = vkui::icon(symbol);
+            QVERIFY(!icon.isNull());
+            QVERIFY(!icon.pixmap(QSize(24, 24)).isNull());
         }
     }
 };

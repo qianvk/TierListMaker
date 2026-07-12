@@ -3,21 +3,26 @@
 #include "window/AppTitleBar.h"
 #include "window/RootWidget.h"
 
+#include "logging/Logger.h"
+
 #include <QCloseEvent>
+
+#include <QWKWidgets/widgetwindowagent.h>
 
 namespace tlm {
 
 MainWindow::MainWindow(ProjectRepository* repository, RecentProjectsStore* recentProjects,
-                       AssetManager* assetManager, ThumbnailCache* thumbnailCache, AppSettings* settings,
-                       LanguageManager* languageManager, AppUpdater* updater, QWidget* parent)
-    : vkframeless::FramelessWindow(parent) {
-    vkframeless::FramelessWindowOptions opts = options();
-    opts.backgroundColor = QColor(QStringLiteral("#f5f6f8"));
-    opts.backgroundOpacity = 0.98;
-    opts.captionButtonIconColor = QColor(QStringLiteral("#30343a"));
-    opts.systemButtonVisibility = vkframeless::SystemButtonVisibility::Always;
-    opts.paintedCornerRadius = 12;
-    setOptions(opts);
+                       AssetManager* assetManager, ThumbnailCache* thumbnailCache,
+                       AppSettings* settings, LanguageManager* languageManager, AppUpdater* updater,
+                       QWidget* parent)
+    : QMainWindow(parent), m_windowAgent(new QWK::WidgetWindowAgent(this)) {
+    setAttribute(Qt::WA_DontCreateNativeAncestors);
+    if (!m_windowAgent->setup(this)) {
+        Logger::error(QStringLiteral("ui.window.agent.setup failed backend=qwindowkit"));
+    } else if (!m_windowAgent->installSystemButtons()) {
+        Logger::warn(
+            QStringLiteral("ui.window.agent.system-buttons.install failed backend=qwindowkit"));
+    }
 
     setWindowTitle(QStringLiteral("TierListMaker"));
     resize(1180, 780);
@@ -25,12 +30,9 @@ MainWindow::MainWindow(ProjectRepository* repository, RecentProjectsStore* recen
 
     m_root = new RootWidget(repository, recentProjects, assetManager, thumbnailCache, settings,
                             languageManager, updater, this);
-    setFramelessContentWidget(m_root);
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    setSystemButtonTitleBar(nullptr);
-#else
-    setSystemButtonTitleBar(m_root->titleBar());
-#endif
+    setCentralWidget(m_root);
+    m_root->installWindowAgent(m_windowAgent);
+    Logger::info(QStringLiteral("ui.window.agent.ready backend=qwindowkit titleBars=2"));
 }
 
 void MainWindow::closeEvent(QCloseEvent* event) {
@@ -38,7 +40,7 @@ void MainWindow::closeEvent(QCloseEvent* event) {
         event->ignore();
         return;
     }
-    vkframeless::FramelessWindow::closeEvent(event);
+    QMainWindow::closeEvent(event);
 }
 
 } // namespace tlm

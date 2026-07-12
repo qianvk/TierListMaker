@@ -1,13 +1,13 @@
 # Build Guide
 
-TierListMaker uses CMake, Qt 6, C++20, and VKFrameless.
+TierListMaker uses CMake, Qt 6, C++20, QWindowKit, and VkUI.
 
 ## Dependencies
 
-- CMake 3.21 or newer.
+- CMake 3.24 or newer.
 - Ninja or another CMake generator.
 - Qt 6.5 or newer with Core, Gui, Widgets, Svg, Concurrent, and Test.
-- VKFrameless initialized as the `external/vkframeless` submodule.
+- QWindowKit and VkUI initialized under `third_party/` with recursive submodules.
 
 ## Configure
 

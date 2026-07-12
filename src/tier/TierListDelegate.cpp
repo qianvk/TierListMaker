@@ -1,7 +1,8 @@
 #include "tier/TierListDelegate.h"
 
-#include "tier/TierListView.h"
+#include "theme/Theme.h"
 #include "tier/TierListModel.h"
+#include "tier/TierListView.h"
 
 #include <QApplication>
 #include <QFontMetrics>
@@ -12,36 +13,36 @@
 #include <algorithm>
 #include <utility>
 
+#include <vkui/core/VkIcon.h>
+
 namespace tlm {
 
 namespace {
 constexpr int kMinimumLabelWidth = 82;
 constexpr int kMaximumLabelWidth = 190;
 constexpr int kDefaultOuterRadius = 16;
-constexpr int kWindowsOuterRadius = 8;
+[[maybe_unused]] constexpr int kWindowsOuterRadius = 8;
 constexpr int kTileMargin = 0;
 constexpr int kTileSpacing = 0;
 constexpr int kNominalTileExtent = 84;
 constexpr int kMinTileSide = 34;
 constexpr int kMaxTileSide = 512;
 
-const QColor kContentBackground(QStringLiteral("#f7f8fb"));
-const QColor kGridLine(QStringLiteral("#c8d0da"));
-const QColor kTextColor(QStringLiteral("#111111"));
-const QColor kTileBackground(QStringLiteral("#ffffff"));
 constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
 
 qreal canvasBackgroundVisibility(const TierProject* project) {
     if (!project) {
         return kDefaultBackgroundIconVisibility;
     }
-    const bool hasCustomBackground = !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
+    const bool hasCustomBackground =
+        !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
     const qreal fallback = hasCustomBackground ? 1.0 : kDefaultBackgroundIconVisibility;
     return qBound<qreal>(
         0.0,
         project->canvas.value(QStringLiteral("backgroundVisibility"))
-            .toDouble(project->canvas.value(QStringLiteral("backgroundImageOpacity")).toDouble(
-                project->canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
+            .toDouble(project->canvas.value(QStringLiteral("backgroundImageOpacity"))
+                          .toDouble(project->canvas.value(QStringLiteral("backgroundOpacity"))
+                                        .toDouble(fallback))),
         1.0);
 }
 
@@ -74,8 +75,8 @@ QPainterPath rowClipPath(const QRect& rect, bool firstRow, bool lastRow) {
         squareMask.addRect(QRectF(rowRect.left(), rowRect.top(), rowRect.width(), radius + 1));
     }
     if (!lastRow) {
-        squareMask.addRect(QRectF(rowRect.left(), rowRect.bottom() - radius - 1,
-                                  rowRect.width(), radius + 1));
+        squareMask.addRect(
+            QRectF(rowRect.left(), rowRect.bottom() - radius - 1, rowRect.width(), radius + 1));
     }
     return rounded.united(squareMask);
 }
@@ -233,7 +234,8 @@ QPixmap TierListDelegate::fullPixmapForImageId(const QString& imageId) const {
 
     QImageReader reader(m_assetManager->resolvedImagePath(*m_project, *image));
     reader.setAutoTransform(true);
-    // Mission Control hover only needs a high-quality display source; capped decoding keeps frames smooth.
+    // Mission Control hover only needs a high-quality display source; capped decoding keeps frames
+    // smooth.
     const QSize sourceSize = reader.size();
     if (sourceSize.isValid()) {
         reader.setScaledSize(sourceSize.scaled(QSize(768, 768), Qt::KeepAspectRatio));
@@ -325,11 +327,12 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
                             QPainter::SmoothPixmapTransform);
 
     const QRect rowRect = paintOption.rect;
-    const bool firstRow = view ? view->isVisualFirstRow(index)
-                               : index.data(TierListModel::FirstRowRole).toBool();
-    const bool lastRow = view ? view->isVisualLastRow(index)
-                              : index.data(TierListModel::LastRowRole).toBool();
+    const bool firstRow =
+        view ? view->isVisualFirstRow(index) : index.data(TierListModel::FirstRowRole).toBool();
+    const bool lastRow =
+        view ? view->isVisualLastRow(index) : index.data(TierListModel::LastRowRole).toBool();
     const QColor rowColor = index.data(TierListModel::ColorRole).value<QColor>();
+    const ThemeTokens& colors = activeThemeTokens();
     const qreal backgroundVisibility = canvasBackgroundVisibility(m_project);
     // When a background image is present, rows act like a terminal-style material layer:
     // visibility 0 restores the solid board; visibility 1 leaves the image unobstructed.
@@ -338,16 +341,13 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     const float gridAlpha = static_cast<float>(1.0 - backgroundVisibility * 0.72);
 
     painter->setClipPath(rowClipPath(rowRect, firstRow, lastRow));
-    QColor labelColor = rowColor.isValid() ? rowColor : QColor(QStringLiteral("#d9dee7"));
+    QColor labelColor = rowColor.isValid() ? rowColor : colors.controlFillHovered;
     labelColor.setAlphaF(labelAlpha);
     const int currentLabelWidth = labelWidth();
     const int labelSlide = qRound((currentLabelWidth + 2) * missionProgress);
     const QRect labelPaintRect = labelRect(rowRect).translated(-labelSlide, 0);
     painter->fillRect(labelPaintRect, labelColor);
-    QColor contentBackground = option.palette.color(QPalette::AlternateBase);
-    if (!contentBackground.isValid()) {
-        contentBackground = kContentBackground;
-    }
+    QColor contentBackground = colors.tierRowBackground;
     contentBackground.setAlphaF(materialAlpha);
     const int animatedSplitX = rowRect.left() + qRound(currentLabelWidth * (1.0 - missionProgress));
     painter->fillRect(QRect(animatedSplitX, rowRect.top(),
@@ -358,16 +358,17 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     labelFont.setBold(true);
     labelFont.setPointSize(labelFont.pointSize() + 7);
     painter->setFont(labelFont);
-    QColor textColor = kTextColor;
+    QColor textColor = contrastingTextColor(labelColor);
     textColor.setAlphaF(1.0F);
     painter->setPen(textColor);
-    painter->drawText(labelPaintRect.adjusted(5, 5, -5, -5), Qt::AlignCenter,
-                      painter->fontMetrics().elidedText(index.data(TierListModel::LabelRole).toString(),
-                                                        Qt::ElideRight, currentLabelWidth - 10));
+    painter->drawText(
+        labelPaintRect.adjusted(5, 5, -5, -5), Qt::AlignCenter,
+        painter->fontMetrics().elidedText(index.data(TierListModel::LabelRole).toString(),
+                                          Qt::ElideRight, currentLabelWidth - 10));
 
     painter->setClipping(false);
     painter->setRenderHint(QPainter::Antialiasing, false);
-    QColor gridLine = kGridLine;
+    QColor gridLine = colors.separator;
     gridLine.setAlphaF(gridAlpha * static_cast<float>(1.0 - missionProgress));
     painter->setPen(QPen(gridLine, 1));
     painter->drawLine(animatedSplitX, rowRect.top(), animatedSplitX, rowRect.bottom());
@@ -410,44 +411,48 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
             }
         }
         const qreal scale = view ? view->dockScaleForImage(index, tileRect, image->id) : 1.0;
-        const QPointF dockOffset = view ? view->dockOffsetForImage(index, tileRect, image->id) : QPointF();
+        const QPointF dockOffset =
+            view ? view->dockOffsetForImage(index, tileRect, image->id) : QPointF();
         const QSizeF paintSize(tileRect.width() * scale, tileRect.height() * scale);
         const QPointF center = QPointF(tileRect.center()) + dockOffset;
         const QRectF paintRect(center.x() - paintSize.width() / 2.0,
-                               center.y() - paintSize.height() / 2.0,
-                               paintSize.width(), paintSize.height());
-        paintTiles.append(PaintTile{image, tileRect, paintRect, scale, image->id == m_selectedImageId});
+                               center.y() - paintSize.height() / 2.0, paintSize.width(),
+                               paintSize.height());
+        paintTiles.append(
+            PaintTile{image, tileRect, paintRect, scale, image->id == m_selectedImageId});
     }
 
-    std::sort(paintTiles.begin(), paintTiles.end(), [](const PaintTile& left, const PaintTile& right) {
-        if (!qFuzzyCompare(left.scale, right.scale)) {
-            return left.scale < right.scale;
-        }
-        return left.baseRect.left() < right.baseRect.left();
-    });
+    std::sort(paintTiles.begin(), paintTiles.end(),
+              [](const PaintTile& left, const PaintTile& right) {
+                  if (!qFuzzyCompare(left.scale, right.scale)) {
+                      return left.scale < right.scale;
+                  }
+                  return left.baseRect.left() < right.baseRect.left();
+              });
 
     for (const PaintTile& tile : std::as_const(paintTiles)) {
         const TierImage* image = tile.image;
         const QRectF imageRect = tile.paintRect;
         const bool selected = tile.selected;
 
-        const qreal deviceRatio = option.widget ? option.widget->devicePixelRatioF() : qApp->devicePixelRatio();
+        const qreal deviceRatio =
+            option.widget ? option.widget->devicePixelRatioF() : qApp->devicePixelRatio();
         const QSize targetPixelSize(qCeil(imageRect.width() * deviceRatio),
                                     qCeil(imageRect.height() * deviceRatio));
         QPixmap pixmap = pixmapForImage(*image, targetPixelSize);
         painter->save();
         const QRectF drawBounds = imageRect;
         painter->setClipRect(drawBounds);
-        painter->fillRect(drawBounds, option.palette.alternateBase());
+        painter->fillRect(drawBounds, colors.elevatedBackground);
         if (!pixmap.isNull()) {
-            painter->drawPixmap(drawBounds, pixmap,
-                                image->thumbnailSourceRect(pixmap.size(), drawBounds.size().toSize()));
+            painter->drawPixmap(
+                drawBounds, pixmap,
+                image->thumbnailSourceRect(pixmap.size(), drawBounds.size().toSize()));
         }
         painter->restore();
 
         painter->setRenderHint(QPainter::Antialiasing, false);
-        painter->setPen(QPen(selected ? option.palette.highlight().color() : QColor(0, 0, 0, 42),
-                             selected ? 2 : 1));
+        painter->setPen(QPen(selected ? colors.accent : colors.imageBorder, selected ? 2 : 1));
         painter->setBrush(Qt::NoBrush);
         painter->drawRect(imageRect.adjusted(0.5, 0.5, -0.5, -0.5));
         painter->setRenderHint(QPainter::Antialiasing, true);
@@ -456,7 +461,8 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
     painter->restore();
 }
 
-QSize TierListDelegate::sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const {
+QSize TierListDelegate::sizeHint(const QStyleOptionViewItem& option,
+                                 const QModelIndex& index) const {
     Q_UNUSED(option);
     return QSize(1, qMax(1, index.data(TierListModel::RowHeightRole).toInt()));
 }
@@ -469,8 +475,9 @@ QPixmap TierListDelegate::pixmapForImage(const TierImage& image, QSize targetPix
     if (m_thumbnailCache) {
         if (m_project && m_assetManager) {
             if (!m_thumbnailCache->hasThumbnail(image.id, targetPixelSize)) {
-                m_thumbnailCache->requestThumbnail(image.id, m_assetManager->resolvedImagePath(*m_project, image),
-                                                   targetPixelSize.isEmpty() ? QSize(192, 192) : targetPixelSize);
+                m_thumbnailCache->requestThumbnail(
+                    image.id, m_assetManager->resolvedImagePath(*m_project, image),
+                    targetPixelSize.isEmpty() ? QSize(192, 192) : targetPixelSize);
             }
         }
         const QPixmap cached = m_thumbnailCache->thumbnail(image.id, targetPixelSize);
@@ -478,7 +485,8 @@ QPixmap TierListDelegate::pixmapForImage(const TierImage& image, QSize targetPix
             return cached;
         }
     }
-    return QPixmap(QStringLiteral(":/icons/image.svg"));
+    return vkui::icon(vkui::VkSymbol::Eye, vkui::VkIconRole::Secondary)
+        .pixmap(targetPixelSize.isEmpty() ? QSize(64, 64) : targetPixelSize);
 }
 
 } // namespace tlm

@@ -4,20 +4,21 @@
 #include "assets/ThumbnailCache.h"
 #include "tier/TierProject.h"
 
-#include <QDialog>
-#include <QEvent>
 #include <QMetaObject>
+#include <QPointer>
 #include <QRect>
+#include <QWidget>
 
-class QHideEvent;
-class QShowEvent;
+namespace vkui {
+class VkPopover;
+}
 
 namespace tlm {
 
 class GalleryGridWidget;
 
 /** Popup gallery for every imported image, with tight square cells and shared image drag MIME. */
-class ImageGalleryPopover final : public QDialog {
+class ImageGalleryPopover final : public QWidget {
     Q_OBJECT
 
 public:
@@ -27,7 +28,9 @@ public:
                  ThumbnailCache* thumbnailCache, const QString& selectedImageId);
     void setSelectedImageId(const QString& selectedImageId);
     void setOutsideDismissSuspended(bool suspended);
-    void placeBelow(const QRect& globalAnchorRect);
+    void openFor(QWidget* anchor);
+    void closeAnimated();
+    bool isOpen() const;
     QRect imageSourceRect(const QString& imageId) const;
     QSize sizeHint() const override;
 
@@ -41,10 +44,6 @@ signals:
     void dragActiveChanged(bool active);
 
 protected:
-    bool eventFilter(QObject* watched, QEvent* event) override;
-    void showEvent(QShowEvent* event) override;
-    void hideEvent(QHideEvent* event) override;
-    void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
@@ -58,21 +57,20 @@ private:
     int cellIndexAt(const QPoint& point) const;
     void recalculateGrid(const QRect& availableGeometry);
     void requestThumbnails();
-    bool shouldDismissForGlobalPosition(const QPoint& globalPosition) const;
 
     const TierProject* m_project{nullptr};
     const AssetManager* m_assetManager{nullptr};
     ThumbnailCache* m_thumbnailCache{nullptr};
     QString m_selectedImageId;
     GalleryGridWidget* m_grid{nullptr};
+    vkui::VkPopover* m_popover{nullptr};
+    QPointer<QWidget> m_anchor;
+    QPointer<QWidget> m_hostWindow;
     QMetaObject::Connection m_thumbnailConnection;
     int m_tileExtent{72};
     int m_columns{1};
     int m_rows{1};
-    int m_arrowCenterX{46};
-    QRect m_anchorGlobalRect;
     bool m_outsideDismissSuspended{false};
-    bool m_eventFilterInstalled{false};
 };
 
 } // namespace tlm

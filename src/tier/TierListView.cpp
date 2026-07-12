@@ -1,12 +1,14 @@
 #include "tier/TierListView.h"
 
+#include "theme/Theme.h"
+
 #include "logging/Logger.h"
 #include "tier/TierDragController.h"
 #include "tier/TierListDelegate.h"
 #include "tier/TierListModel.h"
 
-#include <QApplication>
 #include <QAction>
+#include <QApplication>
 #include <QContextMenuEvent>
 #include <QCursor>
 #include <QDir>
@@ -15,14 +17,14 @@
 #include <QDragLeaveEvent>
 #include <QDragMoveEvent>
 #include <QDropEvent>
+#include <QFileInfo>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
-#include <QMenu>
 #include <QPainter>
 #include <QPainterPath>
-#include <QFileInfo>
 #include <QPointer>
 #include <QScrollBar>
 #include <QSet>
@@ -38,8 +40,6 @@
 namespace tlm {
 
 namespace {
-const QColor kGridLine(QStringLiteral("#c8d0da"));
-const QColor kDropLine(QStringLiteral("#1677ff"));
 constexpr int kRowReorderAnimationMs = 190;
 constexpr int kImageReorderAnimationMs = 145;
 constexpr int kInitialLayoutLineHeight = 84;
@@ -79,13 +79,15 @@ qreal canvasBackgroundVisibility(const TierProject* project) {
     if (!project) {
         return kDefaultBackgroundIconVisibility;
     }
-    const bool hasCustomBackground = !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
+    const bool hasCustomBackground =
+        !project->canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
     const qreal fallback = hasCustomBackground ? 1.0 : kDefaultBackgroundIconVisibility;
     return qBound<qreal>(
         0.0,
         project->canvas.value(QStringLiteral("backgroundVisibility"))
-            .toDouble(project->canvas.value(QStringLiteral("backgroundImageOpacity")).toDouble(
-                project->canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
+            .toDouble(project->canvas.value(QStringLiteral("backgroundImageOpacity"))
+                          .toDouble(project->canvas.value(QStringLiteral("backgroundOpacity"))
+                                        .toDouble(fallback))),
         1.0);
 }
 
@@ -101,8 +103,8 @@ QPainterPath placeholderClipPath(const QRectF& rect, bool firstRow, bool lastRow
 
     QPainterPath squareMask;
     if (!firstRow) {
-        squareMask.addRect(QRectF(rect.left(), rect.top(), rect.width(),
-                                  TierListDelegate::outerRadius() + 1));
+        squareMask.addRect(
+            QRectF(rect.left(), rect.top(), rect.width(), TierListDelegate::outerRadius() + 1));
     }
     if (!lastRow) {
         squareMask.addRect(QRectF(rect.left(), rect.bottom() - TierListDelegate::outerRadius() - 1,
@@ -130,10 +132,8 @@ bool rectContainsRect(const QRectF& outer, const QRectF& inner) {
     const qreal outerBottom = outer.top() + outer.height();
     const qreal innerRight = inner.left() + inner.width();
     const qreal innerBottom = inner.top() + inner.height();
-    return outer.left() <= inner.left() + kEpsilon &&
-           outer.top() <= inner.top() + kEpsilon &&
-           outerRight + kEpsilon >= innerRight &&
-           outerBottom + kEpsilon >= innerBottom;
+    return outer.left() <= inner.left() + kEpsilon && outer.top() <= inner.top() + kEpsilon &&
+           outerRight + kEpsilon >= innerRight && outerBottom + kEpsilon >= innerBottom;
 }
 
 QRect centeredPixmapCropRect(const QPixmap& pixmap, const QSize& targetSize) {
@@ -151,7 +151,8 @@ QRect centeredPixmapCropRect(const QPixmap& pixmap, const QSize& targetSize) {
     return QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
 }
 
-QPixmap centeredDragPixmap(const QPixmap& pixmap, const QSize& logicalSize, qreal devicePixelRatio) {
+QPixmap centeredDragPixmap(const QPixmap& pixmap, const QSize& logicalSize,
+                           qreal devicePixelRatio) {
     if (pixmap.isNull() || logicalSize.isEmpty()) {
         return {};
     }
@@ -189,7 +190,8 @@ qreal missionLayoutMarginForSize(const QSizeF& viewportSize) {
 QRectF missionHoverSafeBounds(const QSizeF& viewportSize) {
     QRectF bounds(QPointF(0.0, 0.0), viewportSize);
     const qreal shortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
-    const qreal margin = missionLayoutMarginForSize(viewportSize) + qBound<qreal>(6.0, shortSide / 96.0, 14.0);
+    const qreal margin =
+        missionLayoutMarginForSize(viewportSize) + qBound<qreal>(6.0, shortSide / 96.0, 14.0);
     if (bounds.width() <= margin * 2.0 || bounds.height() <= margin * 2.0) {
         return bounds.adjusted(2.0, 2.0, -2.0, -2.0);
     }
@@ -266,11 +268,13 @@ QRectF missionRectWithMargin(const QRectF& rect, qreal margin) {
 }
 
 bool missionRectsConflictWithMargin(const QRectF& first, const QRectF& second, qreal margin) {
-    const QRectF overlap = missionRectWithMargin(first, margin).intersected(missionRectWithMargin(second, margin));
+    const QRectF overlap =
+        missionRectWithMargin(first, margin).intersected(missionRectWithMargin(second, margin));
     return overlap.isValid() && !overlap.isEmpty();
 }
 
-bool missionRectConflictsWithBlockers(const QRectF& rect, const QVector<QRectF>& blockers, qreal margin) {
+bool missionRectConflictsWithBlockers(const QRectF& rect, const QVector<QRectF>& blockers,
+                                      qreal margin) {
     for (const QRectF& blocker : blockers) {
         if (missionRectsConflictWithMargin(blocker, rect, margin)) {
             return true;
@@ -298,9 +302,8 @@ QPointF missionSeparationVectorForMargin(const QRectF& fixedRect, const QRectF& 
                                             : -overlap.width() - kNumericalPad,
                        0.0);
     }
-    return QPointF(0.0,
-                   direction.y() >= 0.0 ? overlap.height() + kNumericalPad
-                                        : -overlap.height() - kNumericalPad);
+    return QPointF(0.0, direction.y() >= 0.0 ? overlap.height() + kNumericalPad
+                                             : -overlap.height() - kNumericalPad);
 }
 
 struct MissionHoverItem {
@@ -335,10 +338,8 @@ QRectF missionLargestShrunkRectThatFits(const QRectF& base, const QPointF& hover
 }
 
 QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
-                                            const QVector<QRectF>& blockers,
-                                            qreal margin,
-                                            int* candidateCount,
-                                            bool* usedFallback) {
+                                            const QVector<QRectF>& blockers, qreal margin,
+                                            int* candidateCount, bool* usedFallback) {
     if (!missionRectConflictsWithBlockers(preferred, blockers, margin)) {
         return preferred;
     }
@@ -352,10 +353,9 @@ QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
     QVector<QRectF> inflated;
     inflated.reserve(blockers.size());
     for (const QRectF& blocker : blockers) {
-        const QRectF obstacle = blocker.adjusted(-size.width() / 2.0 - margin,
-                                                 -size.height() / 2.0 - margin,
-                                                 size.width() / 2.0 + margin,
-                                                 size.height() / 2.0 + margin);
+        const QRectF obstacle =
+            blocker.adjusted(-size.width() / 2.0 - margin, -size.height() / 2.0 - margin,
+                             size.width() / 2.0 + margin, size.height() / 2.0 + margin);
         inflated.append(obstacle);
     }
     std::sort(inflated.begin(), inflated.end(), [&origin](const QRectF& left, const QRectF& right) {
@@ -373,9 +373,7 @@ QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
     xs.append(origin.x());
     ys.append(origin.y());
 
-    auto appendCandidate = [&candidates](const QPointF& point) {
-        candidates.append(point);
-    };
+    auto appendCandidate = [&candidates](const QPointF& point) { candidates.append(point); };
 
     for (int i = 0; i < blockerLimit; ++i) {
         const QRectF obstacle = inflated.at(i);
@@ -388,8 +386,10 @@ QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
         ys.append(top);
         ys.append(bottom);
 
-        const QVector<qreal> ySeeds{origin.y(), obstacle.top(), obstacle.center().y(), obstacle.bottom()};
-        const QVector<qreal> xSeeds{origin.x(), obstacle.left(), obstacle.center().x(), obstacle.right()};
+        const QVector<qreal> ySeeds{origin.y(), obstacle.top(), obstacle.center().y(),
+                                    obstacle.bottom()};
+        const QVector<qreal> xSeeds{origin.x(), obstacle.left(), obstacle.center().x(),
+                                    obstacle.right()};
         for (qreal y : ySeeds) {
             appendCandidate(QPointF(left, y));
             appendCandidate(QPointF(right, y));
@@ -429,9 +429,8 @@ QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
     }
 
     const qreal radialStep = qMax<qreal>(margin, qMin(size.width(), size.height()) * 0.22);
-    const qreal maxRadius = qMax<qreal>(
-        2400.0,
-        qMax(size.width(), size.height()) * static_cast<qreal>(blockers.size()) * 2.2);
+    const qreal maxRadius = qMax<qreal>(2400.0, qMax(size.width(), size.height()) *
+                                                    static_cast<qreal>(blockers.size()) * 2.2);
     constexpr int kDirections = 24;
     constexpr qreal kTwoPi = 6.2831853071795864769;
     for (qreal radius = radialStep; radius <= maxRadius; radius += radialStep) {
@@ -453,9 +452,11 @@ QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
         *usedFallback = true;
     }
     QRectF resolved = preferred;
-    for (int pass = 0; pass < 24 && missionRectConflictsWithBlockers(resolved, blockers, margin); ++pass) {
+    for (int pass = 0; pass < 24 && missionRectConflictsWithBlockers(resolved, blockers, margin);
+         ++pass) {
         for (int i = 0; i < blockers.size(); ++i) {
-            const QPointF push = missionSeparationVectorForMargin(blockers.at(i), resolved, margin, pass * 31 + i);
+            const QPointF push =
+                missionSeparationVectorForMargin(blockers.at(i), resolved, margin, pass * 31 + i);
             if (!push.isNull()) {
                 resolved.translate(push);
             }
@@ -464,24 +465,25 @@ QRectF missionClosestTranslatedRectThatFits(const QRectF& preferred,
     return resolved;
 }
 
-QVector<TierListView::MissionTile> missionTilesWithHoverExpansion(QVector<TierListView::MissionTile> tiles,
-                                                                  int hoverIndex,
-                                                                  const QRectF& hoverTarget,
-                                                                  qreal progress,
-                                                                  const QSizeF& viewportSize) {
+QVector<TierListView::MissionTile>
+missionTilesWithHoverExpansion(QVector<TierListView::MissionTile> tiles, int hoverIndex,
+                               const QRectF& hoverTarget, qreal progress,
+                               const QSizeF& viewportSize) {
     if (hoverIndex < 0 || hoverIndex >= tiles.size() || progress <= 0.001) {
         return tiles;
     }
 
     const QRectF hoverBase = tiles.at(hoverIndex).rect;
     const qreal easedProgress = missionMacHoverEase(progress);
-    const qreal boardShortSide = qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
+    const qreal boardShortSide =
+        qMax<qreal>(1.0, qMin(viewportSize.width(), viewportSize.height()));
     const qreal baseLongSide = qMax<qreal>(1.0, qMax(hoverBase.width(), hoverBase.height()));
     const qreal influenceRadius = qMax<qreal>(baseLongSide * 2.75, boardShortSide * 0.28);
     const qreal fixedMargin = missionControlDefaultImageMargin(viewportSize);
     constexpr qreal kMinimumNeighborScale = 0.58;
 
-    QRectF hoverRect(hoverBase.topLeft() + (hoverTarget.topLeft() - hoverBase.topLeft()) * easedProgress,
+    QRectF hoverRect(hoverBase.topLeft() +
+                         (hoverTarget.topLeft() - hoverBase.topLeft()) * easedProgress,
                      hoverBase.size() + (hoverTarget.size() - hoverBase.size()) * easedProgress);
     tiles[hoverIndex].rect = hoverRect;
 
@@ -493,17 +495,17 @@ QVector<TierListView::MissionTile> missionTilesWithHoverExpansion(QVector<TierLi
         }
         const QRectF base = tiles.at(i).rect;
         const qreal distance = missionDistanceToRect(base.center(), hoverBase);
-        const qreal influence = std::exp(-(distance * distance) /
-                                         (2.0 * influenceRadius * influenceRadius));
+        const qreal influence =
+            std::exp(-(distance * distance) / (2.0 * influenceRadius * influenceRadius));
         items.append(MissionHoverItem{i, distance, influence});
     }
-    std::stable_sort(items.begin(), items.end(), [](const MissionHoverItem& left,
-                                                    const MissionHoverItem& right) {
-        if (!qFuzzyCompare(left.distance + 1.0, right.distance + 1.0)) {
-            return left.distance < right.distance;
-        }
-        return left.index < right.index;
-    });
+    std::stable_sort(items.begin(), items.end(),
+                     [](const MissionHoverItem& left, const MissionHoverItem& right) {
+                         if (!qFuzzyCompare(left.distance + 1.0, right.distance + 1.0)) {
+                             return left.distance < right.distance;
+                         }
+                         return left.index < right.index;
+                     });
 
     QVector<QRectF> blockers;
     blockers.reserve(tiles.size());
@@ -519,20 +521,19 @@ QVector<TierListView::MissionTile> missionTilesWithHoverExpansion(QVector<TierLi
 
     for (const MissionHoverItem& item : std::as_const(items)) {
         const QRectF base = tiles.at(item.index).rect;
-        const qreal minScale = qBound<qreal>(kMinimumNeighborScale,
-                                             1.0 - 0.42 * item.influence * easedProgress,
-                                             1.0);
+        const qreal minScale =
+            qBound<qreal>(kMinimumNeighborScale, 1.0 - 0.42 * item.influence * easedProgress, 1.0);
         qreal selectedScale = 1.0;
-        QRectF rect = missionLargestShrunkRectThatFits(base, hoverRect.center(), blockers,
-                                                       fixedMargin, minScale, &shrinkTests,
-                                                       &selectedScale);
+        QRectF rect =
+            missionLargestShrunkRectThatFits(base, hoverRect.center(), blockers, fixedMargin,
+                                             minScale, &shrinkTests, &selectedScale);
         bool usedFallback = false;
         if (missionRectConflictsWithBlockers(rect, blockers, fixedMargin)) {
             rect = missionClosestTranslatedRectThatFits(rect, blockers, fixedMargin,
                                                         &candidateTests, &usedFallback);
-            const QPointF delta = rect.center() - missionShrinkRectAwayFromPoint(base, hoverRect.center(),
-                                                                                 selectedScale)
-                                                    .center();
+            const QPointF delta =
+                rect.center() -
+                missionShrinkRectAwayFromPoint(base, hoverRect.center(), selectedScale).center();
             const qreal moveDistance = std::hypot(delta.x(), delta.y());
             if (moveDistance > 0.5) {
                 ++movedImages;
@@ -562,29 +563,31 @@ QVector<TierListView::MissionTile> missionTilesWithHoverExpansion(QVector<TierLi
     static QString lastLoggedHoverId;
     static int lastLoggedProgressBucket = -1;
     const int progressBucket = qRound(easedProgress * 10.0);
-    if (tiles.at(hoverIndex).imageId != lastLoggedHoverId || progressBucket != lastLoggedProgressBucket) {
+    if (tiles.at(hoverIndex).imageId != lastLoggedHoverId ||
+        progressBucket != lastLoggedProgressBucket) {
         lastLoggedHoverId = tiles.at(hoverIndex).imageId;
         lastLoggedProgressBucket = progressBucket;
-        Logger::debug(QStringLiteral("tier.list.mission.hover.layout imageId=%1 progress=%2 influenced=%3 "
-                                     "mode=fixed-margin-nearest-first margin=%4 minNeighborScale=%5 "
-                                     "movedImages=%6 avgMove=%7 shrinkTests=%8 candidateTests=%9 "
-                                     "fallback=%10 marginViolations=%11 "
-                                     "hoverRect=(%12,%13,%14,%15)")
-                          .arg(tiles.at(hoverIndex).imageId)
-                          .arg(easedProgress, 0, 'f', 2)
-                          .arg(influenced)
-                          .arg(fixedMargin, 0, 'f', 1)
-                          .arg(strongestShrink, 0, 'f', 2)
-                          .arg(movedImages)
-                          .arg(movedImages == 0 ? 0.0 : totalMove / movedImages, 0, 'f', 1)
-                          .arg(shrinkTests)
-                          .arg(candidateTests)
-                          .arg(fallbackMoves)
-                          .arg(marginViolations)
-                          .arg(qRound(hoverRect.x()))
-                          .arg(qRound(hoverRect.y()))
-                          .arg(qRound(hoverRect.width()))
-                          .arg(qRound(hoverRect.height())));
+        Logger::debug(
+            QStringLiteral("tier.list.mission.hover.layout imageId=%1 progress=%2 influenced=%3 "
+                           "mode=fixed-margin-nearest-first margin=%4 minNeighborScale=%5 "
+                           "movedImages=%6 avgMove=%7 shrinkTests=%8 candidateTests=%9 "
+                           "fallback=%10 marginViolations=%11 "
+                           "hoverRect=(%12,%13,%14,%15)")
+                .arg(tiles.at(hoverIndex).imageId)
+                .arg(easedProgress, 0, 'f', 2)
+                .arg(influenced)
+                .arg(fixedMargin, 0, 'f', 1)
+                .arg(strongestShrink, 0, 'f', 2)
+                .arg(movedImages)
+                .arg(movedImages == 0 ? 0.0 : totalMove / movedImages, 0, 'f', 1)
+                .arg(shrinkTests)
+                .arg(candidateTests)
+                .arg(fallbackMoves)
+                .arg(marginViolations)
+                .arg(qRound(hoverRect.x()))
+                .arg(qRound(hoverRect.y()))
+                .arg(qRound(hoverRect.width()))
+                .arg(qRound(hoverRect.height())));
     }
 
     return tiles;
@@ -592,7 +595,8 @@ QVector<TierListView::MissionTile> missionTilesWithHoverExpansion(QVector<TierLi
 
 class MissionMaxRectsPacker {
 public:
-    explicit MissionMaxRectsPacker(const QRectF& bounds) : m_bounds(bounds), m_center(bounds.center()) {
+    explicit MissionMaxRectsPacker(const QRectF& bounds)
+        : m_bounds(bounds), m_center(bounds.center()) {
         m_freeRects.append(bounds);
     }
 
@@ -618,8 +622,10 @@ public:
             const QRectF candidate(x, y, size.width(), size.height());
             const QPointF delta = candidate.center() - m_center;
             const qreal centerScore = delta.x() * delta.x() + delta.y() * delta.y();
-            const qreal shortScore = qMin(freeRect.width() - size.width(), freeRect.height() - size.height());
-            const qreal areaScore = freeRect.width() * freeRect.height() - size.width() * size.height();
+            const qreal shortScore =
+                qMin(freeRect.width() - size.width(), freeRect.height() - size.height());
+            const qreal areaScore =
+                freeRect.width() * freeRect.height() - size.width() * size.height();
 
             if (centerScore < bestCenterScore - kEpsilon ||
                 (qAbs(centerScore - bestCenterScore) <= kEpsilon &&
@@ -665,14 +671,15 @@ private:
             const qreal usedBottom = usedRect.top() + usedRect.height();
 
             // Split around an arbitrary centered placement, then prune contained free rects.
-            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), freeRect.top(),
-                                                 usedRect.left() - freeRect.left(), freeRect.height()));
-            appendFreeRect(nextFreeRects, QRectF(usedRight, freeRect.top(),
-                                                 freeRight - usedRight, freeRect.height()));
-            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), freeRect.top(),
-                                                 freeRect.width(), usedRect.top() - freeRect.top()));
-            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), usedBottom,
-                                                 freeRect.width(), freeBottom - usedBottom));
+            appendFreeRect(nextFreeRects,
+                           QRectF(freeRect.left(), freeRect.top(),
+                                  usedRect.left() - freeRect.left(), freeRect.height()));
+            appendFreeRect(nextFreeRects, QRectF(usedRight, freeRect.top(), freeRight - usedRight,
+                                                 freeRect.height()));
+            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), freeRect.top(), freeRect.width(),
+                                                 usedRect.top() - freeRect.top()));
+            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), usedBottom, freeRect.width(),
+                                                 freeBottom - usedBottom));
         }
 
         m_freeRects = std::move(nextFreeRects);
@@ -789,7 +796,8 @@ QVector<TierListView::MissionTile> layoutMissionTiles(const QVector<MissionInput
     }
     const qreal packingGap = qMax<qreal>(0.0, gap);
     const qreal fillTarget = items.size() <= 2 ? 0.54 : 0.84;
-    const qreal areaDrivenScale = std::sqrt((boundsArea * fillTarget) / qMax<qreal>(1.0, preferredArea));
+    const qreal areaDrivenScale =
+        std::sqrt((boundsArea * fillTarget) / qMax<qreal>(1.0, preferredArea));
     const qreal highLimit = qBound<qreal>(0.08, areaDrivenScale, 2.35);
 
     QVector<MissionPlacement> bestPlacements;
@@ -797,7 +805,8 @@ QVector<TierListView::MissionTile> layoutMissionTiles(const QVector<MissionInput
     qreal high = highLimit;
     for (int step = 0; step < kMissionLayoutSearchSteps; ++step) {
         const qreal mid = (low + high) / 2.0;
-        QVector<MissionPlacement> placements = packMissionTilesAtScale(items, bounds, packingGap, mid);
+        QVector<MissionPlacement> placements =
+            packMissionTilesAtScale(items, bounds, packingGap, mid);
         if (placements.size() == items.size()) {
             bestPlacements = std::move(placements);
             low = mid;
@@ -810,18 +819,20 @@ QVector<TierListView::MissionTile> layoutMissionTiles(const QVector<MissionInput
         bestPlacements = packMissionTilesAtScale(items, bounds, 0.0, 0.02);
     }
     if (bestPlacements.size() != items.size()) {
-        Logger::warn(QStringLiteral("tier.list.mission.pack.incomplete images=%1 placed=%2 bounds=(%3,%4)")
-                         .arg(items.size())
-                         .arg(bestPlacements.size())
-                         .arg(qRound(bounds.width()))
-                         .arg(qRound(bounds.height())));
+        Logger::warn(
+            QStringLiteral("tier.list.mission.pack.incomplete images=%1 placed=%2 bounds=(%3,%4)")
+                .arg(items.size())
+                .arg(bestPlacements.size())
+                .arg(qRound(bounds.width()))
+                .arg(qRound(bounds.height())));
     }
     centerMissionPlacements(bestPlacements, bounds);
 
-    std::stable_sort(bestPlacements.begin(), bestPlacements.end(), [&items](const MissionPlacement& left,
-                                                                            const MissionPlacement& right) {
-        return items.at(left.inputIndex).sourceOrder < items.at(right.inputIndex).sourceOrder;
-    });
+    std::stable_sort(bestPlacements.begin(), bestPlacements.end(),
+                     [&items](const MissionPlacement& left, const MissionPlacement& right) {
+                         return items.at(left.inputIndex).sourceOrder <
+                                items.at(right.inputIndex).sourceOrder;
+                     });
 
     qreal packedArea = 0.0;
     for (const MissionPlacement& placement : std::as_const(bestPlacements)) {
@@ -829,7 +840,8 @@ QVector<TierListView::MissionTile> layoutMissionTiles(const QVector<MissionInput
         packedArea += placement.imageRect.width() * placement.imageRect.height();
         tiles.append(TierListView::MissionTile{item.imageId, placement.imageRect, item.sourceSize});
     }
-    Logger::debug(QStringLiteral("tier.list.mission.pack algorithm=maxrects-center images=%1 scale=%2 occupancy=%3 gap=%4")
+    Logger::debug(QStringLiteral("tier.list.mission.pack algorithm=maxrects-center images=%1 "
+                                 "scale=%2 occupancy=%3 gap=%4")
                       .arg(items.size())
                       .arg(low, 0, 'f', 3)
                       .arg(packedArea / boundsArea, 0, 'f', 3)
@@ -849,8 +861,8 @@ qreal missionTileAspect(const TierListView::MissionTile& tile) {
 }
 
 QRectF missionRectAroundCenter(const QPointF& center, const QSizeF& size) {
-    return QRectF(center.x() - size.width() / 2.0, center.y() - size.height() / 2.0,
-                  size.width(), size.height());
+    return QRectF(center.x() - size.width() / 2.0, center.y() - size.height() / 2.0, size.width(),
+                  size.height());
 }
 
 QRectF missionHoverTargetRect(const TierListView::MissionTile& tile, const QSizeF& viewportSize) {
@@ -861,13 +873,15 @@ QRectF missionHoverTargetRect(const TierListView::MissionTile& tile, const QSize
     const qreal baseLongSide = qMax<qreal>(1.0, qMax(base.width(), base.height()));
     const qreal preferredScale =
         qBound<qreal>(1.58, boardShortSide / qMax<qreal>(1.0, baseLongSide * 3.15), 2.45);
-    const qreal maxLongSide = qMax(baseLongSide * 1.28, qMin(boardShortSide * 0.42, boardLongSide * 0.34));
+    const qreal maxLongSide =
+        qMax(baseLongSide * 1.28, qMin(boardShortSide * 0.42, boardLongSide * 0.34));
     const qreal minLongSide = qMin(baseLongSide * 1.42, maxLongSide);
     const qreal targetLongSide = qBound(minLongSide, baseLongSide * preferredScale, maxLongSide);
 
     QSizeF targetSize = missionSizeForLongSide(missionTileAspect(tile), targetLongSide);
-    const qreal fitScale = qMin<qreal>(1.0, qMin(safeBounds.width() / qMax<qreal>(1.0, targetSize.width()),
-                                                 safeBounds.height() / qMax<qreal>(1.0, targetSize.height())));
+    const qreal fitScale =
+        qMin<qreal>(1.0, qMin(safeBounds.width() / qMax<qreal>(1.0, targetSize.width()),
+                              safeBounds.height() / qMax<qreal>(1.0, targetSize.height())));
     targetSize *= fitScale;
     return missionClampRectInside(missionRectAroundCenter(base.center(), targetSize), safeBounds);
 }
@@ -876,17 +890,19 @@ qreal missionTileCornerRadius(const QRectF& rect) {
     return qBound<qreal>(6.0, qMin(rect.width(), rect.height()) * 0.085, 14.0);
 }
 
-QVector<TierListView::MissionTile> missionTilesInPaintOrder(QVector<TierListView::MissionTile> tiles,
-                                                            const QString& hoverImageId) {
-    std::sort(tiles.begin(), tiles.end(), [&hoverImageId](const TierListView::MissionTile& left,
-                                                          const TierListView::MissionTile& right) {
-        const bool leftHover = !hoverImageId.isEmpty() && left.imageId == hoverImageId;
-        const bool rightHover = !hoverImageId.isEmpty() && right.imageId == hoverImageId;
-        if (leftHover != rightHover) {
-            return !leftHover;
-        }
-        return left.rect.width() * left.rect.height() < right.rect.width() * right.rect.height();
-    });
+QVector<TierListView::MissionTile>
+missionTilesInPaintOrder(QVector<TierListView::MissionTile> tiles, const QString& hoverImageId) {
+    std::sort(tiles.begin(), tiles.end(),
+              [&hoverImageId](const TierListView::MissionTile& left,
+                              const TierListView::MissionTile& right) {
+                  const bool leftHover = !hoverImageId.isEmpty() && left.imageId == hoverImageId;
+                  const bool rightHover = !hoverImageId.isEmpty() && right.imageId == hoverImageId;
+                  if (leftHover != rightHover) {
+                      return !leftHover;
+                  }
+                  return left.rect.width() * left.rect.height() <
+                         right.rect.width() * right.rect.height();
+              });
     return tiles;
 }
 
@@ -896,7 +912,8 @@ public:
     using DropHandler = std::function<bool(const QPoint&)>;
 
     RowDragCatchment(QWidget* parent, MoveHandler moveHandler, DropHandler dropHandler)
-        : QWidget(parent), m_moveHandler(std::move(moveHandler)), m_dropHandler(std::move(dropHandler)) {
+        : QWidget(parent), m_moveHandler(std::move(moveHandler)),
+          m_dropHandler(std::move(dropHandler)) {
         setAcceptDrops(true);
         setAttribute(Qt::WA_NoSystemBackground);
         setAttribute(Qt::WA_TranslucentBackground);
@@ -930,7 +947,8 @@ protected:
             event->ignore();
             return;
         }
-        const bool accepted = m_dropHandler && m_dropHandler(mapToGlobal(event->position().toPoint()));
+        const bool accepted =
+            m_dropHandler && m_dropHandler(mapToGlobal(event->position().toPoint()));
         if (!accepted) {
             event->ignore();
             return;
@@ -993,8 +1011,7 @@ void TierListView::setGalleryMissionControlActive(bool active, const QRect& sour
 void TierListView::setMissionControlActiveForSource(bool active, MissionControlSource source,
                                                     const QRect& sourceGlobalRect) {
     const bool gallerySource = source == MissionControlSource::Gallery;
-    if (m_missionControlActive == active &&
-        m_missionFromGallery == gallerySource &&
+    if (m_missionControlActive == active && m_missionFromGallery == gallerySource &&
         ((active && m_missionTransitionProgress >= 0.999) ||
          (!active && m_missionTransitionProgress <= 0.001))) {
         return;
@@ -1003,8 +1020,8 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
     const bool entering = active;
     if (gallerySource) {
         if (sourceGlobalRect.isValid()) {
-            m_missionGallerySourceRect = QRectF(viewport()->mapFromGlobal(sourceGlobalRect.topLeft()),
-                                                sourceGlobalRect.size());
+            m_missionGallerySourceRect = QRectF(
+                viewport()->mapFromGlobal(sourceGlobalRect.topLeft()), sourceGlobalRect.size());
         }
         if (!m_missionGallerySourceRect.isValid()) {
             const QSizeF fallbackSize(36.0, 36.0);
@@ -1034,7 +1051,8 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
     } else {
         unsetCursor();
     }
-    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=%3 algorithm=justified-gallery")
+    Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=%3 "
+                                "algorithm=justified-gallery")
                      .arg(active)
                      .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit"))
                      .arg(gallerySource ? QStringLiteral("gallery") : QStringLiteral("row")));
@@ -1064,8 +1082,8 @@ void TierListView::refreshLayoutMetrics() {
 
     const int availableHeight = qMax(1, viewport()->height());
     const int viewportWidth = qMax(1, viewport()->width());
-    const int labelWidth = tierDelegate() ? tierDelegate()->labelWidth()
-                                          : TierListDelegate::minimumLabelWidth();
+    const int labelWidth =
+        tierDelegate() ? tierDelegate()->labelWidth() : TierListDelegate::minimumLabelWidth();
     auto imageCountAt = [this, model](int row) {
         if (m_imageDragActive) {
             return previewImageCountForRow(row);
@@ -1095,8 +1113,8 @@ void TierListView::refreshLayoutMetrics() {
     QVector<int> rowUnits;
     rowUnits.reserve(rows);
     for (int row = 0; row < rows; ++row) {
-        rowUnits.append(TierListDelegate::rowUnitsForImageCount(imageCountAt(row), viewportWidth,
-                                                                kInitialLayoutLineHeight, labelWidth));
+        rowUnits.append(TierListDelegate::rowUnitsForImageCount(
+            imageCountAt(row), viewportWidth, kInitialLayoutLineHeight, labelWidth));
     }
 
     QVector<int> rowHeights;
@@ -1107,8 +1125,8 @@ void TierListView::refreshLayoutMetrics() {
         bool changed = false;
         for (int row = 0; row < rows; ++row) {
             const int lineHeight = qMax(1, rowHeights.at(row) / qMax(1, rowUnits.at(row)));
-            const int units = TierListDelegate::rowUnitsForImageCount(imageCountAt(row), viewportWidth,
-                                                                      lineHeight, labelWidth);
+            const int units = TierListDelegate::rowUnitsForImageCount(
+                imageCountAt(row), viewportWidth, lineHeight, labelWidth);
             nextUnits.append(units);
             changed = changed || units != rowUnits.at(row);
         }
@@ -1206,8 +1224,8 @@ QPointF TierListView::visualOffsetForImage(const QString& imageId) const {
 
 qreal TierListView::dockScaleForImage(const QModelIndex& index, const QRect& tileRect,
                                       const QString& imageId) const {
-    if (m_dockHoverProgress <= 0.001 || m_imageDragActive || m_rowDropActive ||
-        !index.isValid() || index.row() != m_dockHoverRow || imageId.isEmpty()) {
+    if (m_dockHoverProgress <= 0.001 || m_imageDragActive || m_rowDropActive || !index.isValid() ||
+        index.row() != m_dockHoverRow || imageId.isEmpty()) {
         return 1.0;
     }
 
@@ -1241,7 +1259,8 @@ QPointF TierListView::dockOffsetForImage(const QModelIndex& index, const QRect& 
 QRect TierListView::imageSourceRect(const QString& imageId) const {
     if (m_missionControlActive) {
         const QRect rect = missionImageRect(imageId);
-        return rect.isValid() ? QRect(viewport()->mapTo(window(), rect.topLeft()), rect.size()) : QRect();
+        return rect.isValid() ? QRect(viewport()->mapTo(window(), rect.topLeft()), rect.size())
+                              : QRect();
     }
 
     TierListModel* model = tierModel();
@@ -1273,19 +1292,19 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
                 m_activeImageIndex = QPersistentModelIndex();
                 emit imageSelected(imageId);
                 scheduleMissionImageLift(imageId, event->pos());
-                Logger::debug(QStringLiteral("tier.list.mission.image.select imageId=%1 pos=(%2,%3)")
-                                  .arg(imageId)
-                                  .arg(event->pos().x())
-                                  .arg(event->pos().y()));
+                Logger::debug(
+                    QStringLiteral("tier.list.mission.image.select imageId=%1 pos=(%2,%3)")
+                        .arg(imageId)
+                        .arg(event->pos().x())
+                        .arg(event->pos().y()));
                 viewport()->update();
                 event->accept();
                 return;
             }
             ++m_missionPressSerial;
             m_suppressBlankDoubleClick = true;
-            QTimer::singleShot(QApplication::doubleClickInterval() + 80, this, [this]() {
-                m_suppressBlankDoubleClick = false;
-            });
+            QTimer::singleShot(QApplication::doubleClickInterval() + 80, this,
+                               [this]() { m_suppressBlankDoubleClick = false; });
             Logger::info(QStringLiteral("tier.list.mission.blank.click action=exit pos=(%1,%2)")
                              .arg(event->pos().x())
                              .arg(event->pos().y()));
@@ -1323,11 +1342,12 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
         m_pressKind = PressKind::RowLabel;
         setCursor(Qt::OpenHandCursor);
         setFocus(Qt::MouseFocusReason);
-        Logger::debug(QStringLiteral("tier.list.mouse.press kind=row-label rowId=%1 row=%2 pos=(%3,%4)")
-                          .arg(m_pressedRowId)
-                          .arg(index.row())
-                          .arg(event->pos().x())
-                          .arg(event->pos().y()));
+        Logger::debug(
+            QStringLiteral("tier.list.mouse.press kind=row-label rowId=%1 row=%2 pos=(%3,%4)")
+                .arg(m_pressedRowId)
+                .arg(index.row())
+                .arg(event->pos().x())
+                .arg(event->pos().y()));
         event->accept();
         return;
     }
@@ -1339,7 +1359,8 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
         m_activeImageId = imageId;
         m_activeImageIndex = index;
         setFocus(Qt::MouseFocusReason);
-        Logger::debug(QStringLiteral("tier.list.mouse.press kind=image imageId=%1 rowId=%2 row=%3 pos=(%4,%5)")
+        Logger::debug(QStringLiteral(
+                          "tier.list.mouse.press kind=image imageId=%1 rowId=%2 row=%3 pos=(%4,%5)")
                           .arg(imageId, m_pressedRowId)
                           .arg(index.row())
                           .arg(event->pos().x())
@@ -1446,11 +1467,11 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
         if (!imageId.isEmpty() && imageRect.isValid()) {
             m_activeImageId = imageId;
             m_activeImageIndex = QPersistentModelIndex();
-            Logger::info(QStringLiteral("tier.list.mission.preview.request source=double-click imageId=%1")
-                             .arg(imageId));
-            emit imagePreviewRequested(imageId,
-                                       QRect(viewport()->mapTo(window(), imageRect.topLeft()),
-                                             imageRect.size()));
+            Logger::info(
+                QStringLiteral("tier.list.mission.preview.request source=double-click imageId=%1")
+                    .arg(imageId));
+            emit imagePreviewRequested(
+                imageId, QRect(viewport()->mapTo(window(), imageRect.topLeft()), imageRect.size()));
             event->accept();
             return;
         }
@@ -1476,12 +1497,12 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
             const QRect imageRect = delegate->imageRectForId(index, rowRect, imageId);
             m_activeImageId = imageId;
             m_activeImageIndex = index;
-            Logger::info(QStringLiteral("tier.list.preview.request source=double-click imageId=%1 row=%2")
-                             .arg(imageId)
-                             .arg(index.row()));
-            emit imagePreviewRequested(imageId,
-                                       QRect(viewport()->mapTo(window(), imageRect.topLeft()),
-                                             imageRect.size()));
+            Logger::info(
+                QStringLiteral("tier.list.preview.request source=double-click imageId=%1 row=%2")
+                    .arg(imageId)
+                    .arg(index.row()));
+            emit imagePreviewRequested(
+                imageId, QRect(viewport()->mapTo(window(), imageRect.topLeft()), imageRect.size()));
             event->accept();
             return;
         }
@@ -1489,7 +1510,8 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
             ++m_blankPressSerial;
             if (m_suppressBlankDoubleClick) {
                 m_suppressBlankDoubleClick = false;
-                Logger::debug(QStringLiteral("tier.list.blank.double-click suppressed reason=missionExit"));
+                Logger::debug(
+                    QStringLiteral("tier.list.blank.double-click suppressed reason=missionExit"));
                 event->accept();
                 return;
             }
@@ -1531,9 +1553,9 @@ void TierListView::contextMenuEvent(QContextMenuEvent* event) {
 
     QMenu menu(this);
     QAction* editAction = menu.addAction(tr("Edit"));
-    QAction* removeAction = menu.addAction(image->assignedTierRowId.has_value()
-                                               ? tr("Remove from Tier Row")
-                                               : tr("Remove from Image Gallery"));
+    QAction* removeAction =
+        menu.addAction(image->assignedTierRowId.has_value() ? tr("Remove from Tier Row")
+                                                            : tr("Remove from Image Gallery"));
     QAction* chosen = menu.exec(event->globalPos());
     if (chosen == editAction) {
         Logger::info(QStringLiteral("tier.list.context.edit imageId=%1 mission=%2")
@@ -1546,7 +1568,8 @@ void TierListView::contextMenuEvent(QContextMenuEvent* event) {
                              .arg(imageId, *image->assignedTierRowId));
             emit imageRemoveFromTierRowRequested(imageId);
         } else {
-            Logger::info(QStringLiteral("tier.list.context.remove.from.gallery imageId=%1").arg(imageId));
+            Logger::info(
+                QStringLiteral("tier.list.context.remove.from.gallery imageId=%1").arg(imageId));
             emit imageRemoveFromGalleryRequested(imageId);
         }
     }
@@ -1564,9 +1587,10 @@ void TierListView::keyPressEvent(QKeyEvent* event) {
         if (!source.isValid()) {
             source = QRect(viewport()->rect().center() - QPoint(20, 20), QSize(40, 40));
         }
-        Logger::info(QStringLiteral("tier.list.preview.request source=space imageId=%1").arg(m_activeImageId));
-        emit imagePreviewRequested(m_activeImageId,
-                                   QRect(viewport()->mapTo(window(), source.topLeft()), source.size()));
+        Logger::info(QStringLiteral("tier.list.preview.request source=space imageId=%1")
+                         .arg(m_activeImageId));
+        emit imagePreviewRequested(
+            m_activeImageId, QRect(viewport()->mapTo(window(), source.topLeft()), source.size()));
         event->accept();
         return;
     }
@@ -1590,14 +1614,15 @@ void TierListView::resizeEvent(QResizeEvent* event) {
 
 void TierListView::paintEvent(QPaintEvent* event) {
     const bool missionLayerVisible = m_missionControlActive || m_missionTransitionProgress > 0.001;
+    const ThemeTokens& colors = activeThemeTokens();
     {
         QPainter backgroundPainter(viewport());
         backgroundPainter.setRenderHint(QPainter::Antialiasing);
         QPainterPath boardClip;
         boardClip.addRoundedRect(QRectF(viewport()->rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                                  TierListDelegate::outerRadius(), TierListDelegate::outerRadius());
-        const QColor boardColor = missionLayerVisible ? palette().color(QPalette::AlternateBase)
-                                                      : palette().color(QPalette::Base);
+        const QColor boardColor =
+            missionLayerVisible ? colors.elevatedBackground : colors.contentBackground;
         backgroundPainter.fillPath(boardClip, boardColor);
         paintCanvasBackground(&backgroundPainter);
     }
@@ -1609,9 +1634,10 @@ void TierListView::paintEvent(QPaintEvent* event) {
                                QPainter::TextAntialiasing);
         paintMissionControl(&painter);
         const QRectF outline = QRectF(viewport()->rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-        painter.setPen(QPen(kGridLine, 1));
+        painter.setPen(QPen(colors.separator, 1));
         painter.setBrush(Qt::NoBrush);
-        painter.drawRoundedRect(outline, TierListDelegate::outerRadius(), TierListDelegate::outerRadius());
+        painter.drawRoundedRect(outline, TierListDelegate::outerRadius(),
+                                TierListDelegate::outerRadius());
         return;
     }
 
@@ -1628,38 +1654,41 @@ void TierListView::paintEvent(QPaintEvent* event) {
     if (!missionLayerVisible && m_rowDropActive && !m_rowDropId.isEmpty() && m_rowDropIndex >= 0) {
         const qreal y = m_placeholderY;
         if (y >= 0.0) {
-            QColor fill = kDropLine;
+            QColor fill = colors.dropTarget;
             fill.setAlpha(26);
             const int sourceHeight = qMax(2, m_reorderSourceRect.height());
             const QRectF placeholderRect(0.5, y, qMax(1, viewport()->width() - 1), sourceHeight);
             const bool firstVisualRow = placeholderRect.top() <= 0.5;
             const bool lastVisualRow = placeholderRect.bottom() >= viewport()->height() - 1.5;
-            const QPainterPath clipPath = placeholderClipPath(placeholderRect, firstVisualRow, lastVisualRow);
+            const QPainterPath clipPath =
+                placeholderClipPath(placeholderRect, firstVisualRow, lastVisualRow);
             painter.fillPath(clipPath, fill);
         }
     }
 
     if (!missionLayerVisible && m_imageDragActive && m_imagePlaceholderRect.isValid()) {
         const QRectF placeholder = m_imagePlaceholderRect;
-        QColor fill = kDropLine;
+        QColor fill = colors.dropTarget;
         fill.setAlpha(34);
         painter.fillRect(placeholder, fill);
         if (TierListDelegate* delegate = tierDelegate()) {
             const qreal dpr = viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
-            const QSize targetPixels(qCeil(placeholder.width() * dpr), qCeil(placeholder.height() * dpr));
+            const QSize targetPixels(qCeil(placeholder.width() * dpr),
+                                     qCeil(placeholder.height() * dpr));
             const QPixmap pixmap = delegate->pixmapForImageId(m_imageDragId, targetPixels);
             const TierProject* project = tierModel() ? tierModel()->project() : nullptr;
             const TierImage* image = project ? project->imageById(m_imageDragId) : nullptr;
             if (!pixmap.isNull()) {
                 painter.save();
                 painter.setOpacity(0.38);
-                painter.drawPixmap(placeholder, pixmap,
-                                   image ? image->thumbnailSourceRect(pixmap.size(), placeholder.size().toSize())
-                                         : centeredPixmapCropRect(pixmap, placeholder.size().toSize()));
+                painter.drawPixmap(
+                    placeholder, pixmap,
+                    image ? image->thumbnailSourceRect(pixmap.size(), placeholder.size().toSize())
+                          : centeredPixmapCropRect(pixmap, placeholder.size().toSize()));
                 painter.restore();
             }
         }
-        QColor stroke = kDropLine;
+        QColor stroke = colors.dropTarget;
         stroke.setAlpha(165);
         painter.setPen(QPen(stroke, 2));
         painter.setBrush(Qt::NoBrush);
@@ -1667,9 +1696,10 @@ void TierListView::paintEvent(QPaintEvent* event) {
     }
 
     const QRectF outline = QRectF(viewport()->rect()).adjusted(0.5, 0.5, -0.5, -0.5);
-    painter.setPen(QPen(kGridLine, 1));
+    painter.setPen(QPen(colors.separator, 1));
     painter.setBrush(Qt::NoBrush);
-    painter.drawRoundedRect(outline, TierListDelegate::outerRadius(), TierListDelegate::outerRadius());
+    painter.drawRoundedRect(outline, TierListDelegate::outerRadius(),
+                            TierListDelegate::outerRadius());
 }
 
 void TierListView::dragEnterEvent(QDragEnterEvent* event) {
@@ -1755,21 +1785,25 @@ void TierListView::dropEvent(QDropEvent* event) {
             if (TierListModel* model = tierModel()) {
                 const int insertionIndex = m_imageDropInsertionIndex;
                 if (insertionIndex >= 0) {
-                    Logger::info(QStringLiteral("tier.list.image.drop imageId=%1 rowId=%2 row=%3 index=%4 reason=viewDrop")
+                    Logger::info(QStringLiteral("tier.list.image.drop imageId=%1 rowId=%2 row=%3 "
+                                                "index=%4 reason=viewDrop")
                                      .arg(imageId, model->rowIdAt(target.row()))
                                      .arg(target.row())
                                      .arg(insertionIndex));
                     emit imageDropped(imageId, model->rowIdAt(target.row()), insertionIndex);
                 } else {
-                    Logger::warn(QStringLiteral("tier.list.image.drop rejected imageId=%1 row=%2 reason=invalidInsertion")
+                    Logger::warn(QStringLiteral("tier.list.image.drop rejected imageId=%1 row=%2 "
+                                                "reason=invalidInsertion")
                                      .arg(imageId)
                                      .arg(target.row()));
                 }
             }
         } else {
-            Logger::warn(QStringLiteral("tier.list.image.drop rejected imageId=%1 targetValid=%2 reason=noTarget")
-                             .arg(imageId)
-                             .arg(target.isValid()));
+            Logger::warn(
+                QStringLiteral(
+                    "tier.list.image.drop rejected imageId=%1 targetValid=%2 reason=noTarget")
+                    .arg(imageId)
+                    .arg(target.isValid()));
         }
     }
 
@@ -1917,10 +1951,11 @@ void TierListView::animatePlaceholder(qreal targetY) {
     m_placeholderAnimation->setEasingCurve(QEasingCurve::OutQuint);
     m_placeholderAnimation->setStartValue(m_placeholderY);
     m_placeholderAnimation->setEndValue(targetY);
-    connect(m_placeholderAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
-        m_placeholderY = value.toReal();
-        viewport()->update();
-    });
+    connect(m_placeholderAnimation, &QVariantAnimation::valueChanged, this,
+            [this](const QVariant& value) {
+                m_placeholderY = value.toReal();
+                viewport()->update();
+            });
     connect(m_placeholderAnimation, &QVariantAnimation::finished, this, [this, targetY]() {
         m_placeholderY = targetY;
         if (m_placeholderAnimation) {
@@ -2037,7 +2072,8 @@ void TierListView::beginImageDragVisuals(const QString& imageId, bool synchronou
         }
     }
 
-    Logger::debug(QStringLiteral("tier.list.image.visual.begin imageId=%1 sourceRow=%2 sourceIndex=%3 capturedOrigins=%4 feedback=%5")
+    Logger::debug(QStringLiteral("tier.list.image.visual.begin imageId=%1 sourceRow=%2 "
+                                 "sourceIndex=%3 capturedOrigins=%4 feedback=%5")
                       .arg(m_imageDragId)
                       .arg(m_imageDragSourceRow)
                       .arg(m_imageDropInsertionIndex)
@@ -2085,10 +2121,12 @@ void TierListView::updateImageDropIntentAt(const QPoint& viewportPoint) {
     }
 
     if (!target.isValid()) {
-        Logger::debug(QStringLiteral("tier.list.image.drag.intent.clear imageId=%1 pos=(%2,%3) reason=noTarget")
-                          .arg(m_imageDragId)
-                          .arg(viewportPoint.x())
-                          .arg(viewportPoint.y()));
+        Logger::debug(
+            QStringLiteral(
+                "tier.list.image.drag.intent.clear imageId=%1 pos=(%2,%3) reason=noTarget")
+                .arg(m_imageDragId)
+                .arg(viewportPoint.x())
+                .arg(viewportPoint.y()));
         updateImageDropIntent({}, -1);
         return;
     }
@@ -2107,7 +2145,8 @@ void TierListView::updateImageDropIntent(const QModelIndex& target, int insertio
             TierListModel* model = tierModel();
             if (model) {
                 const QModelIndex source = model->index(m_imageDragSourceRow, 0);
-                const QStringList imageIds = source.data(TierListModel::ImageIdsRole).toStringList();
+                const QStringList imageIds =
+                    source.data(TierListModel::ImageIdsRole).toStringList();
                 updateImageDropIntent(source, static_cast<int>(imageIds.indexOf(m_imageDragId)));
             }
         } else {
@@ -2120,8 +2159,10 @@ void TierListView::updateImageDropIntent(const QModelIndex& target, int insertio
     applyImagePreviewTargetRow(target.row());
 
     QRectF placeholderRect;
-    const QHash<QString, QPointF> targets = targetImageOffsets(target, insertionIndex, &placeholderRect);
-    const bool sameIntent = m_imageDropIndex == target && m_imageDropInsertionIndex == insertionIndex &&
+    const QHash<QString, QPointF> targets =
+        targetImageOffsets(target, insertionIndex, &placeholderRect);
+    const bool sameIntent = m_imageDropIndex == target &&
+                            m_imageDropInsertionIndex == insertionIndex &&
                             m_imagePlaceholderRect.isValid() &&
                             qAbs(m_imagePlaceholderRect.x() - placeholderRect.x()) < 0.5 &&
                             qAbs(m_imagePlaceholderRect.y() - placeholderRect.y()) < 0.5 &&
@@ -2157,7 +2198,8 @@ void TierListView::updateImageDropIntent(const QModelIndex& target, int insertio
         m_imagePlaceholderRect = placeholderRect;
         m_imageDropIndex = QPersistentModelIndex(target);
         m_imageDropInsertionIndex = insertionIndex;
-        Logger::debug(QStringLiteral("tier.list.image.drag.intent.sync imageId=%1 row=%2 index=%3 placeholder=(%4,%5,%6,%7) affectedKeys=%8")
+        Logger::debug(QStringLiteral("tier.list.image.drag.intent.sync imageId=%1 row=%2 index=%3 "
+                                     "placeholder=(%4,%5,%6,%7) affectedKeys=%8")
                           .arg(m_imageDragId)
                           .arg(target.row())
                           .arg(insertionIndex)
@@ -2177,14 +2219,16 @@ void TierListView::updateImageDropIntent(const QModelIndex& target, int insertio
     animateImagePlaceholder(placeholderRect);
     m_imageDropIndex = QPersistentModelIndex(target);
     m_imageDropInsertionIndex = insertionIndex;
-    Logger::debug(QStringLiteral("tier.list.image.drag.intent imageId=%1 row=%2 index=%3 placeholder=(%4,%5,%6,%7)")
-                      .arg(m_imageDragId)
-                      .arg(target.row())
-                      .arg(insertionIndex)
-                      .arg(qRound(placeholderRect.x()))
-                      .arg(qRound(placeholderRect.y()))
-                      .arg(qRound(placeholderRect.width()))
-                      .arg(qRound(placeholderRect.height())));
+    Logger::debug(
+        QStringLiteral(
+            "tier.list.image.drag.intent imageId=%1 row=%2 index=%3 placeholder=(%4,%5,%6,%7)")
+            .arg(m_imageDragId)
+            .arg(target.row())
+            .arg(insertionIndex)
+            .arg(qRound(placeholderRect.x()))
+            .arg(qRound(placeholderRect.y()))
+            .arg(qRound(placeholderRect.width()))
+            .arg(qRound(placeholderRect.height())));
     viewport()->update();
 }
 
@@ -2202,10 +2246,11 @@ void TierListView::applyImagePreviewTargetRow(int targetRow) {
 
     const int previousTarget = m_imagePreviewTargetRow;
     m_imagePreviewTargetRow = targetRow;
-    Logger::debug(QStringLiteral("tier.list.image.preview.metrics imageId=%1 previousTarget=%2 target=%3")
-                      .arg(m_imageDragId)
-                      .arg(previousTarget)
-                      .arg(m_imagePreviewTargetRow));
+    Logger::debug(
+        QStringLiteral("tier.list.image.preview.metrics imageId=%1 previousTarget=%2 target=%3")
+            .arg(m_imageDragId)
+            .arg(previousTarget)
+            .arg(m_imagePreviewTargetRow));
     refreshLayoutMetrics();
 }
 
@@ -2231,7 +2276,8 @@ int TierListView::previewImageCountForRow(int row) const {
     return qMax(0, count);
 }
 
-int TierListView::imageInsertionIndexForPosition(const QModelIndex& target, const QPoint& point) const {
+int TierListView::imageInsertionIndexForPosition(const QModelIndex& target,
+                                                 const QPoint& point) const {
     TierListDelegate* delegate = tierDelegate();
     if (!delegate || !target.isValid()) {
         return -1;
@@ -2245,7 +2291,7 @@ int TierListView::imageInsertionIndexForPosition(const QModelIndex& target, cons
     }
 
     int visualInsertion = delegate->insertionIndexForPosition(target, visualRect(target), point,
-                                                             qMax(0, visualCount));
+                                                              qMax(0, visualCount));
     if (target.row() == m_imageDragSourceRow && sourceIndex >= 0 && visualInsertion > sourceIndex) {
         ++visualInsertion;
     }
@@ -2284,27 +2330,29 @@ void TierListView::animateImageOffset(const QString& imageId, const QPointF& tar
     animation->setEasingCurve(QEasingCurve::OutQuint);
     animation->setStartValue(currentOffset);
     animation->setEndValue(targetOffset);
-    connect(animation, &QVariantAnimation::valueChanged, this, [this, imageId](const QVariant& value) {
-        const QPointF offset = value.toPointF();
-        if (qAbs(offset.x()) < 0.5 && qAbs(offset.y()) < 0.5) {
-            m_imageTileOffsets.remove(imageId);
-        } else {
-            m_imageTileOffsets.insert(imageId, offset);
-        }
-        viewport()->update();
-    });
-    connect(animation, &QVariantAnimation::finished, this, [this, imageId, animation, targetOffset]() {
-        if (m_imageTileAnimations.value(imageId) == animation) {
-            m_imageTileAnimations.remove(imageId);
-        }
-        if (qAbs(targetOffset.x()) < 0.5 && qAbs(targetOffset.y()) < 0.5) {
-            m_imageTileOffsets.remove(imageId);
-        } else {
-            m_imageTileOffsets.insert(imageId, targetOffset);
-        }
-        animation->deleteLater();
-        viewport()->update();
-    });
+    connect(animation, &QVariantAnimation::valueChanged, this,
+            [this, imageId](const QVariant& value) {
+                const QPointF offset = value.toPointF();
+                if (qAbs(offset.x()) < 0.5 && qAbs(offset.y()) < 0.5) {
+                    m_imageTileOffsets.remove(imageId);
+                } else {
+                    m_imageTileOffsets.insert(imageId, offset);
+                }
+                viewport()->update();
+            });
+    connect(animation, &QVariantAnimation::finished, this,
+            [this, imageId, animation, targetOffset]() {
+                if (m_imageTileAnimations.value(imageId) == animation) {
+                    m_imageTileAnimations.remove(imageId);
+                }
+                if (qAbs(targetOffset.x()) < 0.5 && qAbs(targetOffset.y()) < 0.5) {
+                    m_imageTileOffsets.remove(imageId);
+                } else {
+                    m_imageTileOffsets.insert(imageId, targetOffset);
+                }
+                animation->deleteLater();
+                viewport()->update();
+            });
     animation->start();
 }
 
@@ -2351,10 +2399,11 @@ void TierListView::animateImagePlaceholder(const QRectF& targetRect) {
     m_imagePlaceholderAnimation->setEasingCurve(QEasingCurve::OutQuint);
     m_imagePlaceholderAnimation->setStartValue(m_imagePlaceholderRect);
     m_imagePlaceholderAnimation->setEndValue(targetRect);
-    connect(m_imagePlaceholderAnimation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
-        m_imagePlaceholderRect = value.toRectF();
-        viewport()->update();
-    });
+    connect(m_imagePlaceholderAnimation, &QVariantAnimation::valueChanged, this,
+            [this](const QVariant& value) {
+                m_imagePlaceholderRect = value.toRectF();
+                viewport()->update();
+            });
     connect(m_imagePlaceholderAnimation, &QVariantAnimation::finished, this, [this, targetRect]() {
         m_imagePlaceholderRect = targetRect;
         if (m_imagePlaceholderAnimation) {
@@ -2381,7 +2430,8 @@ void TierListView::stopImageAnimations() {
     }
 }
 
-QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& target, int insertionIndex,
+QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& target,
+                                                         int insertionIndex,
                                                          QRectF* placeholderRect) const {
     QHash<QString, QPointF> offsets;
     if (placeholderRect) {
@@ -2421,7 +2471,8 @@ QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& targ
         int placeholderIndex = -1;
         if (row == targetRow) {
             placeholderIndex = insertionIndex;
-            if (row == m_imageDragSourceRow && originalSourceIndex >= 0 && originalSourceIndex < placeholderIndex) {
+            if (row == m_imageDragSourceRow && originalSourceIndex >= 0 &&
+                originalSourceIndex < placeholderIndex) {
                 --placeholderIndex;
             }
             placeholderIndex = qBound(0, placeholderIndex, static_cast<int>(visualIds.size()));
@@ -2451,8 +2502,8 @@ QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& targ
         }
     }
 
-    Logger::debug(QStringLiteral(
-                      "tier.list.image.drag.layout imageId=%1 sourceRow=%2 targetRow=%3 index=%4 affected=%5 missingBaseRects=%6 placeholderValid=%7")
+    Logger::debug(QStringLiteral("tier.list.image.drag.layout imageId=%1 sourceRow=%2 targetRow=%3 "
+                                 "index=%4 affected=%5 missingBaseRects=%6 placeholderValid=%7")
                       .arg(m_imageDragId)
                       .arg(m_imageDragSourceRow)
                       .arg(targetRow)
@@ -2466,7 +2517,8 @@ QHash<QString, QPointF> TierListView::targetImageOffsets(const QModelIndex& targ
 
 void TierListView::startRowDrag() {
     if (!m_pressedIndex.isValid() || m_pressedRowId.isEmpty()) {
-        Logger::warn(QStringLiteral("tier.list.row.drag.start rejected invalid pressed index or row id"));
+        Logger::warn(
+            QStringLiteral("tier.list.row.drag.start rejected invalid pressed index or row id"));
         resetPressState();
         return;
     }
@@ -2493,7 +2545,9 @@ void TierListView::startRowDrag() {
     beginRowReorderVisuals(m_pressedIndex);
     resetPressState();
     setCursor(Qt::ClosedHandCursor);
-    Logger::info(QStringLiteral("tier.list.row.drag.start rowId=%1 sourceRow=%2").arg(draggedRowId).arg(sourceRow));
+    Logger::info(QStringLiteral("tier.list.row.drag.start rowId=%1 sourceRow=%2")
+                     .arg(draggedRowId)
+                     .arg(sourceRow));
 
     QWidget* catchment = createRowDragCatchment();
     const Qt::DropAction result = drag->exec(Qt::MoveAction);
@@ -2502,11 +2556,12 @@ void TierListView::startRowDrag() {
         catchment->deleteLater();
     }
 
-    Logger::info(QStringLiteral("tier.list.row.drag.finish rowId=%1 result=%2 committed=%3 destination=%4")
-                     .arg(draggedRowId)
-                     .arg(static_cast<int>(result))
-                     .arg(m_rowDragCommitted)
-                     .arg(m_rowDropIndex));
+    Logger::info(
+        QStringLiteral("tier.list.row.drag.finish rowId=%1 result=%2 committed=%3 destination=%4")
+            .arg(draggedRowId)
+            .arg(static_cast<int>(result))
+            .arg(m_rowDragCommitted)
+            .arg(m_rowDropIndex));
     finishRowReorderVisuals(m_rowDragCommitted);
     clearDropState();
     unsetCursor();
@@ -2515,7 +2570,8 @@ void TierListView::startRowDrag() {
 
 void TierListView::startImageDrag() {
     if (!m_pressedIndex.isValid() || m_pressedImageId.isEmpty()) {
-        Logger::warn(QStringLiteral("tier.list.image.drag.start rejected invalid pressed index or image id"));
+        Logger::warn(QStringLiteral(
+            "tier.list.image.drag.start rejected invalid pressed index or image id"));
         resetPressState();
         return;
     }
@@ -2617,8 +2673,9 @@ void TierListView::updateRowDropIntent(const QPoint& viewportPoint, const QStrin
 
 bool TierListView::commitRowDrop(const QString& rowId, int destinationIndex, const char* reason) {
     if (m_rowDragCommitted) {
-        Logger::debug(QStringLiteral("tier.list.row.drop ignored already committed rowId=%1 reason=%2")
-                          .arg(rowId, QString::fromUtf8(reason ? reason : "unknown")));
+        Logger::debug(
+            QStringLiteral("tier.list.row.drop ignored already committed rowId=%1 reason=%2")
+                .arg(rowId, QString::fromUtf8(reason ? reason : "unknown")));
         return true;
     }
     if (rowId.isEmpty() || destinationIndex < 0) {
@@ -2709,7 +2766,7 @@ void TierListView::animateDockHover(qreal targetProgress) {
     m_dockHoverAnimation = animation;
     animation->setDuration(targetProgress > m_dockHoverProgress ? 150 : 180);
     animation->setEasingCurve(targetProgress > m_dockHoverProgress ? QEasingCurve::OutCubic
-                                                                    : QEasingCurve::OutQuint);
+                                                                   : QEasingCurve::OutQuint);
     animation->setStartValue(m_dockHoverProgress);
     animation->setEndValue(targetProgress);
     connect(animation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
@@ -2746,8 +2803,9 @@ void TierListView::animateMissionTransition(qreal targetProgress) {
     auto* animation = new QVariantAnimation(this);
     m_missionTransitionAnimation = animation;
     animation->setDuration(kMissionTransitionMs);
-    animation->setEasingCurve(targetProgress > m_missionTransitionProgress ? QEasingCurve::OutCubic
-                                                                            : QEasingCurve::OutQuint);
+    animation->setEasingCurve(targetProgress > m_missionTransitionProgress
+                                  ? QEasingCurve::OutCubic
+                                  : QEasingCurve::OutQuint);
     animation->setStartValue(m_missionTransitionProgress);
     animation->setEndValue(targetProgress);
     connect(animation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
@@ -2918,8 +2976,7 @@ void TierListView::scheduleBlankMissionControl(const QPoint& viewportPoint) {
 bool TierListView::runBlankAreaAction(BlankAreaAction action, const char* trigger,
                                       const QPoint& viewportPoint) {
     Logger::info(QStringLiteral("tier.list.blank.action trigger=%1 action=%2 pos=(%3,%4)")
-                     .arg(QString::fromLatin1(trigger),
-                          blankAreaActionLogName(action))
+                     .arg(QString::fromLatin1(trigger), blankAreaActionLogName(action))
                      .arg(viewportPoint.x())
                      .arg(viewportPoint.y()));
 
@@ -2990,8 +3047,9 @@ void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoin
 
     const QRect sourceRect = missionImageRect(imageId);
     if (!sourceRect.isValid()) {
-        Logger::warn(QStringLiteral("tier.list.mission.lift.rejected imageId=%1 reason=invalidSource")
-                         .arg(imageId));
+        Logger::warn(
+            QStringLiteral("tier.list.mission.lift.rejected imageId=%1 reason=invalidSource")
+                .arg(imageId));
         return;
     }
 
@@ -3002,9 +3060,9 @@ void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoin
     }
 
     const QRect targetViewportRect = tierRowImageRectForLift(imageId);
-    const QSize targetSize = targetViewportRect.isValid() ? targetViewportRect.size()
-                                                          : QSize(kInitialLayoutLineHeight,
-                                                                  kInitialLayoutLineHeight);
+    const QSize targetSize = targetViewportRect.isValid()
+                                 ? targetViewportRect.size()
+                                 : QSize(kInitialLayoutLineHeight, kInitialLayoutLineHeight);
     const qreal dpr = viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
     QPixmap imagePixmap = delegate->fullPixmapForImageId(imageId);
     if (imagePixmap.isNull()) {
@@ -3049,20 +3107,22 @@ void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoin
     animation->setStartValue(0.0);
     animation->setEndValue(1.0);
     QPointer<QLabel> overlayGuard(overlay);
-    connect(animation, &QVariantAnimation::valueChanged, this,
-            [host, sourceHostRect, targetSize, renderOverlay](const QVariant& value) {
-                const qreal t = missionMacHoverEase(value.toReal());
-                const QPoint cursor = host->mapFromGlobal(QCursor::pos());
-                const QRect targetRect(cursor.x() - targetSize.width() / 2,
-                                       cursor.y() - targetSize.height() / 2,
-                                       targetSize.width(), targetSize.height());
-                const QRect currentRect(
-                    qRound(sourceHostRect.x() + (targetRect.x() - sourceHostRect.x()) * t),
-                    qRound(sourceHostRect.y() + (targetRect.y() - sourceHostRect.y()) * t),
-                    qRound(sourceHostRect.width() + (targetRect.width() - sourceHostRect.width()) * t),
-                    qRound(sourceHostRect.height() + (targetRect.height() - sourceHostRect.height()) * t));
-                renderOverlay(currentRect);
-            });
+    connect(
+        animation, &QVariantAnimation::valueChanged, this,
+        [host, sourceHostRect, targetSize, renderOverlay](const QVariant& value) {
+            const qreal t = missionMacHoverEase(value.toReal());
+            const QPoint cursor = host->mapFromGlobal(QCursor::pos());
+            const QRect targetRect(cursor.x() - targetSize.width() / 2,
+                                   cursor.y() - targetSize.height() / 2, targetSize.width(),
+                                   targetSize.height());
+            const QRect currentRect(
+                qRound(sourceHostRect.x() + (targetRect.x() - sourceHostRect.x()) * t),
+                qRound(sourceHostRect.y() + (targetRect.y() - sourceHostRect.y()) * t),
+                qRound(sourceHostRect.width() + (targetRect.width() - sourceHostRect.width()) * t),
+                qRound(sourceHostRect.height() +
+                       (targetRect.height() - sourceHostRect.height()) * t));
+            renderOverlay(currentRect);
+        });
     connect(animation, &QVariantAnimation::finished, this,
             [this, animation, overlayGuard, imageId, imagePixmap, targetSize, dpr]() {
                 animation->deleteLater();
@@ -3096,28 +3156,32 @@ void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoin
                 }
 
                 setCursor(Qt::ClosedHandCursor);
-                Logger::info(QStringLiteral("tier.list.mission.lift.drag.start imageId=%1 target=(%2,%3)")
-                                 .arg(imageId)
-                                 .arg(targetSize.width())
-                                 .arg(targetSize.height()));
+                Logger::info(
+                    QStringLiteral("tier.list.mission.lift.drag.start imageId=%1 target=(%2,%3)")
+                        .arg(imageId)
+                        .arg(targetSize.width())
+                        .arg(targetSize.height()));
                 const Qt::DropAction result = drag->exec(Qt::MoveAction);
-                Logger::info(QStringLiteral("tier.list.mission.lift.drag.finish imageId=%1 result=%2")
-                                 .arg(imageId)
-                                 .arg(static_cast<int>(result)));
+                Logger::info(
+                    QStringLiteral("tier.list.mission.lift.drag.finish imageId=%1 result=%2")
+                        .arg(imageId)
+                        .arg(static_cast<int>(result)));
                 finishImageDragVisuals();
                 m_missionLiftImageId.clear();
                 unsetCursor();
             });
-    Logger::info(QStringLiteral("tier.list.mission.lift.start imageId=%1 source=(%2,%3,%4,%5) target=(%6,%7,%8,%9)")
-                     .arg(imageId)
-                     .arg(sourceRect.x())
-                     .arg(sourceRect.y())
-                     .arg(sourceRect.width())
-                     .arg(sourceRect.height())
-                     .arg(targetViewportRect.x())
-                     .arg(targetViewportRect.y())
-                     .arg(targetViewportRect.width())
-                     .arg(targetViewportRect.height()));
+    Logger::info(
+        QStringLiteral(
+            "tier.list.mission.lift.start imageId=%1 source=(%2,%3,%4,%5) target=(%6,%7,%8,%9)")
+            .arg(imageId)
+            .arg(sourceRect.x())
+            .arg(sourceRect.y())
+            .arg(sourceRect.width())
+            .arg(sourceRect.height())
+            .arg(targetViewportRect.x())
+            .arg(targetViewportRect.y())
+            .arg(targetViewportRect.width())
+            .arg(targetViewportRect.height()));
     animation->start();
     Q_UNUSED(viewportPoint);
 }
@@ -3142,7 +3206,8 @@ QRect TierListView::tierRowImageRectForLift(const QString& imageId) const {
 
             const QRect rect = delegate->imageRectForId(index, visualRect(index), imageId);
             if (rect.isValid()) {
-                Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 row=%2 rect=(%3,%4,%5,%6) source=existing")
+                Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 row=%2 "
+                                             "rect=(%3,%4,%5,%6) source=existing")
                                   .arg(imageId)
                                   .arg(row)
                                   .arg(rect.x())
@@ -3165,7 +3230,8 @@ QRect TierListView::tierRowImageRectForLift(const QString& imageId) const {
         const QVector<QRect> rects = delegate->tileRectsForCount(index, rowRect, 1);
         if (!rects.isEmpty() && rects.constFirst().isValid()) {
             const QRect rect = delegate->tileImageRect(rects.constFirst());
-            Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 row=%2 rect=(%3,%4,%5,%6) source=fallback-row")
+            Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 row=%2 "
+                                         "rect=(%3,%4,%5,%6) source=fallback-row")
                               .arg(imageId)
                               .arg(row)
                               .arg(rect.x())
@@ -3179,12 +3245,14 @@ QRect TierListView::tierRowImageRectForLift(const QString& imageId) const {
     const int rows = qMax(1, model->rowCount());
     const int side = qBound(34, qMax(1, viewport()->height() / rows), 512);
     const QRect rect(QPoint(), QSize(side, side));
-    Logger::debug(QStringLiteral("tier.list.mission.lift.target imageId=%1 rect=(%2,%3,%4,%5) source=fallback-viewport")
-                      .arg(imageId)
-                      .arg(rect.x())
-                      .arg(rect.y())
-                      .arg(rect.width())
-                      .arg(rect.height()));
+    Logger::debug(
+        QStringLiteral(
+            "tier.list.mission.lift.target imageId=%1 rect=(%2,%3,%4,%5) source=fallback-viewport")
+            .arg(imageId)
+            .arg(rect.x())
+            .arg(rect.y())
+            .arg(rect.width())
+            .arg(rect.height()));
     return rect;
 }
 
@@ -3252,12 +3320,14 @@ void TierListView::ensureMissionControlLayout() const {
     const int boardSide = qMin(viewport()->width(), viewport()->height());
     const qreal margin = qBound<qreal>(12.0, boardSide / 34.0, 24.0);
     const qreal gap = missionControlDefaultImageMargin(viewport()->size());
-    const QRectF layoutBounds = QRectF(viewport()->rect()).adjusted(margin, margin, -margin, -margin);
+    const QRectF layoutBounds =
+        QRectF(viewport()->rect()).adjusted(margin, margin, -margin, -margin);
     QVector<MissionInput> inputs;
     inputs.reserve(imageIds.size());
     const QHash<QString, QRectF> preferredRects =
-        m_missionFromGallery ? QHash<QString, QRectF>()
-                             : (m_missionNormalRects.isEmpty() ? normalImageRects() : m_missionNormalRects);
+        m_missionFromGallery
+            ? QHash<QString, QRectF>()
+            : (m_missionNormalRects.isEmpty() ? normalImageRects() : m_missionNormalRects);
     const qreal fallbackLongSide =
         qBound<qreal>(42.0, qMin(viewport()->width(), viewport()->height()) / 9.0, 96.0);
 
@@ -3272,8 +3342,8 @@ void TierListView::ensureMissionControlLayout() const {
         if (!sourceSize.isValid()) {
             sourceSize = QSize(1, 1);
         }
-        const qreal aspect =
-            qMax<qreal>(0.01, static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height()));
+        const qreal aspect = qMax<qreal>(0.01, static_cast<qreal>(sourceSize.width()) /
+                                                   qMax(1, sourceSize.height()));
         const QRectF preferredRect = preferredRects.value(imageId);
         const qreal preferredLongSide = preferredRect.isValid()
                                             ? qMax(preferredRect.width(), preferredRect.height())
@@ -3319,15 +3389,15 @@ QHash<QString, QRectF> TierListView::normalImageRects() const {
     return rects;
 }
 
-QRectF TierListView::interpolatedMissionRect(const QString& imageId, const QRectF& targetRect) const {
+QRectF TierListView::interpolatedMissionRect(const QString& imageId,
+                                             const QRectF& targetRect) const {
     if (m_missionFromGallery) {
         const QRectF sourceRect = galleryMissionSourceRect();
         const QRectF centerRect = galleryMissionCenterRect(targetRect);
         const qreal p = missionMacHoverEase(qBound<qreal>(0.0, m_missionTransitionProgress, 1.0));
         constexpr qreal kStackPhase = 0.38;
         const auto interpolate = [](const QRectF& from, const QRectF& to, qreal t) {
-            return QRectF(from.x() + (to.x() - from.x()) * t,
-                          from.y() + (to.y() - from.y()) * t,
+            return QRectF(from.x() + (to.x() - from.x()) * t, from.y() + (to.y() - from.y()) * t,
                           from.width() + (to.width() - from.width()) * t,
                           from.height() + (to.height() - from.height()) * t);
         };
@@ -3359,10 +3429,10 @@ QRectF TierListView::galleryMissionSourceRect() const {
 QRectF TierListView::galleryMissionCenterRect(const QRectF& targetRect) const {
     const QRectF viewportRect(viewport()->rect());
     const qreal longSide = qBound<qreal>(
-        34.0,
-        qMax(targetRect.width(), targetRect.height()) * 0.46,
+        34.0, qMax(targetRect.width(), targetRect.height()) * 0.46,
         qBound<qreal>(48.0, qMin(viewportRect.width(), viewportRect.height()) / 8.5, 92.0));
-    const qreal aspect = qMax<qreal>(0.05, targetRect.width() / qMax<qreal>(1.0, targetRect.height()));
+    const qreal aspect =
+        qMax<qreal>(0.05, targetRect.width() / qMax<qreal>(1.0, targetRect.height()));
     return missionRectAroundCenter(viewportRect.center(), missionSizeForLongSide(aspect, longSide));
 }
 
@@ -3387,8 +3457,8 @@ QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
         if (hoverIndex >= 0) {
             const QSizeF viewportSize = viewport()->size();
             const QRectF hoverTarget = missionHoverTargetRect(tiles.at(hoverIndex), viewportSize);
-            tiles = missionTilesWithHoverExpansion(tiles, hoverIndex, hoverTarget, m_missionHoverProgress,
-                                                   viewportSize);
+            tiles = missionTilesWithHoverExpansion(tiles, hoverIndex, hoverTarget,
+                                                   m_missionHoverProgress, viewportSize);
         }
     }
 
@@ -3399,7 +3469,8 @@ QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
 }
 
 QString TierListView::missionImageAt(const QPoint& viewportPoint) const {
-    const QVector<MissionTile> tiles = missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
+    const QVector<MissionTile> tiles =
+        missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
     for (auto it = tiles.crbegin(); it != tiles.crend(); ++it) {
         if (it->rect.contains(QPointF(viewportPoint))) {
             return it->imageId;
@@ -3412,7 +3483,8 @@ QRect TierListView::missionImageRect(const QString& imageId) const {
     if (imageId.isEmpty()) {
         return {};
     }
-    const QVector<MissionTile> tiles = missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
+    const QVector<MissionTile> tiles =
+        missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
     for (const MissionTile& tile : tiles) {
         if (tile.imageId == imageId) {
             return tile.rect.toAlignedRect();
@@ -3421,7 +3493,8 @@ QRect TierListView::missionImageRect(const QString& imageId) const {
     return {};
 }
 
-QPixmap TierListView::missionPixmapForImage(const QString& imageId, QSize targetPixelSize, bool fullQuality) {
+QPixmap TierListView::missionPixmapForImage(const QString& imageId, QSize targetPixelSize,
+                                            bool fullQuality) {
     TierListDelegate* delegate = tierDelegate();
     if (!delegate) {
         return {};
@@ -3440,11 +3513,14 @@ void TierListView::paintMissionControl(QPainter* painter) {
         return;
     }
 
-    const QVector<MissionTile> tiles = missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
+    const ThemeTokens& colors = activeThemeTokens();
+    const QVector<MissionTile> tiles =
+        missionTilesInPaintOrder(missionDisplayTiles(), m_missionHoverImageId);
     if (tiles.isEmpty()) {
-        painter->setPen(palette().color(QPalette::Mid));
+        painter->setPen(colors.secondaryText);
         painter->drawText(viewport()->rect(), Qt::AlignCenter,
-                          m_missionFromGallery ? tr("No imported images") : tr("No images in tier list"));
+                          m_missionFromGallery ? tr("No imported images")
+                                               : tr("No images in tier list"));
         return;
     }
 
@@ -3463,8 +3539,10 @@ void TierListView::paintMissionControl(QPainter* painter) {
             continue;
         }
 
-        const bool fullQuality = tile.imageId == m_missionHoverImageId && m_missionHoverProgress > 0.001;
-        const qreal deviceRatio = viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
+        const bool fullQuality =
+            tile.imageId == m_missionHoverImageId && m_missionHoverProgress > 0.001;
+        const qreal deviceRatio =
+            viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
         const QSize targetPixelSize(qCeil(rect.width() * deviceRatio),
                                     qCeil(rect.height() * deviceRatio));
         QPixmap pixmap = missionPixmapForImage(tile.imageId, targetPixelSize, fullQuality);
@@ -3473,14 +3551,13 @@ void TierListView::paintMissionControl(QPainter* painter) {
         const qreal radius = missionTileCornerRadius(rect);
         tileClip.addRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius);
         painter->setClipPath(tileClip, Qt::IntersectClip);
-        painter->fillPath(tileClip, palette().color(QPalette::AlternateBase));
+        painter->fillPath(tileClip, colors.elevatedBackground);
         if (!pixmap.isNull()) {
             painter->drawPixmap(rect, pixmap, QRectF(pixmap.rect()));
         }
         painter->restore();
 
-        QColor stroke = tile.imageId == m_activeImageId ? palette().color(QPalette::Highlight)
-                                                        : QColor(0, 0, 0, 68);
+        const QColor stroke = tile.imageId == m_activeImageId ? colors.accent : colors.imageBorder;
         painter->setPen(QPen(stroke, tile.imageId == m_activeImageId ? 2.0 : 1.0));
         painter->setBrush(Qt::NoBrush);
         painter->drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), radius, radius);
@@ -3598,8 +3675,8 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
 
     const QString backgroundPath = resolvedCanvasBackgroundPath();
     const bool defaultIconBackground = backgroundPath.isEmpty();
-    const QString pixmapPath = defaultIconBackground ? QString::fromUtf8(kDefaultBackgroundIconPath)
-                                                     : backgroundPath;
+    const QString pixmapPath =
+        defaultIconBackground ? QString::fromUtf8(kDefaultBackgroundIconPath) : backgroundPath;
 
     const QPixmap pixmap = canvasBackgroundPixmap(pixmapPath);
     if (pixmap.isNull()) {
@@ -3614,47 +3691,53 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
         return;
     }
 
-    const int baseLabelWidth = tierDelegate() ? tierDelegate()->labelWidth()
-                                              : TierListDelegate::minimumLabelWidth();
-    const int labelWidth = qRound(baseLabelWidth * (1.0 - qBound<qreal>(0.0, m_missionTransitionProgress, 1.0)));
+    const int baseLabelWidth =
+        tierDelegate() ? tierDelegate()->labelWidth() : TierListDelegate::minimumLabelWidth();
+    const int labelWidth =
+        qRound(baseLabelWidth * (1.0 - qBound<qreal>(0.0, m_missionTransitionProgress, 1.0)));
     const QRectF contentBounds = bounds.adjusted(labelWidth, 0.0, 0.0, 0.0);
     if (!contentBounds.isValid()) {
         return;
     }
 
     QPainterPath outerClip;
-    outerClip.addRoundedRect(bounds, TierListDelegate::outerRadius(), TierListDelegate::outerRadius());
+    outerClip.addRoundedRect(bounds, TierListDelegate::outerRadius(),
+                             TierListDelegate::outerRadius());
     QPainterPath contentClip;
     contentClip.addRect(contentBounds);
     painter->save();
     painter->setClipPath(outerClip.intersected(contentClip));
-    painter->fillRect(contentBounds, palette().color(QPalette::AlternateBase));
+    painter->fillRect(contentBounds, activeThemeTokens().tierRowBackground);
 
     painter->setOpacity(backgroundVisibility);
     if (defaultIconBackground) {
-        const qreal shortSide = qMax<qreal>(1.0, qMin(contentBounds.width(), contentBounds.height()));
+        const qreal shortSide =
+            qMax<qreal>(1.0, qMin(contentBounds.width(), contentBounds.height()));
         const qreal maxSide = qMax<qreal>(32.0, shortSide - 18.0);
         const qreal upperSide = qMin<qreal>(360.0, maxSide);
         const qreal lowerSide = qMin<qreal>(72.0, upperSide);
         const qreal side = qBound<qreal>(lowerSide, shortSide * 0.38, upperSide);
         const QRectF iconTarget(contentBounds.center().x() - side / 2.0,
-                                contentBounds.center().y() - side / 2.0,
-                                side, side);
+                                contentBounds.center().y() - side / 2.0, side, side);
         painter->drawPixmap(iconTarget, pixmap, QRectF(pixmap.rect()));
     } else {
         const QSizeF targetSize = contentBounds.size();
         const QSize sourceSize = pixmap.size();
         const qreal targetRatio = targetSize.width() / qMax<qreal>(1.0, targetSize.height());
-        const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
+        const qreal sourceRatio =
+            static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
         QRect sourceRect;
         if (sourceRatio > targetRatio) {
             const int cropWidth = qRound(sourceSize.height() * targetRatio);
-            sourceRect = QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
+            sourceRect =
+                QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
         } else {
             const int cropHeight = qRound(sourceSize.width() / targetRatio);
-            sourceRect = QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
+            sourceRect =
+                QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
         }
-        // Crop from the original cached pixmap on every paint so resize changes never distort the ratio.
+        // Crop from the original cached pixmap on every paint so resize changes never distort the
+        // ratio.
         painter->drawPixmap(contentBounds, pixmap, sourceRect);
     }
     painter->restore();
@@ -3667,11 +3750,13 @@ QString TierListView::resolvedCanvasBackgroundPath() const {
         return {};
     }
 
-    const QString storedPath = project->canvas.value(QStringLiteral("backgroundImagePath")).toString();
+    const QString storedPath =
+        project->canvas.value(QStringLiteral("backgroundImagePath")).toString();
     if (storedPath.isEmpty()) {
         return {};
     }
-    if (storedPath.startsWith(QStringLiteral(":/")) || storedPath.startsWith(QStringLiteral("qrc:/"))) {
+    if (storedPath.startsWith(QStringLiteral(":/")) ||
+        storedPath.startsWith(QStringLiteral("qrc:/"))) {
         return storedPath;
     }
     const QFileInfo info(storedPath);

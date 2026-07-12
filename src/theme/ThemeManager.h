@@ -4,6 +4,7 @@
 #include "theme/Theme.h"
 
 #include <QObject>
+#include <QtTypes>
 
 class QApplication;
 
@@ -16,19 +17,23 @@ class ThemeManager : public QObject {
 public:
     explicit ThemeManager(AppSettings* settings, QObject* parent = nullptr);
 
-    const Theme& theme() const { return m_theme; }
-    const ThemeTokens& tokens() const { return m_theme.tokens(); }
+    const Theme& theme() const {
+        return m_theme;
+    }
+    const ThemeTokens& tokens() const {
+        return m_theme.tokens();
+    }
     void applyTo(QApplication& app);
 
 signals:
     void themeChanged(const tlm::Theme& theme);
 
 private:
-    Theme::Kind resolveKind() const;
+    void synchronizeTheme();
 
     AppSettings* m_settings{nullptr};
     Theme m_theme;
+    quint64 m_generation{0};
 };
 
 } // namespace tlm
-

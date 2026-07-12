@@ -25,11 +25,16 @@ class EditPage : public QWidget {
     Q_OBJECT
 
 public:
-    EditPage(ProjectRepository* repository, RecentProjectsStore* recentProjects, AssetManager* assetManager,
-             ThumbnailCache* thumbnailCache, AppSettings* settings, QWidget* parent = nullptr);
+    EditPage(ProjectRepository* repository, RecentProjectsStore* recentProjects,
+             AssetManager* assetManager, ThumbnailCache* thumbnailCache, AppSettings* settings,
+             QWidget* parent = nullptr);
 
-    const TierProject& project() const { return m_project; }
-    bool isDirty() const { return m_project.dirty; }
+    const TierProject& project() const {
+        return m_project;
+    }
+    bool isDirty() const {
+        return m_project.dirty;
+    }
     QString displayTitle() const;
 
 public slots:
@@ -43,13 +48,13 @@ public slots:
     void importImagesFromDialog();
     void importImages(const QStringList& filePaths);
     void exportProjectFromDialog();
-    void configureBackground(const QRect& anchorGlobalRect = QRect());
+    void configureBackground(QWidget* anchor = nullptr);
     void deleteSelectedImage();
     void previewSelectedImage();
     bool confirmSaveIfDirty();
     void setTierFocusMode(bool enabled);
     void toggleMissionControlMode();
-    void toggleGallery(const QRect& anchorGlobalRect = QRect());
+    void toggleGallery(QWidget* anchor = nullptr);
     void toggleGalleryMissionControlMode(const QRect& sourceGlobalRect = QRect());
 
 signals:

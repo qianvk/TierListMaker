@@ -2,9 +2,9 @@
 
 #include "navigation/SidebarModel.h"
 
-#include <vkframeless/FramelessWindow.h>
-
 #include <QWidget>
+
+#include <QWKCore/windowagentbase.h>
 
 class QFrame;
 class QResizeEvent;
@@ -16,8 +16,8 @@ class QToolButton;
 class QVBoxLayout;
 class QVariantAnimation;
 
-namespace vkframeless {
-class WindowTitleBar;
+namespace QWK {
+class WidgetWindowAgent;
 }
 
 namespace tlm {
@@ -37,7 +37,7 @@ class ThemeManager;
 class ThumbnailCache;
 class AppUpdater;
 
-/** Root content widget installed into VKFrameless and responsible for page routing. */
+/** Root content widget registered with QWindowKit and responsible for page routing. */
 class RootWidget : public QWidget {
     Q_OBJECT
 
@@ -46,8 +46,11 @@ public:
                AssetManager* assetManager, ThumbnailCache* thumbnailCache, AppSettings* settings,
                LanguageManager* languageManager, AppUpdater* updater, QWidget* parent = nullptr);
 
-    AppTitleBar* titleBar() const { return m_titleBar; }
+    AppTitleBar* titleBar() const {
+        return m_titleBar;
+    }
     bool confirmClose();
+    void installWindowAgent(QWK::WidgetWindowAgent* agent);
 
 public slots:
     void switchToPage(AppPage page);
@@ -68,7 +71,8 @@ private:
     QFrame* createSidebar(QWidget* parent);
     QFrame* createContent(ProjectRepository* repository, RecentProjectsStore* recentProjects,
                           AssetManager* assetManager, ThumbnailCache* thumbnailCache,
-                          AppSettings* settings, LanguageManager* languageManager, AppUpdater* updater);
+                          AppSettings* settings, LanguageManager* languageManager,
+                          AppUpdater* updater);
     void setSidebarCollapsed(bool collapsed);
     void setSidebarWidth(int width);
     void synchronizeInitialLayout();
@@ -83,11 +87,12 @@ private:
     void setTierFocusMode(bool enabled);
 
     AppTitleBar* m_titleBar{nullptr};
+    QWK::WidgetWindowAgent* m_windowAgent{nullptr};
     QSplitter* m_splitter{nullptr};
     QFrame* m_sidebarShell{nullptr};
     QFrame* m_sidebar{nullptr};
     QFrame* m_content{nullptr};
-    vkframeless::WindowTitleBar* m_sidebarTitleBar{nullptr};
+    QWidget* m_sidebarTitleBar{nullptr};
     QVBoxLayout* m_sidebarLayout{nullptr};
     SidebarModel* m_sidebarModel{nullptr};
     SidebarView* m_sidebarView{nullptr};
@@ -101,7 +106,8 @@ private:
     QWidget* m_preferencesPage{nullptr};
     bool m_sidebarCollapsed{false};
     bool m_tierFocusMode{false};
-    vkframeless::SystemButtonVisibility m_savedSystemButtonVisibility{vkframeless::SystemButtonVisibility::Always};
+    QWK::WindowAgentBase::SystemButtonVisibility m_savedSystemButtonVisibility{
+        QWK::WindowAgentBase::AlwaysVisible};
     int m_currentSidebarWidth{0};
     int m_lastExpandedSidebarWidth{240};
     int m_focusSavedSidebarWidth{240};

@@ -1,6 +1,7 @@
 #include "tier/ImageGalleryPopover.h"
 
 #include "logging/Logger.h"
+#include "theme/Theme.h"
 #include "tier/TierDragController.h"
 
 #include <QApplication>
@@ -8,27 +9,25 @@
 #include <QDrag>
 #include <QDragEnterEvent>
 #include <QDropEvent>
-#include <QGuiApplication>
+#include <QMenu>
 #include <QMimeData>
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPointer>
 #include <QScreen>
-#include <QShowEvent>
-#include <QHideEvent>
-#include <QMenu>
 #include <QUrl>
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
+#include <vkui/core/VkIcon.h>
+#include <vkui/widgets/overlays/VkPopover.h>
+
 namespace tlm {
 
 namespace {
-constexpr int kPopoverArrowHeight = 12;
-constexpr int kPopoverArrowCenterX = 46;
 constexpr int kMinimumTileExtent = 44;
 constexpr int kPreferredTileExtent = 72;
 constexpr int kMaximumTileExtent = 86;
@@ -39,47 +38,6 @@ int platformPopoverRadius() {
 #else
     return 10;
 #endif
-}
-
-QColor popoverSurfaceColor(const QPalette& palette) {
-    return palette.color(QPalette::Base).lightness() < 96 ? QColor(31, 35, 53)
-                                                          : QColor(250, 251, 253);
-}
-
-QColor popoverStrokeColor(const QPalette& palette) {
-    return palette.color(QPalette::Base).lightness() < 96 ? QColor(68, 76, 110)
-                                                          : QColor(210, 218, 232);
-}
-
-QPainterPath roundedPopoverPath(const QRectF& bubbleRect, qreal arrowCenterX, qreal arrowHeight,
-                                qreal radius) {
-    QPainterPath bubble;
-    bubble.addRoundedRect(bubbleRect, radius, radius);
-
-    if (bubbleRect.width() <= radius * 2.0 || arrowHeight <= 0.0) {
-        return bubble;
-    }
-
-    constexpr qreal kArrowHalfWidth = 18.0;
-    constexpr qreal kTipHalfWidth = 4.2;
-    constexpr qreal kBodyOverlap = 2.5;
-    const qreal minCenter = bubbleRect.left() + radius + kArrowHalfWidth;
-    const qreal maxCenter = bubbleRect.right() - radius - kArrowHalfWidth;
-    const qreal centerX = qBound(minCenter, arrowCenterX, maxCenter);
-    const qreal baseY = bubbleRect.top() + kBodyOverlap;
-    const qreal tipY = bubbleRect.top() - arrowHeight + 0.5;
-
-    // The arrow overlaps the body, then both paths are unioned so the shared edge is never stroked.
-    QPainterPath arrow;
-    arrow.moveTo(centerX - kArrowHalfWidth, baseY);
-    arrow.cubicTo(centerX - 13.0, baseY, centerX - 9.5, tipY + 6.0,
-                  centerX - kTipHalfWidth, tipY + 2.8);
-    arrow.quadTo(centerX, tipY - 0.4, centerX + kTipHalfWidth, tipY + 2.8);
-    arrow.cubicTo(centerX + 9.5, tipY + 6.0, centerX + 13.0, baseY,
-                  centerX + kArrowHalfWidth, baseY);
-    arrow.closeSubpath();
-
-    return bubble.united(arrow);
 }
 
 QRect centeredCropSourceRect(const QPixmap& pixmap, const QSize& targetSize) {
@@ -112,7 +70,8 @@ QPixmap squareDragPixmap(const QPixmap& pixmap, const QSize& logicalSize, qreal 
     QPainter painter(&result);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     painter.drawPixmap(QRect(QPoint(0, 0), logicalSize), pixmap,
-                       sourceRect.isValid() ? sourceRect : centeredCropSourceRect(pixmap, logicalSize));
+                       sourceRect.isValid() ? sourceRect
+                                            : centeredCropSourceRect(pixmap, logicalSize));
     return result;
 }
 
@@ -150,7 +109,10 @@ public:
             return {};
         }
         const QRect localRect = m_owner->cellRect(index);
-        return QRect(mapTo(window(), localRect.topLeft()), localRect.size());
+        const QPoint globalTopLeft = mapToGlobal(localRect.topLeft());
+        QWidget* host = m_owner->m_hostWindow.data();
+        return host ? QRect(host->mapFromGlobal(globalTopLeft), localRect.size())
+                    : QRect(globalTopLeft, localRect.size());
     }
 
 protected:
@@ -163,11 +125,11 @@ protected:
         painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
 
         QPainterPath clip;
-        clip.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5),
-                            platformPopoverRadius(), platformPopoverRadius());
+        clip.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), platformPopoverRadius(),
+                            platformPopoverRadius());
         painter.setClipPath(clip);
 
-        painter.fillPath(clip, popoverSurfaceColor(palette()));
+        painter.fillPath(clip, activeThemeTokens().popoverBackground);
 
         const QStringList ids = m_owner->imageIds();
         const int itemCount = static_cast<int>(ids.size()) + 1;
@@ -202,7 +164,8 @@ protected:
             QWidget::mouseMoveEvent(event);
             return;
         }
-        if (m_dragging || (event->pos() - m_pressPosition).manhattanLength() < QApplication::startDragDistance()) {
+        if (m_dragging || (event->pos() - m_pressPosition).manhattanLength() <
+                              QApplication::startDragDistance()) {
             return;
         }
 
@@ -218,7 +181,8 @@ protected:
         auto* drag = new QDrag(this);
         drag->setMimeData(TierDragController::createMimeData(imageId));
         if (!pixmap.isNull()) {
-            const QRect crop = image ? image->thumbnailSourceRect(pixmap.size(), sourceRect.size()) : QRect();
+            const QRect crop =
+                image ? image->thumbnailSourceRect(pixmap.size(), sourceRect.size()) : QRect();
             drag->setPixmap(squareDragPixmap(pixmap, sourceRect.size(), devicePixelRatioF(), crop));
             drag->setHotSpot(event->pos() - sourceRect.topLeft());
         }
@@ -271,8 +235,9 @@ protected:
         if (index >= 0 && index < ids.size()) {
             const QString imageId = ids.at(index);
             const QRect source = imageSourceRect(imageId);
-            Logger::info(QStringLiteral("tier.gallery.preview.request source=double-click imageId=%1")
-                             .arg(imageId));
+            Logger::info(
+                QStringLiteral("tier.gallery.preview.request source=double-click imageId=%1")
+                    .arg(imageId));
             emit m_owner->imagePreviewRequested(imageId, source);
             event->accept();
             return;
@@ -352,9 +317,10 @@ protected:
 
 private:
     void paintImageCell(QPainter* painter, const QRect& cell, const QString& imageId) {
+        const ThemeTokens& colors = activeThemeTokens();
         painter->save();
         painter->setRenderHint(QPainter::Antialiasing, false);
-        painter->fillRect(cell, palette().color(QPalette::AlternateBase));
+        painter->fillRect(cell, colors.elevatedBackground);
         const QPixmap pixmap = m_owner->pixmapForImage(imageId, cell.size() * 2);
         if (!pixmap.isNull()) {
             const TierImage* image = m_owner->imageForId(imageId);
@@ -363,7 +329,7 @@ private:
                                       : centeredCropSourceRect(pixmap, cell.size()));
         }
         if (imageId == m_owner->m_selectedImageId) {
-            painter->setPen(QPen(palette().color(QPalette::Highlight), 2));
+            painter->setPen(QPen(colors.accent, 2));
             painter->setBrush(Qt::NoBrush);
             painter->drawRect(cell.adjusted(1, 1, -2, -2));
         }
@@ -371,16 +337,18 @@ private:
     }
 
     void paintImportCell(QPainter* painter, const QRect& cell) {
+        const ThemeTokens& colors = activeThemeTokens();
         painter->save();
-        const bool dark = palette().color(QPalette::Base).lightness() < 96;
-        painter->fillRect(cell, dark ? QColor(44, 50, 73) : QColor(237, 241, 247));
-        const QColor stroke = dark ? QColor(167, 178, 210) : QColor(73, 86, 110);
+        painter->fillRect(cell, colors.controlFillHovered);
+        const QColor stroke = colors.symbolSecondary;
         painter->setRenderHint(QPainter::Antialiasing, true);
         painter->setPen(QPen(stroke, qMax(2, cell.width() / 28), Qt::SolidLine, Qt::RoundCap));
         const int arm = qMax(11, cell.width() / 5);
         const QPoint center = cell.center();
-        painter->drawLine(QPoint(center.x() - arm, center.y()), QPoint(center.x() + arm, center.y()));
-        painter->drawLine(QPoint(center.x(), center.y() - arm), QPoint(center.x(), center.y() + arm));
+        painter->drawLine(QPoint(center.x() - arm, center.y()),
+                          QPoint(center.x() + arm, center.y()));
+        painter->drawLine(QPoint(center.x(), center.y() - arm),
+                          QPoint(center.x(), center.y() + arm));
         painter->restore();
     }
 
@@ -391,11 +359,11 @@ private:
 };
 
 ImageGalleryPopover::ImageGalleryPopover(QWidget* parent)
-    : QDialog(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint),
-      m_grid(new GalleryGridWidget(this)) {
-    setAttribute(Qt::WA_TranslucentBackground);
-    setAutoFillBackground(false);
+    : QWidget(nullptr), m_grid(new GalleryGridWidget(this)), m_popover(new vkui::VkPopover(parent)),
+      m_hostWindow(parent ? parent->window() : nullptr) {
     setObjectName(QStringLiteral("ImageGalleryPopover"));
+    m_popover->setPreferredPlacement(vkui::VkPopoverPlacement::Below);
+    m_popover->setContentWidget(this);
 }
 
 void ImageGalleryPopover::setData(const TierProject* project, const AssetManager* assetManager,
@@ -409,18 +377,18 @@ void ImageGalleryPopover::setData(const TierProject* project, const AssetManager
     m_thumbnailCache = thumbnailCache;
     m_selectedImageId = selectedImageId;
     if (m_thumbnailCache && m_grid) {
-        m_thumbnailConnection = connect(m_thumbnailCache, &ThumbnailCache::thumbnailReady,
-                                        m_grid, [this](const QString&) { m_grid->update(); });
+        m_thumbnailConnection = connect(m_thumbnailCache, &ThumbnailCache::thumbnailReady, m_grid,
+                                        [this](const QString&) { m_grid->update(); });
     }
     requestThumbnails();
-    if (isVisible()) {
-        QScreen* screen = QGuiApplication::screenAt(geometry().center());
+    if (isOpen()) {
+        QScreen* screen = m_anchor && m_anchor->screen() ? m_anchor->screen() : nullptr;
         const QRect available = screen ? screen->availableGeometry().adjusted(10, 10, -10, -10)
                                        : QRect(QPoint(10, 10), QSize(820, 620));
         recalculateGrid(available);
         resize(sizeHint());
         if (m_grid) {
-            m_grid->setGeometry(0, kPopoverArrowHeight, width(), height() - kPopoverArrowHeight);
+            m_grid->setGeometry(rect());
         }
     }
     if (m_grid) {
@@ -443,47 +411,46 @@ void ImageGalleryPopover::setOutsideDismissSuspended(bool suspended) {
         return;
     }
     m_outsideDismissSuspended = suspended;
+    if (m_popover) {
+        const auto normalPolicy = vkui::VkPopoverClosePolicyFlag::OutsideClick |
+                                  vkui::VkPopoverClosePolicyFlag::EscapeKey |
+                                  vkui::VkPopoverClosePolicyFlag::AnchorDestroyed |
+                                  vkui::VkPopoverClosePolicyFlag::WindowDeactivated;
+        m_popover->setClosePolicy(suspended ? vkui::VkPopoverClosePolicyFlag::AnchorDestroyed
+                                            : normalPolicy);
+    }
     Logger::debug(QStringLiteral("tier.gallery.popover.dismiss.suspended value=%1").arg(suspended));
 }
 
-void ImageGalleryPopover::placeBelow(const QRect& globalAnchorRect) {
-    m_anchorGlobalRect = globalAnchorRect;
-    QScreen* screen = globalAnchorRect.isValid() ? QGuiApplication::screenAt(globalAnchorRect.center())
-                                                 : QGuiApplication::screenAt(QCursor::pos());
+void ImageGalleryPopover::openFor(QWidget* anchor) {
+    if (!anchor || !m_popover) {
+        return;
+    }
+    m_anchor = anchor;
+    QScreen* screen = anchor->screen();
     const QRect available = screen ? screen->availableGeometry().adjusted(10, 10, -10, -10)
                                    : QRect(QPoint(10, 10), QSize(820, 620));
     recalculateGrid(available);
-    const QSize popupSize = sizeHint();
-    resize(popupSize);
-
-    const int anchorCenterX = globalAnchorRect.isValid()
-                                  ? globalAnchorRect.center().x()
-                                  : available.center().x();
-    QPoint topLeft = globalAnchorRect.isValid()
-                         ? QPoint(globalAnchorRect.center().x() - kPopoverArrowCenterX,
-                                  globalAnchorRect.bottom() + 8)
-                         : QPoint(available.center().x() - popupSize.width() / 2, available.top() + 54);
-    const int maxX = qMax(available.left(), available.right() - popupSize.width());
-    const int maxY = qMax(available.top(), available.bottom() - popupSize.height());
-    topLeft.setX(qBound(available.left(), topLeft.x(), maxX));
-    topLeft.setY(qBound(available.top(), topLeft.y(), maxY));
-
-    const int radius = platformPopoverRadius();
-    m_arrowCenterX = qBound(radius + 14, anchorCenterX - topLeft.x(), popupSize.width() - radius - 14);
-    move(topLeft);
+    resize(sizeHint());
     if (m_grid) {
-        m_grid->setGeometry(0, kPopoverArrowHeight, width(), height() - kPopoverArrowHeight);
+        m_grid->setGeometry(rect());
     }
-    update();
-    Logger::debug(QStringLiteral("tier.gallery.popover.place images=%1 columns=%2 rows=%3 tile=%4 rect=(%5,%6,%7,%8)")
+    m_popover->openFor(anchor);
+    Logger::debug(QStringLiteral("tier.gallery.popover.place images=%1 columns=%2 rows=%3 tile=%4")
                       .arg(imageIds().size())
                       .arg(m_columns)
                       .arg(m_rows)
-                      .arg(m_tileExtent)
-                      .arg(x())
-                      .arg(y())
-                      .arg(width())
-                      .arg(height()));
+                      .arg(m_tileExtent));
+}
+
+void ImageGalleryPopover::closeAnimated() {
+    if (m_popover) {
+        m_popover->closeAnimated();
+    }
+}
+
+bool ImageGalleryPopover::isOpen() const {
+    return m_popover && m_popover->isOpen();
 }
 
 QRect ImageGalleryPopover::imageSourceRect(const QString& imageId) const {
@@ -491,82 +458,13 @@ QRect ImageGalleryPopover::imageSourceRect(const QString& imageId) const {
 }
 
 QSize ImageGalleryPopover::sizeHint() const {
-    return QSize(qMax(1, m_columns) * m_tileExtent,
-                 qMax(1, m_rows) * m_tileExtent + kPopoverArrowHeight);
-}
-
-bool ImageGalleryPopover::eventFilter(QObject* watched, QEvent* event) {
-    Q_UNUSED(watched);
-    if (!isVisible() || m_outsideDismissSuspended) {
-        return false;
-    }
-
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
-    if (event->type() == QEvent::WindowDeactivate) {
-        Logger::debug(QStringLiteral("tier.gallery.popover.close reason=window-deactivate"));
-        close();
-        return false;
-    }
-#endif
-
-    if (event->type() != QEvent::MouseButtonPress &&
-        event->type() != QEvent::MouseButtonDblClick &&
-        event->type() != QEvent::NonClientAreaMouseButtonPress) {
-        return false;
-    }
-
-    const auto* mouseEvent = static_cast<QMouseEvent*>(event);
-    if (!shouldDismissForGlobalPosition(mouseEvent->globalPosition().toPoint())) {
-        return false;
-    }
-
-    Logger::debug(QStringLiteral("tier.gallery.popover.close reason=outside-click"));
-    close();
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
-    return true;
-#else
-    return false;
-#endif
-}
-
-void ImageGalleryPopover::showEvent(QShowEvent* event) {
-    QDialog::showEvent(event);
-    if (!m_eventFilterInstalled && qApp) {
-        qApp->installEventFilter(this);
-        m_eventFilterInstalled = true;
-    }
-}
-
-void ImageGalleryPopover::hideEvent(QHideEvent* event) {
-    if (m_eventFilterInstalled && qApp) {
-        qApp->removeEventFilter(this);
-        m_eventFilterInstalled = false;
-    }
-    QDialog::hideEvent(event);
-}
-
-void ImageGalleryPopover::paintEvent(QPaintEvent*) {
-    QPainter painter(this);
-    painter.setRenderHint(QPainter::Antialiasing);
-    const QRectF bubbleRect = QRectF(rect()).adjusted(0.5, kPopoverArrowHeight + 0.5, -0.5, -0.5);
-    const int radius = platformPopoverRadius();
-    const QPainterPath path =
-        roundedPopoverPath(bubbleRect, m_arrowCenterX, kPopoverArrowHeight, radius);
-
-    QColor fill = popoverSurfaceColor(palette());
-    fill.setAlpha(255);
-    QColor stroke = popoverStrokeColor(palette());
-    stroke.setAlpha(palette().color(QPalette::Base).lightness() < 96 ? 210 : 150);
-    painter.fillPath(path, fill);
-    painter.setPen(QPen(stroke, 1));
-    painter.setBrush(Qt::NoBrush);
-    painter.drawPath(path);
+    return QSize(qMax(1, m_columns) * m_tileExtent, qMax(1, m_rows) * m_tileExtent);
 }
 
 void ImageGalleryPopover::resizeEvent(QResizeEvent* event) {
-    QDialog::resizeEvent(event);
+    QWidget::resizeEvent(event);
     if (m_grid) {
-        m_grid->setGeometry(0, kPopoverArrowHeight, width(), height() - kPopoverArrowHeight);
+        m_grid->setGeometry(rect());
     }
 }
 
@@ -589,7 +487,8 @@ const TierImage* ImageGalleryPopover::imageForId(const QString& imageId) const {
 }
 
 QString ImageGalleryPopover::resolvedPathForImage(const TierImage& image) const {
-    return m_assetManager && m_project ? m_assetManager->resolvedImagePath(*m_project, image) : image.sourcePath;
+    return m_assetManager && m_project ? m_assetManager->resolvedImagePath(*m_project, image)
+                                       : image.sourcePath;
 }
 
 QPixmap ImageGalleryPopover::pixmapForImage(const QString& imageId, QSize requestedSize) const {
@@ -597,7 +496,8 @@ QPixmap ImageGalleryPopover::pixmapForImage(const QString& imageId, QSize reques
         requestedSize = requestedSize.expandedTo(QSize(m_tileExtent * 2, m_tileExtent * 2));
         if (m_thumbnailCache) {
             if (!m_thumbnailCache->hasThumbnail(imageId, requestedSize)) {
-                m_thumbnailCache->requestThumbnail(imageId, resolvedPathForImage(*image), requestedSize);
+                m_thumbnailCache->requestThumbnail(imageId, resolvedPathForImage(*image),
+                                                   requestedSize);
             }
             const QPixmap cached = m_thumbnailCache->thumbnail(imageId, requestedSize);
             if (!cached.isNull()) {
@@ -605,7 +505,8 @@ QPixmap ImageGalleryPopover::pixmapForImage(const QString& imageId, QSize reques
             }
         }
     }
-    return QPixmap(QStringLiteral(":/icons/image.svg"));
+    return vkui::icon(vkui::VkSymbol::Eye, vkui::VkIconRole::Secondary)
+        .pixmap(requestedSize.isEmpty() ? QSize(64, 64) : requestedSize);
 }
 
 QRect ImageGalleryPopover::cellRect(int index) const {
@@ -631,7 +532,7 @@ int ImageGalleryPopover::cellIndexAt(const QPoint& point) const {
 void ImageGalleryPopover::recalculateGrid(const QRect& availableGeometry) {
     const int count = qMax(1, static_cast<int>(imageIds().size()) + 1);
     const int maxWidth = qMax(kMinimumTileExtent, qMin(760, availableGeometry.width()));
-    const int maxHeight = qMax(kMinimumTileExtent, availableGeometry.height() - kPopoverArrowHeight);
+    const int maxHeight = qMax(kMinimumTileExtent, availableGeometry.height());
     const int maxColumns = qMax(1, qMin(count, maxWidth / kMinimumTileExtent));
 
     int bestColumns = 1;
@@ -677,18 +578,6 @@ void ImageGalleryPopover::requestThumbnails() {
             m_thumbnailCache->requestThumbnail(image.id, resolvedPathForImage(image), requestSize);
         }
     }
-}
-
-bool ImageGalleryPopover::shouldDismissForGlobalPosition(const QPoint& globalPosition) const {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    if (m_anchorGlobalRect.isValid() && m_anchorGlobalRect.adjusted(-3, -3, 3, 3).contains(globalPosition)) {
-        // Let the gallery toolbar button deliver its clicked() signal; EditPage will close the popover.
-        return false;
-    }
-#else
-    Q_UNUSED(m_anchorGlobalRect);
-#endif
-    return !geometry().contains(globalPosition);
 }
 
 } // namespace tlm

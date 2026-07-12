@@ -1,5 +1,7 @@
 #include "navigation/SidebarModel.h"
 
+#include <vkui/core/VkIcon.h>
+
 namespace tlm {
 
 SidebarModel::SidebarModel(QObject* parent) : QAbstractListModel(parent) {
@@ -46,8 +48,8 @@ QModelIndex SidebarModel::indexForPage(AppPage page) const {
 
 void SidebarModel::retranslate() {
     beginResetModel();
-    m_items = {{AppPage::Edit, tr("Edit"), QIcon(QStringLiteral(":/icons/edit.svg"))},
-               {AppPage::Projects, tr("Projects"), QIcon(QStringLiteral(":/icons/folder.svg"))}};
+    m_items = {{AppPage::Edit, tr("Edit"), vkui::icon(vkui::VkSymbol::Edit)},
+               {AppPage::Projects, tr("Projects"), vkui::icon(vkui::VkSymbol::Projects)}};
     endResetModel();
 }
 

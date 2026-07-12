@@ -1,6 +1,7 @@
-[submodule "external/vkframeless"]
-	path = external/vkframeless
-	url = https://github.com/qianvk/vkframeless.git
 [submodule "third_party/qwindowkit"]
 	path = third_party/qwindowkit
-	url = https://github.com/qianvk/qwindowkit
+	url = https://github.com/qianvk/qwindowkit.git
+	branch = dev
+[submodule "third_party/vkui"]
+	path = third_party/vkui
+	url = https://github.com/qianvk/vkui.git

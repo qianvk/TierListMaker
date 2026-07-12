@@ -1,6 +1,10 @@
 #pragma once
 
-#include <vkframeless/FramelessWindow.h>
+#include <QMainWindow>
+
+namespace QWK {
+class WidgetWindowAgent;
+}
 
 namespace tlm {
 
@@ -14,8 +18,8 @@ class ThemeManager;
 class ThumbnailCache;
 class AppUpdater;
 
-/** Top-level VKFrameless application window with native platform behavior preserved. */
-class MainWindow : public vkframeless::FramelessWindow {
+/** Top-level QWindowKit host with native platform move, resize, and system buttons. */
+class MainWindow : public QMainWindow {
     Q_OBJECT
 
 public:
@@ -23,10 +27,15 @@ public:
                AssetManager* assetManager, ThumbnailCache* thumbnailCache, AppSettings* settings,
                LanguageManager* languageManager, AppUpdater* updater, QWidget* parent = nullptr);
 
+    QWK::WidgetWindowAgent* windowAgent() const {
+        return m_windowAgent;
+    }
+
 protected:
     void closeEvent(QCloseEvent* event) override;
 
 private:
+    QWK::WidgetWindowAgent* m_windowAgent{nullptr};
     RootWidget* m_root{nullptr};
 };
 

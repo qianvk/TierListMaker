@@ -1,5 +1,7 @@
 #include "tier/TierDragController.h"
 
+#include "theme/Theme.h"
+
 #include "logging/Logger.h"
 
 #include <QApplication>
@@ -9,6 +11,8 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPointer>
+
+#include <vkui/core/VkIcon.h>
 
 namespace tlm {
 
@@ -68,22 +72,19 @@ QString TierDragController::rowIdFromMimeData(const QMimeData* mimeData) {
 ImageTileWidget::ImageTileWidget(const TierProject* project, const TierImage* image,
                                  const AssetManager* assetManager, ThumbnailCache* thumbnailCache,
                                  QWidget* parent)
-    : QFrame(parent),
-      m_project(project),
-      m_image(image),
-      m_assetManager(assetManager),
-      m_thumbnailCache(thumbnailCache),
-      m_imageId(image ? image->id : QString()) {
+    : QFrame(parent), m_project(project), m_image(image), m_assetManager(assetManager),
+      m_thumbnailCache(thumbnailCache), m_imageId(image ? image->id : QString()) {
     setTileExtent(m_tileExtent);
     setCursor(Qt::OpenHandCursor);
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     if (m_thumbnailCache && image) {
-        connect(m_thumbnailCache, &ThumbnailCache::thumbnailReady, this, [this](const QString& key) {
-            if (key == m_imageId) {
-                update();
-            }
-        });
+        connect(m_thumbnailCache, &ThumbnailCache::thumbnailReady, this,
+                [this](const QString& key) {
+                    if (key == m_imageId) {
+                        update();
+                    }
+                });
         m_thumbnailCache->requestThumbnail(m_imageId, resolvedPath(), QSize(144, 144));
     }
 }
@@ -134,7 +135,8 @@ void ImageTileWidget::mouseMoveEvent(QMouseEvent* event) {
     if (!(event->buttons() & Qt::LeftButton)) {
         return;
     }
-    if ((event->pos() - m_dragStartPosition).manhattanLength() < QApplication::startDragDistance()) {
+    if ((event->pos() - m_dragStartPosition).manhattanLength() <
+        QApplication::startDragDistance()) {
         return;
     }
     if (m_dragInProgress) {
@@ -163,9 +165,10 @@ void ImageTileWidget::mouseMoveEvent(QMouseEvent* event) {
     Logger::info(QStringLiteral("tier.image.tile.drag.start imageId=%1").arg(imageId));
     const Qt::DropAction result = drag->exec(Qt::MoveAction);
     if (!guard) {
-        Logger::info(QStringLiteral("tier.image.tile.drag.finish imageId=%1 result=%2 widgetAlive=false")
-                         .arg(imageId)
-                         .arg(static_cast<int>(result)));
+        Logger::info(
+            QStringLiteral("tier.image.tile.drag.finish imageId=%1 result=%2 widgetAlive=false")
+                .arg(imageId)
+                .arg(static_cast<int>(result)));
         return;
     }
     Logger::info(QStringLiteral("tier.image.tile.drag.finish imageId=%1 result=%2")
@@ -191,13 +194,15 @@ void ImageTileWidget::mouseReleaseEvent(QMouseEvent* event) {
 }
 
 void ImageTileWidget::mouseDoubleClickEvent(QMouseEvent*) {
-    Logger::info(QStringLiteral("tier.image.tile.preview.request source=double-click imageId=%1").arg(m_imageId));
+    Logger::info(QStringLiteral("tier.image.tile.preview.request source=double-click imageId=%1")
+                     .arg(m_imageId));
     emit previewRequested(m_imageId, imageRectIn(window()));
 }
 
 void ImageTileWidget::keyPressEvent(QKeyEvent* event) {
     if (event->key() == Qt::Key_Space) {
-        Logger::info(QStringLiteral("tier.image.tile.preview.request source=space imageId=%1").arg(m_imageId));
+        Logger::info(QStringLiteral("tier.image.tile.preview.request source=space imageId=%1")
+                         .arg(m_imageId));
         emit previewRequested(m_imageId, imageRectIn(window()));
         event->accept();
         return;
@@ -206,12 +211,13 @@ void ImageTileWidget::keyPressEvent(QKeyEvent* event) {
 }
 
 void ImageTileWidget::paintEvent(QPaintEvent*) {
+    const ThemeTokens& colors = activeThemeTokens();
     QPainter painter(this);
     painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
     const QRect tileRect = rect();
     const QRect imageRect = tileRect;
 
-    painter.fillRect(tileRect, palette().color(QPalette::AlternateBase));
+    painter.fillRect(tileRect, colors.elevatedBackground);
     painter.save();
     painter.setClipRect(imageRect);
     QPixmap p = pixmap();
@@ -224,7 +230,8 @@ void ImageTileWidget::paintEvent(QPaintEvent*) {
 
     const QString text = m_image ? m_image->displayName : QString();
     if (!text.isEmpty()) {
-        const QRect bannerRect = imageRect.adjusted(0, imageRect.height() - qMax(18, imageRect.height() / 4), 0, 0);
+        const QRect bannerRect =
+            imageRect.adjusted(0, imageRect.height() - qMax(18, imageRect.height() / 4), 0, 0);
         QLinearGradient gradient(bannerRect.topLeft(), bannerRect.bottomLeft());
         gradient.setColorAt(0.0, QColor(0, 0, 0, 0));
         gradient.setColorAt(1.0, QColor(0, 0, 0, 150));
@@ -233,12 +240,13 @@ void ImageTileWidget::paintEvent(QPaintEvent*) {
         QFont textFont = painter.font();
         textFont.setPixelSize(qMax(10, imageRect.height() / 7));
         painter.setFont(textFont);
-        painter.drawText(bannerRect.adjusted(6, 0, -6, -2), Qt::AlignLeft | Qt::AlignBottom,
-                         painter.fontMetrics().elidedText(text, Qt::ElideRight, bannerRect.width() - 12));
+        painter.drawText(
+            bannerRect.adjusted(6, 0, -6, -2), Qt::AlignLeft | Qt::AlignBottom,
+            painter.fontMetrics().elidedText(text, Qt::ElideRight, bannerRect.width() - 12));
     }
 
     painter.setRenderHint(QPainter::Antialiasing, false);
-    painter.setPen(QPen(m_selected || hasFocus() ? palette().highlight().color() : QColor(0, 0, 0, 42),
+    painter.setPen(QPen(m_selected || hasFocus() ? colors.accent : colors.imageBorder,
                         m_selected || hasFocus() ? 2 : 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(tileRect.adjusted(0, 0, -1, -1));
@@ -252,14 +260,16 @@ QString ImageTileWidget::resolvedPath() const {
     if (!m_project || !m_image) {
         return {};
     }
-    return m_assetManager ? m_assetManager->resolvedImagePath(*m_project, *m_image) : m_image->sourcePath;
+    return m_assetManager ? m_assetManager->resolvedImagePath(*m_project, *m_image)
+                          : m_image->sourcePath;
 }
 
 QPixmap ImageTileWidget::pixmap() const {
     if (m_thumbnailCache && m_thumbnailCache->hasThumbnail(m_imageId)) {
         return m_thumbnailCache->thumbnail(m_imageId);
     }
-    return QPixmap(QStringLiteral(":/icons/image.svg"));
+    return vkui::icon(vkui::VkSymbol::Eye, vkui::VkIconRole::Secondary)
+        .pixmap(QSize(m_tileExtent, m_tileExtent));
 }
 
 } // namespace tlm

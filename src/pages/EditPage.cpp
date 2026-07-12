@@ -2,6 +2,7 @@
 
 #include "logging/Logger.h"
 #include "preview/PreviewOverlay.h"
+#include "theme/Theme.h"
 #include "tier/ImageEditDialog.h"
 #include "tier/ImageGalleryPopover.h"
 #include "tier/TierBoardWidget.h"
@@ -11,100 +12,64 @@
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
+#include <QEventLoop>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFormLayout>
-#include <QGuiApplication>
 #include <QGraphicsDropShadowEffect>
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
-#include <QMouseEvent>
+#include <QPaintEvent>
 #include <QPainter>
 #include <QPainterPath>
-#include <QPaintEvent>
-#include <QPushButton>
 #include <QPixmap>
-#include <QScreen>
-#include <QShowEvent>
-#include <QHideEvent>
+#include <QPushButton>
 #include <QSignalBlocker>
-#include <QSlider>
 #include <QSizePolicy>
+#include <QSlider>
 #include <QTimer>
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <memory>
 #include <optional>
+
+#include <vkui/core/VkIcon.h>
+#include <vkui/widgets/overlays/VkPopover.h>
 
 namespace tlm {
 
 namespace {
-constexpr int kPopoverArrowHeight = 12;
-constexpr int kPopoverArrowCenterX = 46;
 constexpr int kContentTitleBarHeight = 54;
 constexpr int kTierBoardOuterMargin = 16;
 constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
 constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
 
-int platformPopoverRadius() {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    return 16;
-#else
-    return 10;
-#endif
-}
+class BackgroundPopover final : public QObject {
+public:
+    enum Result { Rejected, Accepted };
 
-QColor popoverSurfaceColor(const QPalette& palette) {
-    return palette.color(QPalette::Base).lightness() < 96 ? QColor(31, 35, 53)
-                                                          : QColor(250, 251, 253);
-}
-
-QColor popoverStrokeColor(const QPalette& palette) {
-    return palette.color(QPalette::Base).lightness() < 96 ? QColor(68, 76, 110)
-                                                          : QColor(210, 218, 232);
-}
-
-QPainterPath roundedPopoverPath(const QRectF& bubbleRect, qreal arrowCenterX, qreal arrowHeight,
-                                qreal radius) {
-    QPainterPath bubble;
-    bubble.addRoundedRect(bubbleRect, radius, radius);
-
-    if (bubbleRect.width() <= radius * 2.0 || arrowHeight <= 0.0) {
-        return bubble;
+    explicit BackgroundPopover(QWidget* parent = nullptr)
+        : QObject(parent), m_popover(std::make_unique<vkui::VkPopover>(parent)),
+          m_content(new QWidget) {
+        m_content->setObjectName(QStringLiteral("BackgroundPopoverContent"));
+        m_popover->setPreferredPlacement(vkui::VkPopoverPlacement::Below);
+        m_popover->setContentWidget(m_content);
+        connect(m_popover.get(), &vkui::VkPopover::closed, this, [this]() {
+            if (m_loop) {
+                m_loop->quit();
+            }
+        });
     }
 
-    constexpr qreal kArrowHalfWidth = 18.0;
-    constexpr qreal kTipHalfWidth = 4.2;
-    constexpr qreal kBodyOverlap = 2.5;
-    const qreal minCenter = bubbleRect.left() + radius + kArrowHalfWidth;
-    const qreal maxCenter = bubbleRect.right() - radius - kArrowHalfWidth;
-    const qreal centerX = qBound(minCenter, arrowCenterX, maxCenter);
-    const qreal baseY = bubbleRect.top() + kBodyOverlap;
-    const qreal tipY = bubbleRect.top() - arrowHeight + 0.5;
-
-    // The arrow overlaps the body, then both paths are unioned so the shared edge is never stroked.
-    QPainterPath arrow;
-    arrow.moveTo(centerX - kArrowHalfWidth, baseY);
-    arrow.cubicTo(centerX - 13.0, baseY, centerX - 9.5, tipY + 6.0,
-                  centerX - kTipHalfWidth, tipY + 2.8);
-    arrow.quadTo(centerX, tipY - 0.4, centerX + kTipHalfWidth, tipY + 2.8);
-    arrow.cubicTo(centerX + 9.5, tipY + 6.0, centerX + 13.0, baseY,
-                  centerX + kArrowHalfWidth, baseY);
-    arrow.closeSubpath();
-
-    return bubble.united(arrow);
-}
-
-class BackgroundPopover final : public QDialog {
-public:
-    explicit BackgroundPopover(QWidget* parent = nullptr)
-        : QDialog(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint) {
-        setAttribute(Qt::WA_TranslucentBackground);
-        setAutoFillBackground(false);
-        setObjectName(QStringLiteral("BackgroundPopover"));
+    QWidget* contentWidget() const {
+        return m_content;
+    }
+    void setFixedWidth(int width) {
+        m_content->setFixedWidth(width);
     }
 
     void setOutsideDismissSuspended(bool suspended) {
@@ -112,91 +77,51 @@ public:
             return;
         }
         m_outsideDismissSuspended = suspended;
-        Logger::debug(QStringLiteral("tier.edit.background.popover.dismiss.suspended value=%1").arg(suspended));
+        const auto normalPolicy = vkui::VkPopoverClosePolicyFlag::OutsideClick |
+                                  vkui::VkPopoverClosePolicyFlag::EscapeKey |
+                                  vkui::VkPopoverClosePolicyFlag::AnchorDestroyed |
+                                  vkui::VkPopoverClosePolicyFlag::WindowDeactivated;
+        m_popover->setClosePolicy(suspended ? vkui::VkPopoverClosePolicyFlag::AnchorDestroyed
+                                            : normalPolicy);
+        Logger::debug(QStringLiteral("tier.edit.background.popover.dismiss.suspended value=%1")
+                          .arg(suspended));
     }
 
-    void placeBelow(const QRect& globalAnchorRect) {
-        m_anchorGlobalRect = globalAnchorRect;
-        adjustSize();
-        const QSize popupSize = sizeHint().expandedTo(size());
-        const int anchorCenterX = globalAnchorRect.isValid()
-                                      ? globalAnchorRect.center().x()
-                                      : parentWidget()->mapToGlobal(QPoint(parentWidget()->width() - 46, 0)).x();
-        QPoint topLeft = globalAnchorRect.isValid()
-                             ? QPoint(globalAnchorRect.center().x() - kPopoverArrowCenterX,
-                                      globalAnchorRect.bottom() + 8)
-                             : parentWidget()->mapToGlobal(QPoint(parentWidget()->width() - popupSize.width() - 22,
-                                                                  54));
-        QScreen* screen = globalAnchorRect.isValid() ? QGuiApplication::screenAt(globalAnchorRect.center())
-                                                     : QGuiApplication::screenAt(topLeft);
-        if (screen) {
-            const QRect available = screen->availableGeometry().adjusted(10, 10, -10, -10);
-            topLeft.setX(qBound(available.left(), topLeft.x(), available.right() - popupSize.width()));
-            topLeft.setY(qBound(available.top(), topLeft.y(), available.bottom() - popupSize.height()));
+    int execFor(QWidget* anchor) {
+        if (!anchor) {
+            return Rejected;
         }
-        const int radius = platformPopoverRadius();
-        m_arrowCenterX = qBound(radius + 14, anchorCenterX - topLeft.x(), popupSize.width() - radius - 14);
-        move(topLeft);
-        update();
+        m_result = Rejected;
+        QEventLoop loop;
+        m_loop = &loop;
+        m_popover->openFor(anchor);
+        if (!m_popover->isOpen()) {
+            m_loop = nullptr;
+            Logger::warn(
+                QStringLiteral("tier.edit.background.popover.open rejected invalid-anchor=1"));
+            return Rejected;
+        }
+        loop.exec(QEventLoop::DialogExec);
+        m_loop = nullptr;
+        return m_result;
     }
 
-protected:
-    bool eventFilter(QObject* watched, QEvent* event) override {
-        Q_UNUSED(watched);
-        if (!isVisible() || m_outsideDismissSuspended || event->type() != QEvent::MouseButtonPress) {
-            return false;
-        }
-
-        const auto* mouseEvent = static_cast<QMouseEvent*>(event);
-        if (geometry().contains(mouseEvent->globalPosition().toPoint())) {
-            return false;
-        }
-
-        Logger::info(QStringLiteral("tier.edit.background.cancel reason=outside-click"));
-        reject();
-        return true;
+    void accept() {
+        m_result = Accepted;
+        m_popover->closeAnimated();
     }
 
-    void showEvent(QShowEvent* event) override {
-        QDialog::showEvent(event);
-        if (!m_eventFilterInstalled && qApp) {
-            qApp->installEventFilter(this);
-            m_eventFilterInstalled = true;
-        }
-    }
-
-    void hideEvent(QHideEvent* event) override {
-        if (m_eventFilterInstalled && qApp) {
-            qApp->removeEventFilter(this);
-            m_eventFilterInstalled = false;
-        }
-        QDialog::hideEvent(event);
-    }
-
-    void paintEvent(QPaintEvent* event) override {
-        Q_UNUSED(event);
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        const int radius = platformPopoverRadius();
-        const QRectF bubbleRect = QRectF(rect()).adjusted(0.5, kPopoverArrowHeight + 0.5, -0.5, -0.5);
-        const QPainterPath path =
-            roundedPopoverPath(bubbleRect, m_arrowCenterX, kPopoverArrowHeight, radius);
-
-        QColor fill = popoverSurfaceColor(palette());
-        fill.setAlpha(255);
-        QColor stroke = popoverStrokeColor(palette());
-        stroke.setAlpha(palette().color(QPalette::Base).lightness() < 96 ? 210 : 150);
-        painter.fillPath(path, fill);
-        painter.setPen(QPen(stroke, 1));
-        painter.setBrush(Qt::NoBrush);
-        painter.drawPath(path);
+    void reject() {
+        m_result = Rejected;
+        m_popover->closeAnimated();
     }
 
 private:
-    int m_arrowCenterX{kPopoverArrowCenterX};
-    QRect m_anchorGlobalRect;
+    std::unique_ptr<vkui::VkPopover> m_popover;
+    QWidget* m_content{nullptr};
+    QEventLoop* m_loop{nullptr};
+    int m_result{Rejected};
     bool m_outsideDismissSuspended{false};
-    bool m_eventFilterInstalled{false};
 };
 
 class BackgroundPreviewWidget final : public QWidget {
@@ -229,25 +154,25 @@ protected:
         QPainterPath clip;
         clip.addRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12);
         painter.setClipPath(clip);
-        painter.fillPath(clip, palette().color(QPalette::AlternateBase));
+        const ThemeTokens& colors = activeThemeTokens();
+        painter.fillPath(clip, colors.elevatedBackground);
 
         if (!m_pixmap.isNull() && !rect().isEmpty()) {
             painter.setOpacity(m_visibility);
             if (m_centeredIcon) {
-                painter.drawPixmap(centeredIconTargetRect(rect()), m_pixmap, QRectF(m_pixmap.rect()));
+                painter.drawPixmap(centeredIconTargetRect(rect()), m_pixmap,
+                                   QRectF(m_pixmap.rect()));
             } else {
                 painter.drawPixmap(rect(), m_pixmap, sourceRectForTarget(rect().size()));
             }
             painter.setOpacity(1.0);
         } else {
-            painter.setPen(palette().color(QPalette::WindowText));
+            painter.setPen(colors.primaryText);
             painter.drawText(rect().adjusted(12, 8, -12, -8), Qt::AlignCenter, m_defaultText);
         }
 
         painter.setClipping(false);
-        QColor stroke = palette().color(QPalette::Mid);
-        stroke.setAlpha(120);
-        painter.setPen(QPen(stroke, 1));
+        painter.setPen(QPen(colors.border, 1));
         painter.setBrush(Qt::NoBrush);
         painter.drawRoundedRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5), 12, 12);
     }
@@ -267,8 +192,10 @@ private:
             return {};
         }
         const QSize sourceSize = m_pixmap.size();
-        const qreal targetRatio = static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
-        const qreal sourceRatio = static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
+        const qreal targetRatio =
+            static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
+        const qreal sourceRatio =
+            static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
         if (sourceRatio > targetRatio) {
             const int cropWidth = qRound(sourceSize.height() * targetRatio);
             return QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
@@ -288,7 +215,8 @@ QString resolvedCanvasImagePath(const TierProject& project, const QString& store
     if (storedPath.isEmpty()) {
         return {};
     }
-    if (storedPath.startsWith(QStringLiteral(":/")) || storedPath.startsWith(QStringLiteral("qrc:/"))) {
+    if (storedPath.startsWith(QStringLiteral(":/")) ||
+        storedPath.startsWith(QStringLiteral("qrc:/"))) {
         return storedPath;
     }
     const QFileInfo info(storedPath);
@@ -302,41 +230,26 @@ QString resolvedCanvasImagePath(const TierProject& project, const QString& store
 }
 
 qreal canvasBackgroundVisibility(const QJsonObject& canvas) {
-    const bool hasCustomBackground = !canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
+    const bool hasCustomBackground =
+        !canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty();
     const qreal fallback = hasCustomBackground ? 1.0 : kDefaultBackgroundIconVisibility;
     return qBound<qreal>(
         0.0,
         canvas.value(QStringLiteral("backgroundVisibility"))
-            .toDouble(canvas.value(QStringLiteral("backgroundImageOpacity")).toDouble(
-                canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
+            .toDouble(
+                canvas.value(QStringLiteral("backgroundImageOpacity"))
+                    .toDouble(
+                        canvas.value(QStringLiteral("backgroundOpacity")).toDouble(fallback))),
         1.0);
 }
 
-void applyDialogLineEditTheme(QLineEdit* edit) {
-    if (!edit) {
-        return;
-    }
-    if (edit->palette().color(QPalette::Base).lightness() >= 96) {
-        edit->setStyleSheet({});
-        return;
-    }
-    edit->setStyleSheet(QStringLiteral(
-        "QLineEdit{background:palette(alternate-base);color:palette(window-text);"
-        "border:1px solid palette(mid);border-radius:8px;padding:6px 8px;}"
-        "QLineEdit:hover{border-color:palette(midlight);}"
-        "QLineEdit:focus{border-color:palette(highlight);}"));
-}
 } // namespace
 
 EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentProjects,
-                   AssetManager* assetManager, ThumbnailCache* thumbnailCache, AppSettings* settings,
-                   QWidget* parent)
-    : QWidget(parent),
-      m_repository(repository),
-      m_recentProjects(recentProjects),
-      m_assetManager(assetManager),
-      m_thumbnailCache(thumbnailCache),
-      m_settings(settings),
+                   AssetManager* assetManager, ThumbnailCache* thumbnailCache,
+                   AppSettings* settings, QWidget* parent)
+    : QWidget(parent), m_repository(repository), m_recentProjects(recentProjects),
+      m_assetManager(assetManager), m_thumbnailCache(thumbnailCache), m_settings(settings),
       m_exporter(new TierListExporter(assetManager, this)),
       m_project(TierProject::createUntitled()) {
     setFocusPolicy(Qt::StrongFocus);
@@ -346,8 +259,8 @@ EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentPro
 
     m_autosaveTimer = new QTimer(this);
     connect(m_autosaveTimer, &QTimer::timeout, this, [this]() {
-        if (!m_backgroundPreviewActive && m_settings && m_settings->autosaveEnabled() && m_project.dirty &&
-            !m_project.filePath.isEmpty()) {
+        if (!m_backgroundPreviewActive && m_settings && m_settings->autosaveEnabled() &&
+            m_project.dirty && !m_project.filePath.isEmpty()) {
             saveProject();
         }
     });
@@ -356,23 +269,124 @@ EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentPro
 }
 
 QString EditPage::displayTitle() const {
-    return QStringLiteral("%1%2").arg(m_project.name, m_project.dirty ? QStringLiteral(" *") : QString());
+    return QStringLiteral("%1%2").arg(m_project.name,
+                                      m_project.dirty ? QStringLiteral(" *") : QString());
 }
 
 bool EditPage::newProject() {
     if (!confirmSaveIfDirty()) {
         return false;
     }
-    setProject(TierProject::createUntitled());
-    return true;
+
+    QDialog dialog(this);
+    dialog.setWindowTitle(tr("New Project"));
+    dialog.setModal(true);
+    dialog.setMinimumWidth(520);
+
+    auto* layout = new QVBoxLayout(&dialog);
+    auto* form = new QFormLayout;
+    auto* nameEdit = new QLineEdit(tr("Untitled Tier List"), &dialog);
+    nameEdit->selectAll();
+    form->addRow(tr("Project name"), nameEdit);
+
+    auto* directoryRow = new QWidget(&dialog);
+    auto* directoryLayout = new QHBoxLayout(directoryRow);
+    directoryLayout->setContentsMargins(0, 0, 0, 0);
+    directoryLayout->setSpacing(8);
+    auto* directoryEdit = new QLineEdit(QDir::homePath(), directoryRow);
+    directoryEdit->setReadOnly(true);
+    auto* browseButton =
+        new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Choose"), directoryRow);
+    directoryLayout->addWidget(directoryEdit, 1);
+    directoryLayout->addWidget(browseButton);
+    form->addRow(tr("Parent folder"), directoryRow);
+    layout->addLayout(form);
+
+    auto* pathHint = new QLabel(&dialog);
+    pathHint->setWordWrap(true);
+    pathHint->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    layout->addWidget(pathHint);
+
+    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
+    QPushButton* createButton = buttons->addButton(tr("Create"), QDialogButtonBox::AcceptRole);
+    layout->addWidget(buttons);
+
+    const auto projectPath = [nameEdit, directoryEdit]() {
+        TierProject candidate = TierProject::createUntitled();
+        candidate.name = nameEdit->text().trimmed();
+        const QString folderName = QFileInfo(candidate.suggestedFileName()).completeBaseName();
+        const QString folderPath = QDir(directoryEdit->text()).filePath(folderName);
+        return QDir(folderPath).filePath(candidate.suggestedFileName());
+    };
+    const auto refreshPathHint = [&, createButton]() {
+        const bool valid =
+            !nameEdit->text().trimmed().isEmpty() && QDir(directoryEdit->text()).exists();
+        createButton->setEnabled(valid);
+        pathHint->setText(
+            tr("Project will be created at:\n%1").arg(QDir::toNativeSeparators(projectPath())));
+    };
+
+    connect(nameEdit, &QLineEdit::textChanged, &dialog, refreshPathHint);
+    connect(browseButton, &QPushButton::clicked, &dialog, [&]() {
+        const QString directory = QFileDialog::getExistingDirectory(
+            &dialog, tr("Choose Parent Folder"), directoryEdit->text(),
+            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+        if (!directory.isEmpty()) {
+            directoryEdit->setText(QDir::cleanPath(directory));
+            refreshPathHint();
+        }
+    });
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    refreshPathHint();
+
+    if (dialog.exec() != QDialog::Accepted) {
+        Logger::debug(QStringLiteral("tier.edit.project.create.cancel"));
+        return false;
+    }
+
+    const QString filePath = QFileInfo(projectPath()).absoluteFilePath();
+    const QString projectDirectory = QFileInfo(filePath).absolutePath();
+    const bool projectDirectoryAlreadyExisted = QDir(projectDirectory).exists();
+    if (QFileInfo::exists(filePath)) {
+        QMessageBox::warning(
+            this, tr("New Project"),
+            tr("A project already exists at:\n%1").arg(QDir::toNativeSeparators(filePath)));
+        Logger::warn(
+            QStringLiteral("tier.edit.project.create rejected=existing path=\"%1\"").arg(filePath));
+        return false;
+    }
+    if (!QDir().mkpath(projectDirectory)) {
+        QMessageBox::critical(this, tr("New Project"),
+                              tr("Could not create the project folder:\n%1")
+                                  .arg(QDir::toNativeSeparators(projectDirectory)));
+        Logger::error(QStringLiteral("tier.edit.project.create rejected=mkdir path=\"%1\"")
+                          .arg(projectDirectory));
+        return false;
+    }
+
+    const TierProject previousProject = m_project;
+    TierProject project = TierProject::createUntitled();
+    project.name = nameEdit->text().trimmed();
+    setProject(std::move(project));
+    const bool saved = saveProjectToPath(filePath);
+    if (!saved) {
+        setProject(previousProject);
+        if (!projectDirectoryAlreadyExisted) {
+            QDir(projectDirectory).removeRecursively();
+        }
+    }
+    Logger::info(
+        QStringLiteral("tier.edit.project.create path=\"%1\" saved=%2").arg(filePath).arg(saved));
+    return saved;
 }
 
 bool EditPage::openProjectFromDialog() {
     if (!confirmSaveIfDirty()) {
         return false;
     }
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("Open Project"), QString(), tr("TierListMaker Projects (*.tlmproject)"));
+    const QString path = QFileDialog::getOpenFileName(this, tr("Open Project"), QString(),
+                                                      tr("TierListMaker Projects (*.tlmproject)"));
     return path.isEmpty() ? false : openProject(path);
 }
 
@@ -415,8 +429,10 @@ void EditPage::renameProject(const QString& name) {
 }
 
 void EditPage::resetRows() {
-    if (QMessageBox::question(this, tr("Reset Rows"),
-                              tr("Reset rows to S/A/B/C/D and remove row assignments from images?")) != QMessageBox::Yes) {
+    if (QMessageBox::question(
+            this, tr("Reset Rows"),
+            tr("Reset rows to S/A/B/C/D and remove row assignments from images?")) !=
+        QMessageBox::Yes) {
         return;
     }
     m_project.resetDefaultRows();
@@ -434,13 +450,12 @@ void EditPage::importImagesFromDialog() {
 }
 
 void EditPage::importImages(const QStringList& filePaths) {
-    ImageImportBehavior behavior = m_settings ? m_settings->importBehavior()
-                                              : ImageImportBehavior::CopyIntoProject;
+    ImageImportBehavior behavior =
+        m_settings ? m_settings->importBehavior() : ImageImportBehavior::CopyIntoProject;
     if (behavior == ImageImportBehavior::AskEveryTime) {
-        const int choice =
-            QMessageBox::question(this, tr("Import Images"),
-                                  tr("Copy imported images into the project folder?"),
-                                  QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+        const int choice = QMessageBox::question(
+            this, tr("Import Images"), tr("Copy imported images into the project folder?"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
         behavior = choice == QMessageBox::Yes ? ImageImportBehavior::CopyIntoProject
                                               : ImageImportBehavior::ReferenceOriginal;
     }
@@ -461,11 +476,10 @@ void EditPage::exportProjectFromDialog() {
     options.scale = m_settings ? m_settings->defaultExportScale() : 2;
     const QString format = m_settings ? m_settings->defaultExportFormat() : QStringLiteral("png");
     options.format = ExportOptions::formatFromSuffix(format);
-    const QString suggested =
-        QFileInfo(m_project.suggestedFileName()).completeBaseName() + QStringLiteral(".") +
-        ExportOptions::suffixForFormat(options.format);
-    const QString path = QFileDialog::getSaveFileName(
-        this, tr("Export Tier List"), suggested, tr("PNG (*.png);;JPEG (*.jpg);;PDF (*.pdf)"));
+    const QString suggested = QFileInfo(m_project.suggestedFileName()).completeBaseName() +
+                              QStringLiteral(".") + ExportOptions::suffixForFormat(options.format);
+    const QString path = QFileDialog::getSaveFileName(this, tr("Export Tier List"), suggested,
+                                                      tr("PNG (*.png);;JPEG (*.jpg);;PDF (*.pdf)"));
     if (path.isEmpty()) {
         return;
     }
@@ -475,7 +489,7 @@ void EditPage::exportProjectFromDialog() {
     }
 }
 
-void EditPage::configureBackground(const QRect& anchorGlobalRect) {
+void EditPage::configureBackground(QWidget* anchor) {
     const QJsonObject originalCanvas = m_project.canvas;
     const bool originalDirty = m_project.dirty;
     const QDateTime originalUpdatedAt = m_project.updatedAt;
@@ -486,27 +500,15 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     m_backgroundPreviewActive = true;
 
     BackgroundPopover dialog(this);
-    dialog.setPalette(qApp ? qApp->palette() : palette());
-    dialog.setWindowTitle(tr("Tier List Background"));
     dialog.setFixedWidth(380);
-    dialog.setStyleSheet(QStringLiteral(
-        "QLabel{color:palette(window-text);}"
-        "QPushButton{border:1px solid palette(mid);border-radius:8px;"
-        "padding:7px 12px;background:palette(alternate-base);}"
-        "QPushButton:hover{background:palette(midlight);}"
-        "QPushButton:pressed{background:palette(midlight);}"
-        "QSlider::groove:horizontal{height:4px;border-radius:2px;background:palette(mid);}"
-        "QSlider::sub-page:horizontal{height:4px;border-radius:2px;background:palette(highlight);}"
-        "QSlider::add-page:horizontal{height:4px;border-radius:2px;background:palette(alternate-base);}"
-        "QSlider::handle:horizontal{width:16px;height:16px;margin:-6px 0px;"
-        "border-radius:8px;background:palette(window);border:1px solid palette(mid);}"));
-    auto* layout = new QVBoxLayout(&dialog);
-    layout->setContentsMargins(18, kPopoverArrowHeight + 18, 18, 16);
+    QWidget* popoverContent = dialog.contentWidget();
+    auto* layout = new QVBoxLayout(popoverContent);
+    layout->setContentsMargins(6, 6, 6, 6);
     layout->setSpacing(12);
 
-    auto* preview = new BackgroundPreviewWidget(&dialog);
+    auto* preview = new BackgroundPreviewWidget(popoverContent);
 
-    auto* pathLabel = new QLabel(&dialog);
+    auto* pathLabel = new QLabel(popoverContent);
     pathLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
     pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     pathLabel->setWordWrap(true);
@@ -514,7 +516,8 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     auto updatePreview = [&]() {
         const QPixmap pixmap(selectedPath);
         if (!clearBackground && !pixmap.isNull()) {
-            preview->setPreview(selectedPath, false, backgroundVisibility, tr("Default Background"));
+            preview->setPreview(selectedPath, false, backgroundVisibility,
+                                tr("Default Background"));
             pathLabel->setText(QFileInfo(selectedPath).fileName());
         } else {
             preview->setPreview(QString::fromUtf8(kDefaultBackgroundIconPath), true,
@@ -545,21 +548,22 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
         }
     };
 
-    auto* choose = new QPushButton(tr("Choose Image"), &dialog);
-    auto* clear = new QPushButton(tr("Use Default"), &dialog);
+    auto* choose = new QPushButton(tr("Choose Image"), popoverContent);
+    auto* clear = new QPushButton(tr("Use Default"), popoverContent);
     auto* actions = new QHBoxLayout;
     actions->addWidget(choose);
     actions->addWidget(clear);
     actions->addStretch();
 
-    auto* opacityLabel = new QLabel(&dialog);
+    auto* opacityLabel = new QLabel(popoverContent);
     opacityLabel->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    auto* opacitySlider = new QSlider(Qt::Horizontal, &dialog);
+    auto* opacitySlider = new QSlider(Qt::Horizontal, popoverContent);
     opacitySlider->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     opacitySlider->setRange(0, 100);
     opacitySlider->setValue(qRound(backgroundVisibility * 100.0));
     auto updateOpacityLabel = [&]() {
-        opacityLabel->setText(tr("Background visibility: %1%").arg(qRound(backgroundVisibility * 100.0)));
+        opacityLabel->setText(
+            tr("Background visibility: %1%").arg(qRound(backgroundVisibility * 100.0)));
     };
     updateOpacityLabel();
 
@@ -569,15 +573,18 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     layout->addWidget(opacityLabel);
     layout->addWidget(opacitySlider);
 
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    auto* buttons =
+        new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, popoverContent);
     layout->addWidget(buttons);
 
     connect(choose, &QPushButton::clicked, &dialog, [&]() {
-        const QStringList filters = m_assetManager ? m_assetManager->supportedNameFilters()
-                                                   : QStringList{tr("Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif)")};
+        const QStringList filters =
+            m_assetManager ? m_assetManager->supportedNameFilters()
+                           : QStringList{tr("Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif)")};
         dialog.setOutsideDismissSuspended(true);
-        const QString imagePath = QFileDialog::getOpenFileName(&dialog, tr("Choose Background Image"),
-                                                               QString(), filters.join(QStringLiteral(";;")));
+        const QString imagePath =
+            QFileDialog::getOpenFileName(popoverContent, tr("Choose Background Image"), QString(),
+                                         filters.join(QStringLiteral(";;")));
         dialog.setOutsideDismissSuspended(false);
         if (imagePath.isEmpty()) {
             Logger::debug(QStringLiteral("tier.edit.background.preview.choose.cancel"));
@@ -605,12 +612,11 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
         updateOpacityLabel();
         updatePreview();
     });
-    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
+    connect(buttons, &QDialogButtonBox::accepted, &dialog, &BackgroundPopover::accept);
+    connect(buttons, &QDialogButtonBox::rejected, &dialog, &BackgroundPopover::reject);
 
     updatePreview();
-    dialog.placeBelow(anchorGlobalRect);
-    if (dialog.exec() != QDialog::Accepted) {
+    if (dialog.execFor(anchor ? anchor : this) != BackgroundPopover::Accepted) {
         m_project.canvas = originalCanvas;
         m_project.dirty = originalDirty;
         m_project.updatedAt = originalUpdatedAt;
@@ -628,21 +634,24 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     m_project.dirty = originalDirty;
     m_project.updatedAt = originalUpdatedAt;
 
-    const QString previousPath = originalCanvas.value(QStringLiteral("backgroundImagePath")).toString();
+    const QString previousPath =
+        originalCanvas.value(QStringLiteral("backgroundImagePath")).toString();
     const qreal previousBackgroundVisibility = canvasBackgroundVisibility(originalCanvas);
-    const bool hasLegacyCanvasKeys = originalCanvas.contains(QStringLiteral("backgroundOpacity")) ||
-                                     originalCanvas.contains(QStringLiteral("backgroundImageOpacity")) ||
-                                     originalCanvas.contains(QStringLiteral("tierListOpacity")) ||
-                                     originalCanvas.contains(QStringLiteral("imagesVisible")) ||
-                                     originalCanvas.contains(QStringLiteral("previewImagesHidden"));
+    const bool hasLegacyCanvasKeys =
+        originalCanvas.contains(QStringLiteral("backgroundOpacity")) ||
+        originalCanvas.contains(QStringLiteral("backgroundImageOpacity")) ||
+        originalCanvas.contains(QStringLiteral("tierListOpacity")) ||
+        originalCanvas.contains(QStringLiteral("imagesVisible")) ||
+        originalCanvas.contains(QStringLiteral("previewImagesHidden"));
     bool changed = hasLegacyCanvasKeys;
 
     if (clearBackground || selectedPath.isEmpty()) {
-        changed = changed || !previousPath.isEmpty() ||
-                  !qFuzzyCompare(previousBackgroundVisibility + 1.0, backgroundVisibility + 1.0) ||
-                  (originalCanvas.contains(QStringLiteral("backgroundVisibility")) &&
-                   qFuzzyCompare(backgroundVisibility + 1.0, kDefaultBackgroundIconVisibility + 1.0)) ||
-                  originalCanvas.contains(QStringLiteral("backgroundImageOpacity"));
+        changed =
+            changed || !previousPath.isEmpty() ||
+            !qFuzzyCompare(previousBackgroundVisibility + 1.0, backgroundVisibility + 1.0) ||
+            (originalCanvas.contains(QStringLiteral("backgroundVisibility")) &&
+             qFuzzyCompare(backgroundVisibility + 1.0, kDefaultBackgroundIconVisibility + 1.0)) ||
+            originalCanvas.contains(QStringLiteral("backgroundImageOpacity"));
         m_project.canvas.remove(QStringLiteral("backgroundImagePath"));
         if (qFuzzyCompare(backgroundVisibility + 1.0, kDefaultBackgroundIconVisibility + 1.0)) {
             m_project.canvas.remove(QStringLiteral("backgroundVisibility"));
@@ -655,12 +664,13 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
                                            QFileInfo(selectedPath).absoluteFilePath()) {
             m_project.canvas.insert(QStringLiteral("backgroundImagePath"), previousPath);
         } else {
-            ImageImportBehavior behavior = m_settings ? m_settings->importBehavior()
-                                                      : ImageImportBehavior::CopyIntoProject;
+            ImageImportBehavior behavior =
+                m_settings ? m_settings->importBehavior() : ImageImportBehavior::CopyIntoProject;
             if (behavior == ImageImportBehavior::AskEveryTime) {
-                const int choice = QMessageBox::question(this, tr("Background Image"),
-                                                         tr("Copy the background image into the project assets?"),
-                                                         QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
+                const int choice =
+                    QMessageBox::question(this, tr("Background Image"),
+                                          tr("Copy the background image into the project assets?"),
+                                          QMessageBox::Yes | QMessageBox::No, QMessageBox::Yes);
                 behavior = choice == QMessageBox::Yes ? ImageImportBehavior::CopyIntoProject
                                                       : ImageImportBehavior::ReferenceOriginal;
             }
@@ -696,25 +706,28 @@ void EditPage::configureBackground(const QRect& anchorGlobalRect) {
     if (m_board) {
         m_board->refreshVisuals();
     }
-    Logger::info(QStringLiteral("tier.edit.background.apply hasImage=%1 backgroundVisibility=%2 previewImagesHidden=false")
-                     .arg(!m_project.canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty())
-                     .arg(backgroundVisibility, 0, 'f', 2));
+    Logger::info(
+        QStringLiteral("tier.edit.background.apply hasImage=%1 backgroundVisibility=%2 "
+                       "previewImagesHidden=false")
+            .arg(
+                !m_project.canvas.value(QStringLiteral("backgroundImagePath")).toString().isEmpty())
+            .arg(backgroundVisibility, 0, 'f', 2));
 }
 
 void EditPage::deleteSelectedImage() {
     if (m_selectedImageId.isEmpty()) {
         return;
     }
-    const int choice = QMessageBox::question(this, tr("Remove Image"),
-                                            tr("Remove the selected image from this project?"),
-                                            QMessageBox::Yes | QMessageBox::Cancel,
-                                            QMessageBox::Cancel);
+    const int choice = QMessageBox::question(
+        this, tr("Remove Image"), tr("Remove the selected image from this project?"),
+        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
     if (choice != QMessageBox::Yes) {
         return;
     }
     removeImageFromRows(m_selectedImageId);
-    auto it = std::remove_if(m_project.images.begin(), m_project.images.end(),
-                             [this](const TierImage& image) { return image.id == m_selectedImageId; });
+    auto it =
+        std::remove_if(m_project.images.begin(), m_project.images.end(),
+                       [this](const TierImage& image) { return image.id == m_selectedImageId; });
     m_project.images.erase(it, m_project.images.end());
     m_selectedImageId.clear();
     markDirty();
@@ -736,12 +749,13 @@ void EditPage::previewSelectedImage() {
             const QRect fallback(width() / 2 - 20, height() / 2 - 20, 40, 40);
             source = QRect(mapTo(window(), fallback.topLeft()), fallback.size());
         }
-        Logger::info(QStringLiteral("tier.edit.preview.request source=space imageId=%1 rect=(%2,%3,%4,%5)")
-                         .arg(m_selectedImageId)
-                         .arg(source.x())
-                         .arg(source.y())
-                         .arg(source.width())
-                         .arg(source.height()));
+        Logger::info(
+            QStringLiteral("tier.edit.preview.request source=space imageId=%1 rect=(%2,%3,%4,%5)")
+                .arg(m_selectedImageId)
+                .arg(source.x())
+                .arg(source.y())
+                .arg(source.width())
+                .arg(source.height()));
         m_previewOverlay->openPreview(source, pixmap);
     }
 }
@@ -750,11 +764,9 @@ bool EditPage::confirmSaveIfDirty() {
     if (!m_project.dirty) {
         return true;
     }
-    const int choice = QMessageBox::warning(this, tr("Unsaved Changes"),
-                                            tr("Save changes to \"%1\"?").arg(m_project.name),
-                                            QMessageBox::Save | QMessageBox::Discard |
-                                                QMessageBox::Cancel,
-                                            QMessageBox::Save);
+    const int choice = QMessageBox::warning(
+        this, tr("Unsaved Changes"), tr("Save changes to \"%1\"?").arg(m_project.name),
+        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
     if (choice == QMessageBox::Cancel) {
         return false;
     }
@@ -777,7 +789,7 @@ void EditPage::setTierFocusMode(bool enabled) {
             m_rootLayout->setSpacing(0);
         }
         if (m_galleryPopover) {
-            m_galleryPopover->close();
+            m_galleryPopover->closeAnimated();
         }
     } else {
         if (m_rootLayout) {
@@ -798,60 +810,59 @@ void EditPage::toggleMissionControlMode() {
     }
 }
 
-void EditPage::toggleGallery(const QRect& anchorGlobalRect) {
-    if (m_galleryPopover) {
+void EditPage::toggleGallery(QWidget* anchor) {
+    if (m_galleryPopover && m_galleryPopover->isOpen()) {
         Logger::debug(QStringLiteral("tier.gallery.popover.close reason=toggle"));
-        m_galleryPopover->close();
+        m_galleryPopover->closeAnimated();
         return;
     }
 
-    auto* popover = new ImageGalleryPopover(this);
-    popover->setAttribute(Qt::WA_DeleteOnClose);
-    popover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
-    connect(popover, &QObject::destroyed, this, [this]() { m_galleryPopover = nullptr; });
-    connect(popover, &ImageGalleryPopover::importRequested, this, [this]() {
-        QPointer<ImageGalleryPopover> guard = m_galleryPopover;
-        if (guard) {
-            guard->setOutsideDismissSuspended(true);
-        }
-        QWidget* dialogParent = guard ? static_cast<QWidget*>(guard.data()) : static_cast<QWidget*>(this);
-        const QStringList files = chooseImageImportFiles(dialogParent);
-        if (guard) {
-            guard->setOutsideDismissSuspended(false);
-            guard->raise();
-            guard->activateWindow();
-        }
-        if (!files.isEmpty()) {
-            importImages(files);
-        } else {
-            Logger::debug(QStringLiteral("tier.gallery.import.cancel popoverAlive=%1")
-                              .arg(guard != nullptr));
-        }
-    });
-    connect(popover, &ImageGalleryPopover::imageFilesDropped, this, &EditPage::importImages);
-    connect(popover, &ImageGalleryPopover::dragActiveChanged, this, [](bool active) {
-        Logger::debug(QStringLiteral("tier.gallery.drag.active active=%1").arg(active));
-    });
-    connect(popover, &ImageGalleryPopover::imageSelected, this, [this](const QString& imageId) {
-        m_selectedImageId = imageId;
-        refreshUi();
-    });
-    connect(popover, &ImageGalleryPopover::imagePreviewRequested, this,
-            [this](const QString& imageId, const QRect& source) {
-                m_selectedImageId = imageId;
-                const QPixmap pixmap = pixmapForImage(imageId);
-                if (!pixmap.isNull()) {
-                    m_previewOverlay->openPreview(source, pixmap);
-                }
-                refreshUi();
-            });
-    connect(popover, &ImageGalleryPopover::imageEditRequested, this, &EditPage::editImage);
-    connect(popover, &ImageGalleryPopover::imageRemoveRequested, this, &EditPage::removeImageFromGallery);
+    if (!m_galleryPopover) {
+        auto* popover = new ImageGalleryPopover(this);
+        m_galleryPopover = popover;
+        connect(popover, &ImageGalleryPopover::importRequested, this, [this]() {
+            QPointer<ImageGalleryPopover> guard = m_galleryPopover;
+            if (guard) {
+                guard->setOutsideDismissSuspended(true);
+            }
+            const QStringList files = chooseImageImportFiles(this);
+            if (guard) {
+                guard->setOutsideDismissSuspended(false);
+            }
+            if (!files.isEmpty()) {
+                importImages(files);
+            } else {
+                Logger::debug(QStringLiteral("tier.gallery.import.cancel popoverAlive=%1")
+                                  .arg(guard != nullptr));
+            }
+        });
+        connect(popover, &ImageGalleryPopover::imageFilesDropped, this, &EditPage::importImages);
+        connect(popover, &ImageGalleryPopover::dragActiveChanged, this, [](bool active) {
+            Logger::debug(QStringLiteral("tier.gallery.drag.active active=%1").arg(active));
+        });
+        connect(popover, &ImageGalleryPopover::imageSelected, this, [this](const QString& imageId) {
+            m_selectedImageId = imageId;
+            refreshUi();
+        });
+        connect(popover, &ImageGalleryPopover::imagePreviewRequested, this,
+                [this](const QString& imageId, const QRect& source) {
+                    m_selectedImageId = imageId;
+                    const QPixmap pixmap = pixmapForImage(imageId);
+                    if (!pixmap.isNull()) {
+                        m_previewOverlay->openPreview(source, pixmap);
+                    }
+                    refreshUi();
+                });
+        connect(popover, &ImageGalleryPopover::imageEditRequested, this, &EditPage::editImage);
+        connect(popover, &ImageGalleryPopover::imageRemoveRequested, this,
+                &EditPage::removeImageFromGallery);
+    }
 
-    m_galleryPopover = popover;
-    popover->placeBelow(anchorGlobalRect);
-    popover->show();
-    Logger::info(QStringLiteral("tier.gallery.popover.open images=%1").arg(m_project.images.size()));
+    auto* popover = m_galleryPopover.data();
+    popover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
+    popover->openFor(anchor);
+    Logger::info(
+        QStringLiteral("tier.gallery.popover.open images=%1").arg(m_project.images.size()));
 }
 
 void EditPage::toggleGalleryMissionControlMode(const QRect& sourceGlobalRect) {
@@ -980,8 +991,9 @@ void EditPage::setProject(TierProject project) {
 
 void EditPage::showError(const QString& title, const Error& error) {
     QMessageBox::critical(this, title,
-                          error.details.isEmpty() ? error.message
-                                                  : QStringLiteral("%1\n\n%2").arg(error.message, error.details));
+                          error.details.isEmpty()
+                              ? error.message
+                              : QStringLiteral("%1\n\n%2").arg(error.message, error.details));
 }
 
 QString EditPage::chooseSavePath() {
@@ -1013,7 +1025,8 @@ void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int 
     TierImage* image = m_project.imageById(imageId);
     TierRow* row = m_project.rowById(rowId);
     if (!image || !row) {
-        Logger::warn(QStringLiteral("tier.edit.image.move.to.row rejected imageId=%1 rowId=%2 imageFound=%3 rowFound=%4")
+        Logger::warn(QStringLiteral("tier.edit.image.move.to.row rejected imageId=%1 rowId=%2 "
+                                    "imageFound=%3 rowFound=%4")
                          .arg(imageId, rowId)
                          .arg(image != nullptr)
                          .arg(row != nullptr));
@@ -1035,10 +1048,11 @@ void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int 
     const int rowImageCount = static_cast<int>(row->imageIds.size());
     m_project.normalizeOrdering();
     m_selectedImageId = imageId;
-    Logger::info(QStringLiteral("tier.edit.image.move.to.row imageId=%1 rowId=%2 index=%3 rowImageCount=%4")
-                     .arg(imageId, rowId)
-                     .arg(index)
-                     .arg(rowImageCount));
+    Logger::info(
+        QStringLiteral("tier.edit.image.move.to.row imageId=%1 rowId=%2 index=%3 rowImageCount=%4")
+            .arg(imageId, rowId)
+            .arg(index)
+            .arg(rowImageCount));
     markDirty();
     refreshUi();
 }
@@ -1046,13 +1060,15 @@ void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int 
 void EditPage::editImage(const QString& imageId) {
     TierImage* image = m_project.imageById(imageId);
     if (!image) {
-        Logger::warn(QStringLiteral("tier.edit.image.edit rejected imageId=%1 reason=missing").arg(imageId));
+        Logger::warn(
+            QStringLiteral("tier.edit.image.edit rejected imageId=%1 reason=missing").arg(imageId));
         return;
     }
 
     const QPixmap pixmap = pixmapForImage(imageId);
     if (pixmap.isNull()) {
-        Logger::warn(QStringLiteral("tier.edit.image.edit rejected imageId=%1 reason=invalidPixmap").arg(imageId));
+        Logger::warn(QStringLiteral("tier.edit.image.edit rejected imageId=%1 reason=invalidPixmap")
+                         .arg(imageId));
         return;
     }
 
@@ -1062,7 +1078,8 @@ void EditPage::editImage(const QString& imageId) {
         return;
     }
 
-    const QString nextName = dialog.displayName().isEmpty() ? image->originalFileName : dialog.displayName();
+    const QString nextName =
+        dialog.displayName().isEmpty() ? image->originalFileName : dialog.displayName();
     const QRectF nextCrop = dialog.cropRect();
     const bool changed = image->displayName != nextName ||
                          qAbs(image->cropRect.x() - nextCrop.x()) > 0.0005 ||
@@ -1077,12 +1094,13 @@ void EditPage::editImage(const QString& imageId) {
     image->displayName = nextName;
     image->cropRect = nextCrop;
     m_selectedImageId = imageId;
-    Logger::info(QStringLiteral("tier.edit.image.edit.apply imageId=%1 name=\"%2\" crop=(%3,%4,%5,%6)")
-                     .arg(imageId, nextName)
-                     .arg(nextCrop.x(), 0, 'f', 4)
-                     .arg(nextCrop.y(), 0, 'f', 4)
-                     .arg(nextCrop.width(), 0, 'f', 4)
-                     .arg(nextCrop.height(), 0, 'f', 4));
+    Logger::info(
+        QStringLiteral("tier.edit.image.edit.apply imageId=%1 name=\"%2\" crop=(%3,%4,%5,%6)")
+            .arg(imageId, nextName)
+            .arg(nextCrop.x(), 0, 'f', 4)
+            .arg(nextCrop.y(), 0, 'f', 4)
+            .arg(nextCrop.width(), 0, 'f', 4)
+            .arg(nextCrop.height(), 0, 'f', 4));
     markDirty();
     refreshUi();
 }
@@ -1090,7 +1108,9 @@ void EditPage::editImage(const QString& imageId) {
 void EditPage::removeImageFromTierRow(const QString& imageId) {
     TierImage* image = m_project.imageById(imageId);
     if (!image) {
-        Logger::warn(QStringLiteral("tier.edit.image.remove.from.row rejected imageId=%1 reason=missing").arg(imageId));
+        Logger::warn(
+            QStringLiteral("tier.edit.image.remove.from.row rejected imageId=%1 reason=missing")
+                .arg(imageId));
         return;
     }
 
@@ -1108,12 +1128,14 @@ void EditPage::removeImageFromTierRow(const QString& imageId) {
 void EditPage::removeImageFromGallery(const QString& imageId) {
     const qsizetype before = m_project.images.size();
     removeImageFromRows(imageId);
-    m_project.images.erase(std::remove_if(m_project.images.begin(), m_project.images.end(),
-                                          [&](const TierImage& image) { return image.id == imageId; }),
-                           m_project.images.end());
+    m_project.images.erase(
+        std::remove_if(m_project.images.begin(), m_project.images.end(),
+                       [&](const TierImage& image) { return image.id == imageId; }),
+        m_project.images.end());
     if (m_project.images.size() == before) {
-        Logger::warn(QStringLiteral("tier.edit.image.remove.from.gallery rejected imageId=%1 reason=missing")
-                         .arg(imageId));
+        Logger::warn(
+            QStringLiteral("tier.edit.image.remove.from.gallery rejected imageId=%1 reason=missing")
+                .arg(imageId));
         return;
     }
     if (m_selectedImageId == imageId) {
@@ -1136,9 +1158,10 @@ void EditPage::moveRowToIndex(const QString& rowId, int destinationIndex) {
         }
     }
     if (sourceIndex < 0) {
-        Logger::warn(QStringLiteral("tier.edit.row.move rejected rowId=%1 sourceRow=-1 destination=%2")
-                         .arg(rowId)
-                         .arg(destinationIndex));
+        Logger::warn(
+            QStringLiteral("tier.edit.row.move rejected rowId=%1 sourceRow=-1 destination=%2")
+                .arg(rowId)
+                .arg(destinationIndex));
         return;
     }
 
@@ -1152,7 +1175,8 @@ void EditPage::moveRowToIndex(const QString& rowId, int destinationIndex) {
     }
 
     TierRow moved = m_project.rows.takeAt(sourceIndex);
-    m_project.rows.insert(qBound(0, destinationIndex, static_cast<int>(m_project.rows.size())), moved);
+    m_project.rows.insert(qBound(0, destinationIndex, static_cast<int>(m_project.rows.size())),
+                          moved);
     for (int i = 0; i < static_cast<int>(m_project.rows.size()); ++i) {
         m_project.rows[i].order = i;
     }
@@ -1177,11 +1201,14 @@ void EditPage::editTierRow(const QString& rowId) {
     auto* form = new QFormLayout;
 
     auto* labelEdit = new QLineEdit(row->label, &dialog);
-    applyDialogLineEditTheme(labelEdit);
     QColor selectedColor = row->color;
     auto* colorButton = new QPushButton(selectedColor.name(QColor::HexRgb), &dialog);
-    colorButton->setStyleSheet(QStringLiteral("QPushButton{background:%1;color:#111111;}").arg(
-        selectedColor.name(QColor::HexRgb)));
+    const auto applyColorButtonStyle = [](QPushButton* button, const QColor& color) {
+        button->setStyleSheet(
+            QStringLiteral("QPushButton{background:%1;color:%2;}")
+                .arg(color.name(QColor::HexRgb), contrastingTextColor(color).name(QColor::HexRgb)));
+    };
+    applyColorButtonStyle(colorButton, selectedColor);
     connect(colorButton, &QPushButton::clicked, &dialog, [&]() {
         const QColor next = QColorDialog::getColor(selectedColor, &dialog, tr("Tier Color"));
         if (!next.isValid()) {
@@ -1189,8 +1216,7 @@ void EditPage::editTierRow(const QString& rowId) {
         }
         selectedColor = next;
         colorButton->setText(selectedColor.name(QColor::HexRgb));
-        colorButton->setStyleSheet(QStringLiteral("QPushButton{background:%1;color:#111111;}").arg(
-            selectedColor.name(QColor::HexRgb)));
+        applyColorButtonStyle(colorButton, selectedColor);
     });
 
     form->addRow(tr("Label"), labelEdit);
@@ -1203,7 +1229,8 @@ void EditPage::editTierRow(const QString& rowId) {
     actions->addStretch();
     layout->addLayout(actions);
 
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
+    auto* buttons =
+        new QDialogButtonBox(QDialogButtonBox::Save | QDialogButtonBox::Cancel, &dialog);
     layout->addWidget(buttons);
 
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
@@ -1211,11 +1238,13 @@ void EditPage::editTierRow(const QString& rowId) {
 
     connect(deleteRow, &QPushButton::clicked, &dialog, [&]() {
         if (m_project.rows.size() <= 1) {
-            QMessageBox::information(&dialog, tr("Delete Row"), tr("At least one row is required."));
+            QMessageBox::information(&dialog, tr("Delete Row"),
+                                     tr("At least one row is required."));
             return;
         }
         if (QMessageBox::question(&dialog, tr("Delete Row"),
-                                  tr("Delete this row and remove its image assignments?")) != QMessageBox::Yes) {
+                                  tr("Delete this row and remove its image assignments?")) !=
+            QMessageBox::Yes) {
             return;
         }
         if (TierRow* deleted = m_project.rowById(rowId)) {
@@ -1256,9 +1285,11 @@ void EditPage::editTierRow(const QString& rowId) {
 bool EditPage::saveProjectToPath(const QString& filePath) {
     const QString absolutePath = QFileInfo(filePath).absoluteFilePath();
     const QString previousPath = m_project.filePath;
-    const bool pathChanged = previousPath.isEmpty() || QFileInfo(previousPath).absoluteFilePath() != absolutePath;
+    const bool pathChanged =
+        previousPath.isEmpty() || QFileInfo(previousPath).absoluteFilePath() != absolutePath;
     if (!m_project.dirty && !pathChanged) {
-        Logger::debug(QStringLiteral("tier.edit.project.save.noop path=\"%1\" reason=clean").arg(absolutePath));
+        Logger::debug(QStringLiteral("tier.edit.project.save.noop path=\"%1\" reason=clean")
+                          .arg(absolutePath));
         emit dirtyChanged(false);
         emit titleChanged(displayTitle());
         return true;
@@ -1284,20 +1315,22 @@ bool EditPage::saveProjectToPath(const QString& filePath) {
 
     auto recentResult = m_recentProjects->addOrUpdate(m_project);
     if (!recentResult) {
-        QMessageBox::warning(this, tr("Recent Projects"),
-                             recentResult.error().details.isEmpty()
-                                 ? recentResult.error().message
-                                 : QStringLiteral("%1\n\n%2").arg(recentResult.error().message,
-                                                                   recentResult.error().details));
+        QMessageBox::warning(
+            this, tr("Recent Projects"),
+            recentResult.error().details.isEmpty()
+                ? recentResult.error().message
+                : QStringLiteral("%1\n\n%2")
+                      .arg(recentResult.error().message, recentResult.error().details));
     }
 
     emit dirtyChanged(false);
     emit titleChanged(displayTitle());
     emit projectSaved();
-    Logger::info(QStringLiteral("tier.edit.project.save path=\"%1\" assetsMigrated=%2 pathChanged=%3")
-                     .arg(absolutePath)
-                     .arg(assetsMigrated)
-                     .arg(pathChanged));
+    Logger::info(
+        QStringLiteral("tier.edit.project.save path=\"%1\" assetsMigrated=%2 pathChanged=%3")
+            .arg(absolutePath)
+            .arg(assetsMigrated)
+            .arg(pathChanged));
     return true;
 }
 
@@ -1308,9 +1341,8 @@ void EditPage::removeImageFromRows(const QString& imageId) {
 }
 
 bool EditPage::hasImagesInRows() const {
-    return std::any_of(m_project.rows.cbegin(), m_project.rows.cend(), [](const TierRow& row) {
-        return !row.imageIds.isEmpty();
-    });
+    return std::any_of(m_project.rows.cbegin(), m_project.rows.cend(),
+                       [](const TierRow& row) { return !row.imageIds.isEmpty(); });
 }
 
 QPixmap EditPage::pixmapForImage(const QString& imageId) const {

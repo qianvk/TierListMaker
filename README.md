@@ -1,6 +1,8 @@
 # TierListMaker
 
-TierListMaker is a native Qt 6/C++20 desktop app for creating personal tier lists. It uses Qt Widgets, JSON project files, local assets, and VKFrameless for a polished frameless desktop window.
+TierListMaker is a native Qt 6/C++20 desktop app for creating personal tier lists. It uses Qt
+Widgets, JSON project files, local assets, QWindowKit's native window integration, and VkUI's
+cross-platform control style.
 
 ![Screenshot placeholder](docs/screenshot-placeholder.svg)
 
@@ -12,12 +14,12 @@ TierListMaker is a native Qt 6/C++20 desktop app for creating personal tier list
 - Rename, reorder, recolor, add, and remove tier rows.
 - Spacebar image preview with a Quick Look-style overlay.
 - Recent projects page with search and missing-file markers.
-- Preferences for language, appearance, import behavior, autosave, export defaults, motion, and privacy.
+- Preferences for language, appearance, import behavior, autosave, and update checks.
 - Local-first behavior with no telemetry by default.
 
 ## Build
 
-Install Qt 6.5+ and initialize submodules, then configure with a local Qt prefix path:
+Install Qt 6.6+, CMake 3.24+, and initialize submodules, then configure with a local Qt prefix path:
 
 ```bash
 git submodule update --init --recursive
@@ -49,14 +51,15 @@ ctest --test-dir build/default --output-on-failure
 
 ## Runtime Requirements
 
-- Qt 6 Core, Gui, Widgets, Svg, and Concurrent modules.
-- VKFrameless from `external/vkframeless`.
+- Qt 6 Core, Gui, Widgets, Svg, Network, and Concurrent modules.
+- QWindowKit (`dev` branch commit) and VkUI from `third_party/`.
 - A desktop platform supported by Qt 6.
 
 ## Third-Party Dependencies
 
 - Qt 6, licensed by The Qt Company under GPL/LGPL/commercial terms.
-- VKFrameless, see its upstream repository for license details.
+- QWindowKit, licensed under Apache-2.0.
+- VkUI, licensed under MIT.
 
 ## Privacy
 
