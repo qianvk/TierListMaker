@@ -764,7 +764,9 @@ void EditPage::toggleGallery(QWidget* anchor) {
             if (guard) {
                 guard->setOutsideDismissSuspended(true);
             }
-            const QStringList files = chooseImageImportFiles(guard ? guard.data() : this);
+            QWidget* dialogParent = guard ? static_cast<QWidget*>(guard.data())
+                                          : static_cast<QWidget*>(this);
+            const QStringList files = chooseImageImportFiles(dialogParent);
             if (guard) {
                 guard->setOutsideDismissSuspended(false);
             }
