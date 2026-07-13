@@ -11,6 +11,7 @@
 #include "window/SidebarToggleButton.h"
 
 #include <QAbstractButton>
+#include <QDialog>
 #include <QEasingCurve>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -140,9 +141,16 @@ bool RootWidget::confirmClose() {
 }
 
 void RootWidget::switchToPage(AppPage page) {
-    const int index = static_cast<int>(page);
+    if (page == AppPage::Preferences) {
+        showPreferencesDialog();
+        updateSelection(m_currentPage);
+        return;
+    }
+
+    const int index = stackIndexForPage(page);
     if (index >= 0 && index < m_pages->count()) {
         m_pages->setCurrentIndex(index);
+        m_currentPage = page;
         updateSelection(page);
         updatePageMargins(page);
         updateTitleBarForPage(page);
@@ -187,6 +195,10 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
                          AssetManager* assetManager, ThumbnailCache* thumbnailCache,
                          AppSettings* settings, LanguageManager* languageManager,
                          AppUpdater* updater) {
+    m_settings = settings;
+    m_languageManager = languageManager;
+    m_updater = updater;
+
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
@@ -210,8 +222,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     m_sidebarShell->setAutoFillBackground(true);
 
     m_sidebar = createSidebar(m_sidebarShell);
-    m_content = createContent(repository, recentProjects, assetManager, thumbnailCache, settings,
-                              languageManager, updater);
+    m_content = createContent(repository, recentProjects, assetManager, thumbnailCache, settings);
 
     m_splitter->addWidget(m_sidebarShell);
     m_splitter->addWidget(m_content);
@@ -322,7 +333,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             m_projectsPage->retranslateUi();
         }
         if (m_pages) {
-            updateTitleBarForPage(static_cast<AppPage>(m_pages->currentIndex()));
+            updateTitleBarForPage(m_currentPage);
         }
         if (m_sidebarToggleButton) {
             m_sidebarToggleButton->setToolTip(m_sidebarCollapsed ? tr("Show sidebar")
@@ -389,8 +400,7 @@ QFrame* RootWidget::createSidebar(QWidget* parent) {
 
 QFrame* RootWidget::createContent(ProjectRepository* repository,
                                   RecentProjectsStore* recentProjects, AssetManager* assetManager,
-                                  ThumbnailCache* thumbnailCache, AppSettings* settings,
-                                  LanguageManager* languageManager, AppUpdater* updater) {
+                                  ThumbnailCache* thumbnailCache, AppSettings* settings) {
     auto* content = new QFrame(m_splitter);
     content->setObjectName(QStringLiteral("Content"));
     content->setMinimumWidth(620);
@@ -407,10 +417,8 @@ QFrame* RootWidget::createContent(ProjectRepository* repository,
     m_editPage =
         new EditPage(repository, recentProjects, assetManager, thumbnailCache, settings, content);
     m_projectsPage = new ProjectsPage(repository, recentProjects, content);
-    m_preferencesPage = new PreferencesPage(settings, languageManager, updater, content);
     m_pages->addWidget(m_editPage);
     m_pages->addWidget(m_projectsPage);
-    m_pages->addWidget(m_preferencesPage);
     contentLayout->addWidget(m_pages, 1);
 
     m_titleBar = new AppTitleBar(content);
@@ -488,9 +496,8 @@ void RootWidget::synchronizeInitialLayout() {
         m_sidebarCollapsed ? 0 : std::max(kSidebarMinimumExpandedWidth, m_lastExpandedSidebarWidth);
     setSidebarWidth(targetWidth);
     if (m_pages) {
-        const auto page = static_cast<AppPage>(m_pages->currentIndex());
-        updatePageMargins(page);
-        updateTitleBarForPage(page);
+        updatePageMargins(m_currentPage);
+        updateTitleBarForPage(m_currentPage);
     }
     syncSidebarPresentation(m_currentSidebarWidth);
     layoutSidebarSurface();
@@ -542,7 +549,7 @@ void RootWidget::setTierFocusMode(bool enabled) {
             m_windowAgent->setSystemButtonVisibility(m_savedSystemButtonVisibility);
         }
         if (m_pages) {
-            updatePageMargins(static_cast<AppPage>(m_pages->currentIndex()));
+            updatePageMargins(m_currentPage);
         }
         if (m_titleBar) {
             m_titleBar->show();
@@ -565,7 +572,7 @@ void RootWidget::setTierFocusMode(bool enabled) {
             m_newProjectButton->show();
         }
         if (m_pages) {
-            updateTitleBarForPage(static_cast<AppPage>(m_pages->currentIndex()));
+            updateTitleBarForPage(m_currentPage);
         }
     }
 
@@ -658,6 +665,47 @@ void RootWidget::setUpdateBadgeVisible(bool visible) {
     }
     m_preferencesBadge->setVisible(visible);
     layoutPreferenceBadge();
+}
+
+void RootWidget::showPreferencesDialog() {
+    if (m_preferencesDialog) {
+        m_preferencesDialog->show();
+        m_preferencesDialog->raise();
+        m_preferencesDialog->activateWindow();
+        return;
+    }
+
+    auto* dialog = new QDialog(window());
+    dialog->setObjectName(QStringLiteral("PreferencesDialog"));
+    dialog->setWindowTitle(tr("Preferences"));
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setModal(false);
+    dialog->setMinimumSize(720, 480);
+    dialog->resize(860, 560);
+
+    auto* layout = new QVBoxLayout(dialog);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    auto* page = new PreferencesPage(m_settings, m_languageManager, m_updater, dialog);
+    layout->addWidget(page, 1);
+
+    m_preferencesDialog = dialog;
+    connect(dialog, &QObject::destroyed, this, [this]() { m_preferencesDialog = nullptr; });
+    dialog->show();
+    dialog->raise();
+    dialog->activateWindow();
+}
+
+int RootWidget::stackIndexForPage(AppPage page) const {
+    switch (page) {
+    case AppPage::Edit:
+        return 0;
+    case AppPage::Projects:
+        return 1;
+    case AppPage::Preferences:
+        return -1;
+    }
+    return -1;
 }
 
 void RootWidget::updateTitleBarLeadingReservation() {

@@ -8,15 +8,22 @@
 #include <QEasingCurve>
 #include <QEvent>
 #include <QFileDialog>
+#include <QFontMetrics>
+#include <QFrame>
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QPainter>
 #include <QPushButton>
 #include <QResizeEvent>
 #include <QSizePolicy>
 #include <QSpinBox>
+#include <QStackedWidget>
+#include <QStyledItemDelegate>
 #include <QSysInfo>
+#include <QTimer>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
 
@@ -35,9 +42,49 @@
 namespace tlm {
 
 namespace {
+constexpr int kUpdateBadgeRole = Qt::UserRole + 41;
+
 template <typename Enum> int enumIndex(Enum value) {
     return static_cast<int>(value);
 }
+
+class PreferencesNavDelegate final : public QStyledItemDelegate {
+public:
+    using QStyledItemDelegate::QStyledItemDelegate;
+
+    void paint(QPainter* painter, const QStyleOptionViewItem& option,
+               const QModelIndex& index) const override {
+        painter->save();
+        painter->setRenderHint(QPainter::Antialiasing);
+
+        const QRect r = option.rect.adjusted(6, 3, -6, -3);
+        const bool selected = option.state.testFlag(QStyle::State_Selected);
+        const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
+        const ThemeTokens& colors = activeThemeTokens();
+        if (selected || hovered) {
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(selected ? colors.selection : colors.controlFillHovered);
+            painter->drawRoundedRect(r, 8, 8);
+        }
+
+        painter->setPen(colors.primaryText);
+        painter->drawText(r.adjusted(14, 0, -30, 0), Qt::AlignVCenter | Qt::AlignLeft,
+                          index.data(Qt::DisplayRole).toString());
+
+        if (index.data(kUpdateBadgeRole).toBool()) {
+            const int d = 8;
+            const QRect badge(r.right() - d - 12, r.center().y() - d / 2, d, d);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(colors.destructive);
+            painter->drawEllipse(badge);
+        }
+        painter->restore();
+    }
+
+    QSize sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const override {
+        return QSize(160, 38);
+    }
+};
 
 void configureAdaptiveField(QWidget* widget) {
     if (!widget) {
@@ -124,20 +171,36 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
     : QWidget(parent), m_settings(settings), m_languageManager(languageManager),
       m_updater(updater) {
     auto* root = new QVBoxLayout(this);
-    root->setContentsMargins(28, 22, 28, 24);
-    root->setSpacing(0);
+    root->setContentsMargins(22, 18, 22, 18);
+    root->setSpacing(14);
 
-    m_pageContainer = new QWidget(this);
-    m_pageContainer->setObjectName(QStringLiteral("PreferencesPageContainer"));
-    m_pageContainer->setMaximumWidth(760);
-    m_pageContainer->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
-    m_sectionsLayout = new QVBoxLayout(m_pageContainer);
-    m_sectionsLayout->setContentsMargins(0, 0, 0, 0);
-    m_sectionsLayout->setSpacing(26);
-    root->addWidget(m_pageContainer, 0, Qt::AlignHCenter | Qt::AlignTop);
-    root->addStretch(1);
+    auto* body = new QHBoxLayout;
+    body->setContentsMargins(0, 0, 0, 0);
+    body->setSpacing(18);
 
-    rebuildPreferencePages();
+    m_nav = new QListWidget(this);
+    m_nav->addItems({tr("General"), tr("Updates"), tr("About")});
+    m_nav->setMinimumWidth(150);
+    m_nav->setMaximumWidth(300);
+    m_nav->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+    m_nav->setFrameShape(QFrame::NoFrame);
+    m_nav->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_nav->setCurrentRow(0);
+    m_nav->setItemDelegate(new PreferencesNavDelegate(m_nav));
+    m_nav->setStyleSheet(
+        QStringLiteral("QListWidget{background:transparent;outline:0;border:none;}"));
+
+    m_stack = new QStackedWidget(this);
+    m_stack->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+    m_stack->addWidget(createGeneralPage());
+    m_stack->addWidget(createUpdatePage());
+    m_stack->addWidget(createAboutPage());
+
+    body->addWidget(m_nav);
+    body->addWidget(m_stack, 1);
+    root->addLayout(body, 1);
+
+    connect(m_nav, &QListWidget::currentRowChanged, m_stack, &QStackedWidget::setCurrentIndex);
     if (m_updater) {
         connect(m_updater, &AppUpdater::checkingStarted, this, [this](const QUrl& url) {
             if (m_updateStatusLabel) {
@@ -162,6 +225,8 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
         connect(m_languageManager, &LanguageManager::languageChanged, this,
                 &PreferencesPage::retranslateUi);
     }
+    updateNavWidth();
+    QTimer::singleShot(0, this, &PreferencesPage::updateNavWidth);
 }
 
 void PreferencesPage::changeEvent(QEvent* event) {
@@ -174,34 +239,70 @@ void PreferencesPage::changeEvent(QEvent* event) {
 
 void PreferencesPage::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
+    updateNavWidth();
 }
 
 void PreferencesPage::retranslateUi() {
+    if (!m_nav || !m_stack) {
+        return;
+    }
+    const int row = qBound(0, m_nav->currentRow(), 2);
+    m_nav->item(0)->setText(tr("General"));
+    m_nav->item(1)->setText(tr("Updates"));
+    m_nav->item(2)->setText(tr("About"));
     rebuildPreferencePages();
+    m_nav->setCurrentRow(row);
+    m_stack->setCurrentIndex(row);
+    updateNavWidth();
 }
 
 void PreferencesPage::setUpdateNotificationVisible(bool visible) {
-    if (m_updateStatusLabel && visible && m_updateStatusLabel->text().trimmed().isEmpty()) {
-        m_updateStatusLabel->setText(tr("An update is available."));
+    if (!m_nav || m_nav->count() < 2) {
+        return;
     }
+    m_nav->item(1)->setData(kUpdateBadgeRole, visible);
+    m_nav->viewport()->update();
 }
 
 void PreferencesPage::rebuildPreferencePages() {
-    if (!m_sectionsLayout) {
+    if (!m_stack) {
         return;
     }
-    while (QLayoutItem* item = m_sectionsLayout->takeAt(0)) {
-        if (QWidget* widget = item->widget()) {
-            widget->deleteLater();
-        }
-        delete item;
+    while (m_stack->count() > 0) {
+        QWidget* page = m_stack->widget(0);
+        m_stack->removeWidget(page);
+        page->deleteLater();
     }
     m_updateStatusLabel = nullptr;
     m_checkUpdateButton = nullptr;
     m_openUpdateButton = nullptr;
-    m_sectionsLayout->addWidget(createGeneralPage());
-    m_sectionsLayout->addWidget(createUpdatePage());
-    m_sectionsLayout->addWidget(createAboutPage());
+    m_stack->addWidget(createGeneralPage());
+    m_stack->addWidget(createUpdatePage());
+    m_stack->addWidget(createAboutPage());
+}
+
+void PreferencesPage::updateNavWidth() {
+    if (!m_nav) {
+        return;
+    }
+    QFontMetrics metrics(m_nav->font());
+    int width = 150;
+    for (int i = 0; i < m_nav->count(); ++i) {
+        width = qMax(width, metrics.horizontalAdvance(m_nav->item(i)->text()) + 62);
+    }
+    const int availableWidth = qMax(1, this->width());
+    const int maximumNavWidth = qBound(190, availableWidth / 3, 300);
+    const int navWidth = qBound(150, width, maximumNavWidth);
+    m_nav->setFixedWidth(navWidth);
+    if (m_stack) {
+        const int contentWidth = qBound(320, availableWidth - navWidth - 86, 760);
+        m_stack->setMinimumWidth(contentWidth);
+        for (int i = 0; i < m_stack->count(); ++i) {
+            if (QWidget* page = m_stack->widget(i)) {
+                page->setMinimumWidth(contentWidth);
+            }
+        }
+    }
 }
 
 void PreferencesPage::refreshPreferenceControlStyles() {

@@ -2,11 +2,13 @@
 
 #include "navigation/SidebarModel.h"
 
+#include <QPointer>
 #include <QWidget>
 
 #include <QWKCore/windowagentbase.h>
 
 class QFrame;
+class QDialog;
 class QResizeEvent;
 class QShowEvent;
 class QSplitter;
@@ -71,8 +73,7 @@ private:
     QFrame* createSidebar(QWidget* parent);
     QFrame* createContent(ProjectRepository* repository, RecentProjectsStore* recentProjects,
                           AssetManager* assetManager, ThumbnailCache* thumbnailCache,
-                          AppSettings* settings, LanguageManager* languageManager,
-                          AppUpdater* updater);
+                          AppSettings* settings);
     void setSidebarCollapsed(bool collapsed);
     void setSidebarWidth(int width);
     void synchronizeInitialLayout();
@@ -85,6 +86,8 @@ private:
     void setUpdateBadgeVisible(bool visible);
     int minimumSidebarToggleX() const;
     void setTierFocusMode(bool enabled);
+    void showPreferencesDialog();
+    int stackIndexForPage(AppPage page) const;
 
     AppTitleBar* m_titleBar{nullptr};
     QWK::WidgetWindowAgent* m_windowAgent{nullptr};
@@ -104,7 +107,11 @@ private:
     QStackedWidget* m_pages{nullptr};
     EditPage* m_editPage{nullptr};
     ProjectsPage* m_projectsPage{nullptr};
-    QWidget* m_preferencesPage{nullptr};
+    QPointer<QDialog> m_preferencesDialog;
+    AppSettings* m_settings{nullptr};
+    LanguageManager* m_languageManager{nullptr};
+    AppUpdater* m_updater{nullptr};
+    AppPage m_currentPage{AppPage::Edit};
     bool m_sidebarCollapsed{false};
     bool m_tierFocusMode{false};
     QWK::WindowAgentBase::SystemButtonVisibility m_savedSystemButtonVisibility{

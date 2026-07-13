@@ -424,6 +424,11 @@ void EditPage::exportProjectFromDialog() {
 }
 
 void EditPage::configureBackground(QWidget* anchor) {
+    if (m_backgroundPreviewActive) {
+        Logger::debug(QStringLiteral("tier.edit.background.popover.ignore active=1"));
+        return;
+    }
+
     const QJsonObject originalCanvas = m_project.canvas;
     const bool originalDirty = m_project.dirty;
     const QDateTime originalUpdatedAt = m_project.updatedAt;
@@ -757,9 +762,12 @@ void EditPage::toggleGallery(QWidget* anchor) {
         connect(popover, &ImageGalleryPopover::importRequested, this, [this]() {
             QPointer<ImageGalleryPopover> guard = m_galleryPopover;
             if (guard) {
-                guard->closeImmediately();
+                guard->setOutsideDismissSuspended(true);
             }
-            const QStringList files = chooseImageImportFiles(this);
+            const QStringList files = chooseImageImportFiles(guard ? guard.data() : this);
+            if (guard) {
+                guard->setOutsideDismissSuspended(false);
+            }
             if (!files.isEmpty()) {
                 importImages(files);
             } else {
@@ -936,10 +944,18 @@ QString EditPage::chooseSavePath() {
         suggested = QDir(directory.isEmpty() ? QDir::homePath() : directory)
                         .filePath(m_project.suggestedFileName());
     }
-    QString path = QFileDialog::getSaveFileName(this, tr("Save Project"), suggested,
-                                                tr("TierListMaker Projects (*.tlmproject)"));
+    const QFileInfo suggestedInfo(suggested);
+    QFileDialog dialog(this, tr("Choose Project Location"), suggestedInfo.absolutePath(),
+                       tr("TierListMaker Projects (*.tlmproject)"));
+    dialog.setAcceptMode(QFileDialog::AcceptSave);
+    dialog.setFileMode(QFileDialog::AnyFile);
+    dialog.setDefaultSuffix(QStringLiteral("tlmproject"));
+    dialog.selectFile(suggestedInfo.fileName());
+    const QString path = dialog.exec() == QDialog::Accepted && !dialog.selectedFiles().isEmpty()
+                             ? dialog.selectedFiles().constFirst()
+                             : QString();
     if (!path.isEmpty() && !path.endsWith(QStringLiteral(".tlmproject"), Qt::CaseInsensitive)) {
-        path += QStringLiteral(".tlmproject");
+        return path + QStringLiteral(".tlmproject");
     }
     return path;
 }
