@@ -35,6 +35,7 @@ public:
     void retranslateUi();
     QSize focusRevealSizeHint() const;
     QRect galleryButtonGlobalRect() const;
+    QLineEdit* titleEditor() const;
 
 signals:
     void templatesRequested(QWidget* anchor);

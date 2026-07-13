@@ -9,6 +9,7 @@ class QPoint;
 class QListView;
 class QComboBox;
 class QLineEdit;
+class QToolButton;
 
 namespace tlm {
 
@@ -42,6 +43,7 @@ private:
     void renameSelectedProject();
     void chooseCoverForSelectedProject();
     void revealSelectedProject();
+    void removeSelectedRecord();
     void saveSelectedProjectAs();
     void deleteSelectedProject();
 
@@ -50,6 +52,7 @@ private:
     AppSettings* m_settings{nullptr};
     QLineEdit* m_search{nullptr};
     QComboBox* m_sort{nullptr};
+    QToolButton* m_openProjectButton{nullptr};
     QListView* m_view{nullptr};
     RecentProjectsModel* m_model{nullptr};
 };

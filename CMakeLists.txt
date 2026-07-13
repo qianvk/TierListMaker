@@ -91,6 +91,8 @@ set(TLM_APP_SOURCES
     src/preview/PreviewOverlay.h
     src/tier/ImageGalleryPopover.cpp
     src/tier/ImageGalleryPopover.h
+    src/tier/CropEditorWidget.cpp
+    src/tier/CropEditorWidget.h
     src/tier/ImageEditDialog.cpp
     src/tier/ImageEditDialog.h
     src/tier/TierRowEditDialog.cpp

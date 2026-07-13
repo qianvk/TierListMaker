@@ -148,7 +148,6 @@ qsizetype ThumbnailCache::pixmapCostBytes(const QPixmap& pixmap) {
 
 QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixelSize) const {
     const bool hasMinimum = !minimumPixelSize.isEmpty();
-    const qint64 minimumArea = static_cast<qint64>(minimumPixelSize.width()) * minimumPixelSize.height();
     const CacheEntry* bestCovering = nullptr;
     const CacheEntry* largestFallback = nullptr;
     qint64 bestCoveringArea = std::numeric_limits<qint64>::max();
@@ -180,12 +179,6 @@ QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixe
         return bestCovering->pixmap;
     }
     if (largestFallback) {
-        if (hasMinimum && largestArea < minimumArea / 2) {
-            Logger::debug(QStringLiteral("thumbnail.cache.undersized key=%1 cachedArea=%2 requestedArea=%3")
-                              .arg(cacheKey)
-                              .arg(largestArea)
-                              .arg(minimumArea));
-        }
         return largestFallback->pixmap;
     }
     return {};

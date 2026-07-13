@@ -4,7 +4,9 @@
 #include "theme/Theme.h"
 #include "widgets/SectionHeader.h"
 
+#include <QAbstractItemView>
 #include <QComboBox>
+#include <QCursor>
 #include <QEasingCurve>
 #include <QEvent>
 #include <QFileDialog>
@@ -48,6 +50,17 @@ template <typename Enum> int enumIndex(Enum value) {
     return static_cast<int>(value);
 }
 
+bool indexIsUnderCursor(const QStyleOptionViewItem& option, const QModelIndex& index) {
+    const auto* viewport = qobject_cast<const QWidget*>(option.widget);
+    const auto* view =
+        qobject_cast<const QAbstractItemView*>(viewport ? viewport->parentWidget() : nullptr);
+    if (!viewport || !view) {
+        return option.state.testFlag(QStyle::State_MouseOver);
+    }
+    const QPoint localPos = viewport->mapFromGlobal(QCursor::pos());
+    return viewport->rect().contains(localPos) && view->indexAt(localPos) == index;
+}
+
 class PreferencesNavDelegate final : public QStyledItemDelegate {
 public:
     using QStyledItemDelegate::QStyledItemDelegate;
@@ -59,7 +72,8 @@ public:
 
         const QRect r = option.rect.adjusted(6, 3, -6, -3);
         const bool selected = option.state.testFlag(QStyle::State_Selected);
-        const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
+        const bool hovered =
+            option.state.testFlag(QStyle::State_MouseOver) && indexIsUnderCursor(option, index);
         const ThemeTokens& colors = activeThemeTokens();
         if (selected || hovered) {
             painter->setPen(Qt::NoPen);
@@ -185,6 +199,8 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
     m_nav->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
     m_nav->setFrameShape(QFrame::NoFrame);
     m_nav->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_nav->setMouseTracking(true);
+    m_nav->viewport()->setMouseTracking(true);
     m_nav->setCurrentRow(0);
     m_nav->setItemDelegate(new PreferencesNavDelegate(m_nav));
     m_nav->setStyleSheet(
@@ -201,6 +217,12 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
     root->addLayout(body, 1);
 
     connect(m_nav, &QListWidget::currentRowChanged, m_stack, &QStackedWidget::setCurrentIndex);
+    connect(m_nav, &QListWidget::currentRowChanged, this,
+            [this](int) { m_nav->viewport()->update(); });
+    connect(m_nav, &QListWidget::itemPressed, this,
+            [this](QListWidgetItem*) { m_nav->viewport()->update(); });
+    connect(m_nav, &QListWidget::itemEntered, this,
+            [this](QListWidgetItem*) { m_nav->viewport()->update(); });
     if (m_updater) {
         connect(m_updater, &AppUpdater::checkingStarted, this, [this](const QUrl& url) {
             if (m_updateStatusLabel) {

@@ -409,11 +409,9 @@ void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& opti
                 tileRect.translate(qRound(offset.x()), qRound(offset.y()));
             }
         }
-        const qreal scale = view ? view->dockScaleForImage(index, tileRect, image->id) : 1.0;
-        const QPointF dockOffset =
-            view ? view->dockOffsetForImage(index, tileRect, image->id) : QPointF();
-        const QSizeF paintSize(tileRect.width() * scale, tileRect.height() * scale);
-        const QPointF center = QPointF(tileRect.center()) + dockOffset;
+        constexpr qreal scale = 1.0;
+        const QSizeF paintSize(tileRect.width(), tileRect.height());
+        const QPointF center = QPointF(tileRect.center());
         const QRectF paintRect(center.x() - paintSize.width() / 2.0,
                                center.y() - paintSize.height() / 2.0, paintSize.width(),
                                paintSize.height());

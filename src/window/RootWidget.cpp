@@ -135,6 +135,7 @@ void RootWidget::installWindowAgent(QWK::WidgetWindowAgent* agent) {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     m_windowAgent->setSystemButtonAreaGeometry(QRect(12, 11, 72, 32));
 #endif
+    setTitleEditorHitTestVisible(m_currentPage == AppPage::Edit);
 }
 
 bool RootWidget::confirmClose() {
@@ -798,19 +799,29 @@ void RootWidget::updateTitleBarForPage(AppPage page) {
     case AppPage::Edit:
         m_titleBar->setEditorActionsVisible(true);
         m_titleBar->setTitleEditable(true);
+        setTitleEditorHitTestVisible(true);
         m_titleBar->setDocumentTitle(m_editPage ? m_editPage->displayTitle() : QString());
         break;
     case AppPage::Projects:
         m_titleBar->setEditorActionsVisible(false);
         m_titleBar->setTitleEditable(false);
+        setTitleEditorHitTestVisible(false);
         m_titleBar->setDocumentTitle(tr("Projects"));
         break;
     case AppPage::Preferences:
         m_titleBar->setEditorActionsVisible(false);
         m_titleBar->setTitleEditable(false);
+        setTitleEditorHitTestVisible(false);
         m_titleBar->setDocumentTitle(tr("Preferences"));
         break;
     }
+}
+
+void RootWidget::setTitleEditorHitTestVisible(bool visible) {
+    if (!m_windowAgent || !m_titleBar || !m_titleBar->titleEditor()) {
+        return;
+    }
+    m_windowAgent->setHitTestVisible(m_titleBar, m_titleBar->titleEditor(), visible);
 }
 
 void RootWidget::updatePageMargins(AppPage page) {

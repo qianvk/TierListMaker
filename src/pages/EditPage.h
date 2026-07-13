@@ -122,7 +122,9 @@ private:
     QVBoxLayout* m_rootLayout{nullptr};
     TierBoardWidget* m_board{nullptr};
     QPointer<ImageGalleryPopover> m_galleryPopover;
+    QPointer<QWidget> m_galleryPopoverAnchor;
     QPointer<vkui::VkPopover> m_templatePopover;
+    QPointer<QWidget> m_templatePopoverAnchor;
     PreviewOverlay* m_previewOverlay{nullptr};
     QTimer* m_autosaveTimer{nullptr};
     bool m_tierFocusMode{false};

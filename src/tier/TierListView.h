@@ -51,8 +51,6 @@ public:
     bool isImageDragSource(const QString& imageId) const;
     QPointF visualOffsetForImage(const QString& imageId) const;
     QRect imageSourceRect(const QString& imageId) const;
-    qreal dockScaleForImage(const QModelIndex& index, const QRect& tileRect, const QString& imageId) const;
-    QPointF dockOffsetForImage(const QModelIndex& index, const QRect& tileRect, const QString& imageId) const;
     bool isMissionControlActive() const { return m_missionControlActive; }
     qreal missionTransitionProgress() const { return m_missionTransitionProgress; }
     bool isGalleryMissionLayerVisible() const {
@@ -143,9 +141,6 @@ private:
     bool commitRowDrop(const QString& rowId, int destinationIndex, const char* reason);
     void clearDropState();
     void clearImageDropState();
-    void updateDockHover(const QPoint& viewportPoint);
-    void animateDockHover(qreal targetProgress);
-    void stopDockHoverAnimation();
     void setMissionControlActiveForSource(bool active, MissionControlSource source,
                                           const QRect& sourceGlobalRect = {},
                                           const QString& tierRowId = {});
@@ -216,11 +211,6 @@ private:
     QVariantAnimation* m_imagePlaceholderAnimation{nullptr};
     bool m_imageDragSynchronousFeedback{false};
 
-    QString m_dockHoverImageId;
-    int m_dockHoverRow{-1};
-    QPointF m_dockHoverPosition;
-    qreal m_dockHoverProgress{0.0};
-    QVariantAnimation* m_dockHoverAnimation{nullptr};
     QString m_canvasBackgroundCachePath;
     QPixmap m_canvasBackgroundCache;
     bool m_missionControlActive{false};

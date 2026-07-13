@@ -34,6 +34,7 @@
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
+#include <QPointer>
 #include <QPushButton>
 #include <QSignalBlocker>
 #include <QSizePolicy>
@@ -196,14 +197,25 @@ public:
         m_result = Rejected;
         QEventLoop loop;
         m_loop = &loop;
+        QPointer<QWidget> anchorGuard(anchor);
+        m_anchor = anchor;
+        anchor->installEventFilter(this);
         m_popover->openFor(anchor);
         if (!m_popover->isOpen()) {
+            if (anchorGuard) {
+                anchorGuard->removeEventFilter(this);
+            }
+            m_anchor = nullptr;
             m_loop = nullptr;
             Logger::warn(
                 QStringLiteral("tier.edit.background.popover.open rejected invalid-anchor=1"));
             return Rejected;
         }
         loop.exec(QEventLoop::DialogExec);
+        if (anchorGuard) {
+            anchorGuard->removeEventFilter(this);
+        }
+        m_anchor = nullptr;
         m_loop = nullptr;
         return m_result;
     }
@@ -218,9 +230,19 @@ public:
         m_popover->closeAnimated();
     }
 
+protected:
+    bool eventFilter(QObject* watched, QEvent* event) override {
+        if (watched == m_anchor.data() && event && event->type() == QEvent::MouseButtonPress) {
+            reject();
+            return true;
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
 private:
     std::unique_ptr<vkui::VkPopover> m_popover;
     QWidget* m_content{nullptr};
+    QPointer<QWidget> m_anchor;
     QEventLoop* m_loop{nullptr};
     int m_result{Rejected};
     bool m_outsideDismissSuspended{false};
@@ -442,8 +464,11 @@ bool EditPage::saveProjectAs() {
 
 void EditPage::showTemplateMenu(QWidget* anchor) {
     if (m_templatePopover && m_templatePopover->isOpen()) {
+        if (anchor && m_templatePopoverAnchor == anchor) {
+            m_templatePopover->closeAnimated();
+            return;
+        }
         m_templatePopover->closeAnimated();
-        return;
     }
     if (!anchor) {
         return;
@@ -472,9 +497,11 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
     connect(popover, &vkui::VkPopover::closed, this, [this, popover]() {
         if (m_templatePopover == popover) {
             m_templatePopover = nullptr;
+            m_templatePopoverAnchor = nullptr;
         }
         popover->deleteLater();
     });
+    m_templatePopoverAnchor = anchor;
 
     auto addSection = [&](const QString& text) {
         auto* label = new QLabel(text, content);
@@ -484,14 +511,37 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
         layout->addWidget(label);
     };
 
-    const QString configuredDefault = m_settings ? m_settings->defaultTemplateId() : QString();
-    auto isDefaultTemplateId = [&](const QString& id) {
-        if (id == QString::fromLatin1(kBuiltInLocalizedTemplateId)) {
+    const QString localizedBuiltInId = localizedBuiltInTemplate(m_settings).id;
+    auto isDefaultTemplateId = [this, localizedBuiltInId](const QString& id) {
+        const QString configuredDefault = m_settings ? m_settings->defaultTemplateId() : QString();
+        if (id == localizedBuiltInId) {
             return configuredDefault.isEmpty() ||
                    configuredDefault == QString::fromLatin1(kBuiltInLocalizedTemplateId) ||
-                   configuredDefault == localizedBuiltInTemplate(m_settings).id;
+                   configuredDefault == localizedBuiltInId;
         }
-        return configuredDefault == id;
+        return !configuredDefault.isEmpty() && configuredDefault == id;
+    };
+
+    struct DefaultTemplateButtonBinding {
+        QString id;
+        QPointer<QToolButton> button;
+    };
+    auto defaultButtons = std::make_shared<QVector<DefaultTemplateButtonBinding>>();
+    auto updateDefaultButton = [this, isDefaultTemplateId](QToolButton* button, const QString& id) {
+        if (!button) {
+            return;
+        }
+        const bool active = isDefaultTemplateId(id);
+        button->setIcon(vkui::icon(active ? vkui::VkSymbol::Checkmark
+                                          : vkui::VkSymbol::DefaultTemplate,
+                                   active ? vkui::VkIconRole::Accent
+                                          : vkui::VkIconRole::Secondary));
+        button->setToolTip(active ? tr("Default template") : tr("Set as default template"));
+    };
+    auto refreshDefaultButtons = [defaultButtons, updateDefaultButton]() {
+        for (const DefaultTemplateButtonBinding& binding : *defaultButtons) {
+            updateDefaultButton(binding.button, binding.id);
+        }
     };
 
     auto addTemplateRow = [&](const QString& id, const QString& name, const QIcon& icon, auto applyCallback,
@@ -516,27 +566,16 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
 
         auto* defaultButton = new QToolButton(row);
         defaultButton->setAutoRaise(true);
-        defaultButton->setIcon(vkui::icon(isDefaultTemplateId(id) ? vkui::VkSymbol::Checkmark
-                                                                  : vkui::VkSymbol::Settings));
         defaultButton->setIconSize(QSize(16, 16));
         defaultButton->setFixedSize(32, 32);
-        defaultButton->setToolTip(isDefaultTemplateId(id) ? tr("Default template")
-                                                          : tr("Set as default template"));
+        updateDefaultButton(defaultButton, id);
+        defaultButtons->append({id, defaultButton});
         rowLayout->addWidget(defaultButton);
         connect(defaultButton, &QToolButton::clicked, this, [=]() {
             if (m_settings) {
                 m_settings->setDefaultTemplateId(id);
             }
-            if (popoverGuard) {
-                popoverGuard->closeAnimated();
-            }
-            if (anchorGuard) {
-                QTimer::singleShot(180, this, [this, anchorGuard]() {
-                    if (anchorGuard) {
-                        showTemplateMenu(anchorGuard);
-                    }
-                });
-            }
+            refreshDefaultButtons();
         });
 
         if constexpr (!std::is_same_v<std::decay_t<decltype(deleteCallback)>, std::nullptr_t>) {
@@ -566,8 +605,7 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
 
     addSection(tr("Built-in"));
     for (const BuiltInTemplate& entry : QVector<BuiltInTemplate>{localizedBuiltInTemplate(m_settings)}) {
-        addTemplateRow(QString::fromLatin1(kBuiltInLocalizedTemplateId), entry.name,
-                       vkui::icon(vkui::VkSymbol::Templates),
+        addTemplateRow(entry.id, entry.name, vkui::icon(vkui::VkSymbol::Templates),
                        [this, project = entry.project, name = entry.name]() {
                            applyTemplateProject(project);
                            Logger::info(QStringLiteral("tier.edit.template.apply builtin=\"%1\"")
@@ -604,7 +642,7 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
                                Logger::info(QStringLiteral("tier.edit.template.apply path=\"%1\"")
                                                 .arg(path));
                            },
-                           [this, path = file.absoluteFilePath(), displayName]() {
+                           [this, path = file.absoluteFilePath(), displayName, templateId]() {
                                if (QMessageBox::question(
                                        this, tr("Delete Template"),
                                        tr("Delete the custom template \"%1\"?").arg(displayName)) !=
@@ -614,6 +652,10 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
                                if (!QFile::remove(path)) {
                                    QMessageBox::warning(this, tr("Delete Template"),
                                                         tr("Could not delete the template file."));
+                                   return;
+                               }
+                               if (m_settings && m_settings->defaultTemplateId() == templateId) {
+                                   m_settings->setDefaultTemplateId({});
                                }
                            });
         }
@@ -1048,9 +1090,13 @@ void EditPage::toggleMissionControlMode() {
 
 void EditPage::toggleGallery(QWidget* anchor) {
     if (m_galleryPopover && m_galleryPopover->isOpen()) {
-        Logger::debug(QStringLiteral("tier.gallery.popover.close reason=toggle"));
+        if (anchor && m_galleryPopoverAnchor == anchor) {
+            Logger::debug(QStringLiteral("tier.gallery.popover.close reason=toggle"));
+            m_galleryPopover->closeAnimated();
+            return;
+        }
+        Logger::debug(QStringLiteral("tier.gallery.popover.close reason=switch-anchor"));
         m_galleryPopover->closeAnimated();
-        return;
     }
     closeTransientPopovers();
 
@@ -1100,6 +1146,7 @@ void EditPage::toggleGallery(QWidget* anchor) {
     auto* popover = m_galleryPopover.data();
     popover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
     popover->openFor(anchor);
+    m_galleryPopoverAnchor = anchor;
     Logger::info(
         QStringLiteral("tier.gallery.popover.open images=%1").arg(m_project.images.size()));
 }
@@ -1317,6 +1364,7 @@ void EditPage::closeTransientPopovers() {
     }
     if (m_galleryPopover && m_galleryPopover->isOpen()) {
         m_galleryPopover->closeAnimated();
+        m_galleryPopoverAnchor = nullptr;
     }
 }
 
@@ -1336,13 +1384,18 @@ bool EditPage::ensureProjectFile() {
 TierProject EditPage::createProjectFromDefaultTemplate() const {
     const QString configured = m_settings ? m_settings->defaultTemplateId() : QString();
     TierProject project = TierProject::createUntitled();
+    bool appliedTemplate = false;
     if (configured.startsWith(QString::fromLatin1(kCustomTemplatePrefix)) && m_repository) {
         const QString path = configured.mid(QString::fromLatin1(kCustomTemplatePrefix).size());
         if (auto result = m_repository->openProject(path)) {
             project.rows = result.value().rows;
             project.canvas = result.value().canvas;
+            appliedTemplate = true;
+        } else if (m_settings) {
+            m_settings->setDefaultTemplateId({});
         }
-    } else {
+    }
+    if (!appliedTemplate) {
         const BuiltInTemplate entry = builtInTemplateForId(configured, m_settings);
         project.rows = entry.project.rows;
         project.canvas = entry.project.canvas;
@@ -1485,7 +1538,7 @@ bool EditPage::saveManagedTemplateFromPrompt(QWidget* reopenAnchor) {
     });
     QTimer::singleShot(0, &dialog, [&]() {
         nameEdit->setFocus(Qt::OtherFocusReason);
-        nameEdit->selectAll();
+        nameEdit->setCursorPosition(nameEdit->text().size());
     });
     if (dialog.exec() != QDialog::Accepted) {
         return false;

@@ -321,6 +321,10 @@ QRect AppTitleBar::galleryButtonGlobalRect() const {
     return globalRectFor(m_galleryButton);
 }
 
+QLineEdit* AppTitleBar::titleEditor() const {
+    return m_titleEdit;
+}
+
 bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     if (m_titleEditOutsideClickFilterInstalled && m_titleEdit && m_titleEdit->hasFocus() &&

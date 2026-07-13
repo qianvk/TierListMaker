@@ -45,7 +45,6 @@ namespace {
 constexpr int kRowReorderAnimationMs = 190;
 constexpr int kImageReorderAnimationMs = 145;
 constexpr int kInitialLayoutLineHeight = 84;
-constexpr qreal kDockMaxScale = 1.30;
 constexpr int kMissionLayoutSearchSteps = 34;
 constexpr int kMissionTransitionMs = 320;
 constexpr int kMissionHoverMs = 220;
@@ -1046,10 +1045,6 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
     m_missionControlActive = active;
     clearDropState();
     finishImageDragVisuals();
-    stopDockHoverAnimation();
-    m_dockHoverProgress = 0.0;
-    m_dockHoverImageId.clear();
-    m_dockHoverRow = -1;
     if (!active) {
         animateMissionHover(0.0);
     }
@@ -1233,40 +1228,6 @@ QPointF TierListView::visualOffsetForImage(const QString& imageId) const {
     return m_imageTileOffsets.value(imageId, QPointF());
 }
 
-qreal TierListView::dockScaleForImage(const QModelIndex& index, const QRect& tileRect,
-                                      const QString& imageId) const {
-    if (m_dockHoverProgress <= 0.001 || m_imageDragActive || m_rowDropActive || !index.isValid() ||
-        index.row() != m_dockHoverRow || imageId.isEmpty()) {
-        return 1.0;
-    }
-
-    const qreal lineDistance = std::abs(tileRect.center().y() - m_dockHoverPosition.y());
-    if (lineDistance > qMax<qreal>(1.0, tileRect.height() * 0.72)) {
-        return 1.0;
-    }
-
-    const qreal sigma = qMax<qreal>(1.0, tileRect.width() * 0.92);
-    const qreal distance = tileRect.center().x() - m_dockHoverPosition.x();
-    const qreal gaussian = std::exp(-(distance * distance) / (2.0 * sigma * sigma));
-    return 1.0 + (kDockMaxScale - 1.0) * gaussian * m_dockHoverProgress;
-}
-
-QPointF TierListView::dockOffsetForImage(const QModelIndex& index, const QRect& tileRect,
-                                         const QString& imageId) const {
-    const qreal scale = dockScaleForImage(index, tileRect, imageId);
-    if (qFuzzyCompare(scale, 1.0)) {
-        return {};
-    }
-
-    const qreal dx = tileRect.center().x() - m_dockHoverPosition.x();
-    const qreal sigma = qMax<qreal>(1.0, tileRect.width() * 0.92);
-    const qreal gaussian = std::exp(-(dx * dx) / (2.0 * sigma * sigma)) * m_dockHoverProgress;
-    const qreal direction = dx < -0.5 ? -1.0 : (dx > 0.5 ? 1.0 : 0.0);
-    const qreal spread = tileRect.width() * 0.16 * gaussian;
-    const qreal lift = tileRect.height() * 0.08 * gaussian;
-    return QPointF(direction * spread, -lift);
-}
-
 QRect TierListView::imageSourceRect(const QString& imageId) const {
     if (m_missionControlActive) {
         const QRect rect = missionImageRect(imageId);
@@ -1408,7 +1369,6 @@ void TierListView::mouseMoveEvent(QMouseEvent* event) {
     }
 
     if (!(event->buttons() & Qt::LeftButton) || m_pressKind == PressKind::None) {
-        updateDockHover(event->pos());
         updateBlankAreaToolTip(event->pos());
         QListView::mouseMoveEvent(event);
         return;
@@ -1424,13 +1384,11 @@ void TierListView::mouseMoveEvent(QMouseEvent* event) {
         return;
     }
     if (m_pressKind == PressKind::RowLabel) {
-        animateDockHover(0.0);
         startRowDrag();
         event->accept();
         return;
     }
     if (m_pressKind == PressKind::ImageTile) {
-        animateDockHover(0.0);
         startImageDrag();
         event->accept();
         return;
@@ -1663,7 +1621,6 @@ void TierListView::keyPressEvent(QKeyEvent* event) {
 }
 
 void TierListView::leaveEvent(QEvent* event) {
-    animateDockHover(0.0);
     viewport()->setToolTip({});
     // Keep Mission Control hover expanded across preview overlays. A preview opens as a
     // sibling widget, so the view can receive Leave even though the user still expects the
@@ -2106,10 +2063,6 @@ void TierListView::beginImageDragVisuals(const QString& imageId, bool synchronou
     m_imageDragActive = true;
     m_imageDragId = imageId;
     m_imageDragSynchronousFeedback = synchronousFeedback;
-    stopDockHoverAnimation();
-    m_dockHoverProgress = 0.0;
-    m_dockHoverRow = -1;
-    m_dockHoverImageId.clear();
     m_imageDragSourceRow = -1;
     m_imageDropInsertionIndex = -1;
     m_imagePlaceholderRect = {};
@@ -2603,10 +2556,6 @@ void TierListView::startRowDrag() {
     m_rowDropIndex = m_pressedIndex.row();
     m_rowDropActive = true;
     m_rowDragCommitted = false;
-    stopDockHoverAnimation();
-    m_dockHoverProgress = 0.0;
-    m_dockHoverRow = -1;
-    m_dockHoverImageId.clear();
     beginRowReorderVisuals(m_pressedIndex);
     resetPressState();
     setCursor(Qt::ClosedHandCursor);
@@ -2770,95 +2719,6 @@ void TierListView::clearDropState() {
 void TierListView::clearImageDropState() {
     m_imageDropIndex = QPersistentModelIndex();
     m_imageDropInsertionIndex = -1;
-}
-
-void TierListView::updateDockHover(const QPoint& viewportPoint) {
-    if (m_imageDragActive || m_rowDropActive || m_reorderSourceRow >= 0) {
-        animateDockHover(0.0);
-        return;
-    }
-
-    TierListDelegate* delegate = tierDelegate();
-    const QModelIndex index = indexAt(viewportPoint);
-    QString imageId;
-    if (delegate && index.isValid()) {
-        imageId = delegate->imageIdAt(index, visualRect(index), viewportPoint);
-    }
-
-    m_dockHoverPosition = viewportPoint;
-    if (imageId.isEmpty()) {
-        animateDockHover(0.0);
-        return;
-    }
-
-    if (m_dockHoverImageId != imageId || m_dockHoverRow != index.row()) {
-        m_dockHoverImageId = imageId;
-        m_dockHoverRow = index.row();
-        if (m_activeImageId != imageId || m_activeImageIndex != index) {
-            m_activeImageId = imageId;
-            m_activeImageIndex = index;
-            emit imageSelected(imageId);
-        }
-        Logger::debug(QStringLiteral("tier.list.image.hover imageId=%1 row=%2 pos=(%3,%4)")
-                          .arg(imageId)
-                          .arg(index.row())
-                          .arg(viewportPoint.x())
-                          .arg(viewportPoint.y()));
-    }
-    animateDockHover(1.0);
-    viewport()->update();
-}
-
-void TierListView::animateDockHover(qreal targetProgress) {
-    targetProgress = qBound<qreal>(0.0, targetProgress, 1.0);
-    if (m_dockHoverAnimation &&
-        qAbs(m_dockHoverAnimation->endValue().toReal() - targetProgress) < 0.01) {
-        viewport()->update();
-        return;
-    }
-    if (qAbs(m_dockHoverProgress - targetProgress) < 0.01 &&
-        ((targetProgress > 0.0 && !m_dockHoverImageId.isEmpty()) || targetProgress <= 0.0)) {
-        if (targetProgress <= 0.0 && m_dockHoverProgress <= 0.001) {
-            m_dockHoverImageId.clear();
-            m_dockHoverRow = -1;
-        }
-        viewport()->update();
-        return;
-    }
-
-    stopDockHoverAnimation();
-    auto* animation = new QVariantAnimation(this);
-    m_dockHoverAnimation = animation;
-    animation->setDuration(targetProgress > m_dockHoverProgress ? 150 : 180);
-    animation->setEasingCurve(targetProgress > m_dockHoverProgress ? QEasingCurve::OutCubic
-                                                                   : QEasingCurve::OutQuint);
-    animation->setStartValue(m_dockHoverProgress);
-    animation->setEndValue(targetProgress);
-    connect(animation, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
-        m_dockHoverProgress = value.toReal();
-        viewport()->update();
-    });
-    connect(animation, &QVariantAnimation::finished, this, [this, animation, targetProgress]() {
-        if (m_dockHoverAnimation == animation) {
-            m_dockHoverAnimation = nullptr;
-        }
-        m_dockHoverProgress = targetProgress;
-        if (targetProgress <= 0.0) {
-            m_dockHoverImageId.clear();
-            m_dockHoverRow = -1;
-        }
-        animation->deleteLater();
-        viewport()->update();
-    });
-    animation->start();
-}
-
-void TierListView::stopDockHoverAnimation() {
-    if (m_dockHoverAnimation) {
-        m_dockHoverAnimation->stop();
-        m_dockHoverAnimation->deleteLater();
-        m_dockHoverAnimation = nullptr;
-    }
 }
 
 void TierListView::animateMissionTransition(qreal targetProgress) {
