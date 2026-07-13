@@ -5,7 +5,6 @@
 namespace tlm {
 
 SidebarToggleButton::SidebarToggleButton(QWidget* parent) : QToolButton(parent) {
-    setCheckable(true);
     setToolTip(tr("Toggle sidebar"));
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     setCursor(Qt::ArrowCursor);

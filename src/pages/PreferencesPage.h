@@ -7,11 +7,10 @@
 #include <QWidget>
 
 class QLabel;
-class QListWidget;
 class QPushButton;
 class QEvent;
 class QResizeEvent;
-class QStackedWidget;
+class QVBoxLayout;
 
 namespace tlm {
 
@@ -31,7 +30,6 @@ protected:
 private:
     void retranslateUi();
     void rebuildPreferencePages();
-    void updateNavWidth();
     void refreshPreferenceControlStyles();
     void applyUpdateResult(const UpdateCheckResult& result);
     void applyUpdateFailure(const QString& reason);
@@ -42,8 +40,8 @@ private:
     AppSettings* m_settings{nullptr};
     LanguageManager* m_languageManager{nullptr};
     AppUpdater* m_updater{nullptr};
-    QListWidget* m_nav{nullptr};
-    QStackedWidget* m_stack{nullptr};
+    QWidget* m_pageContainer{nullptr};
+    QVBoxLayout* m_sectionsLayout{nullptr};
     QLabel* m_updateStatusLabel{nullptr};
     QPushButton* m_checkUpdateButton{nullptr};
     QPushButton* m_openUpdateButton{nullptr};

@@ -14,14 +14,14 @@
 #include <utility>
 
 #include <vkui/core/VkIcon.h>
+#include <vkui/core/VkTheme.h>
+#include <vkui/core/VkThemeManager.h>
 
 namespace tlm {
 
 namespace {
 constexpr int kMinimumLabelWidth = 82;
 constexpr int kMaximumLabelWidth = 190;
-constexpr int kDefaultOuterRadius = 16;
-[[maybe_unused]] constexpr int kWindowsOuterRadius = 8;
 constexpr int kTileMargin = 0;
 constexpr int kTileSpacing = 0;
 constexpr int kNominalTileExtent = 84;
@@ -51,11 +51,10 @@ bool imagesVisible(const TierProject* project) {
 }
 
 int platformOuterRadius() {
-#if defined(Q_OS_WIN)
-    return kWindowsOuterRadius;
-#else
-    return kDefaultOuterRadius;
-#endif
+    return std::max(0, qRound(vkui::VkThemeManager::instance()
+                                  ->theme()
+                                  .metrics()
+                                  .windowCornerRadius));
 }
 
 QPainterPath rowClipPath(const QRect& rect, bool firstRow, bool lastRow) {

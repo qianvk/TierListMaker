@@ -30,6 +30,7 @@ public:
     void setOutsideDismissSuspended(bool suspended);
     void openFor(QWidget* anchor);
     void closeAnimated();
+    void closeImmediately();
     bool isOpen() const;
     QRect imageSourceRect(const QString& imageId) const;
     QSize sizeHint() const override;

@@ -9,6 +9,7 @@
 
 #include <QApplication>
 #include <QColorDialog>
+#include <QCursor>
 #include <QDialog>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -21,6 +22,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPaintEvent>
 #include <QPainter>
@@ -30,8 +32,10 @@
 #include <QSignalBlocker>
 #include <QSizePolicy>
 #include <QSlider>
+#include <QStandardPaths>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <QUuid>
 
 #include <algorithm>
 #include <memory>
@@ -260,8 +264,8 @@ EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentPro
     m_autosaveTimer = new QTimer(this);
     connect(m_autosaveTimer, &QTimer::timeout, this, [this]() {
         if (!m_backgroundPreviewActive && m_settings && m_settings->autosaveEnabled() &&
-            m_project.dirty && !m_project.filePath.isEmpty()) {
-            saveProject();
+            m_project.dirty) {
+            autosaveCurrentProject();
         }
     });
     const int interval = (m_settings ? m_settings->autosaveIntervalMinutes() : 3) * 60 * 1000;
@@ -278,116 +282,27 @@ bool EditPage::newProject() {
         return false;
     }
 
-    QDialog dialog(this);
-    dialog.setWindowTitle(tr("New Project"));
-    dialog.setModal(true);
-    dialog.setMinimumWidth(520);
-
-    auto* layout = new QVBoxLayout(&dialog);
-    auto* form = new QFormLayout;
-    auto* nameEdit = new QLineEdit(tr("Untitled Tier List"), &dialog);
-    nameEdit->selectAll();
-    form->addRow(tr("Project name"), nameEdit);
-
-    auto* directoryRow = new QWidget(&dialog);
-    auto* directoryLayout = new QHBoxLayout(directoryRow);
-    directoryLayout->setContentsMargins(0, 0, 0, 0);
-    directoryLayout->setSpacing(8);
-    auto* directoryEdit = new QLineEdit(QDir::homePath(), directoryRow);
-    directoryEdit->setReadOnly(true);
-    auto* browseButton =
-        new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Choose"), directoryRow);
-    directoryLayout->addWidget(directoryEdit, 1);
-    directoryLayout->addWidget(browseButton);
-    form->addRow(tr("Parent folder"), directoryRow);
-    layout->addLayout(form);
-
-    auto* pathHint = new QLabel(&dialog);
-    pathHint->setWordWrap(true);
-    pathHint->setTextInteractionFlags(Qt::TextSelectableByMouse);
-    layout->addWidget(pathHint);
-
-    auto* buttons = new QDialogButtonBox(QDialogButtonBox::Cancel, &dialog);
-    QPushButton* createButton = buttons->addButton(tr("Create"), QDialogButtonBox::AcceptRole);
-    layout->addWidget(buttons);
-
-    const auto projectPath = [nameEdit, directoryEdit]() {
-        TierProject candidate = TierProject::createUntitled();
-        candidate.name = nameEdit->text().trimmed();
-        const QString folderName = QFileInfo(candidate.suggestedFileName()).completeBaseName();
-        const QString folderPath = QDir(directoryEdit->text()).filePath(folderName);
-        return QDir(folderPath).filePath(candidate.suggestedFileName());
-    };
-    const auto refreshPathHint = [&, createButton]() {
-        const bool valid =
-            !nameEdit->text().trimmed().isEmpty() && QDir(directoryEdit->text()).exists();
-        createButton->setEnabled(valid);
-        pathHint->setText(
-            tr("Project will be created at:\n%1").arg(QDir::toNativeSeparators(projectPath())));
-    };
-
-    connect(nameEdit, &QLineEdit::textChanged, &dialog, refreshPathHint);
-    connect(browseButton, &QPushButton::clicked, &dialog, [&]() {
-        const QString directory = QFileDialog::getExistingDirectory(
-            &dialog, tr("Choose Parent Folder"), directoryEdit->text(),
-            QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
-        if (!directory.isEmpty()) {
-            directoryEdit->setText(QDir::cleanPath(directory));
-            refreshPathHint();
-        }
-    });
-    connect(buttons, &QDialogButtonBox::accepted, &dialog, &QDialog::accept);
-    connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
-    refreshPathHint();
-
-    if (dialog.exec() != QDialog::Accepted) {
-        Logger::debug(QStringLiteral("tier.edit.project.create.cancel"));
-        return false;
-    }
-
-    const QString filePath = QFileInfo(projectPath()).absoluteFilePath();
-    const QString projectDirectory = QFileInfo(filePath).absolutePath();
-    const bool projectDirectoryAlreadyExisted = QDir(projectDirectory).exists();
-    if (QFileInfo::exists(filePath)) {
-        QMessageBox::warning(
-            this, tr("New Project"),
-            tr("A project already exists at:\n%1").arg(QDir::toNativeSeparators(filePath)));
-        Logger::warn(
-            QStringLiteral("tier.edit.project.create rejected=existing path=\"%1\"").arg(filePath));
-        return false;
-    }
-    if (!QDir().mkpath(projectDirectory)) {
-        QMessageBox::critical(this, tr("New Project"),
-                              tr("Could not create the project folder:\n%1")
-                                  .arg(QDir::toNativeSeparators(projectDirectory)));
-        Logger::error(QStringLiteral("tier.edit.project.create rejected=mkdir path=\"%1\"")
-                          .arg(projectDirectory));
-        return false;
-    }
-
-    const TierProject previousProject = m_project;
     TierProject project = TierProject::createUntitled();
-    project.name = nameEdit->text().trimmed();
     setProject(std::move(project));
-    const bool saved = saveProjectToPath(filePath);
-    if (!saved) {
-        setProject(previousProject);
-        if (!projectDirectoryAlreadyExisted) {
-            QDir(projectDirectory).removeRecursively();
-        }
-    }
-    Logger::info(
-        QStringLiteral("tier.edit.project.create path=\"%1\" saved=%2").arg(filePath).arg(saved));
-    return saved;
+    Logger::info(QStringLiteral("tier.edit.project.create temporary=1"));
+    return true;
 }
 
 bool EditPage::openProjectFromDialog() {
     if (!confirmSaveIfDirty()) {
         return false;
     }
-    const QString path = QFileDialog::getOpenFileName(this, tr("Open Project"), QString(),
-                                                      tr("TierListMaker Projects (*.tlmproject)"));
-    return path.isEmpty() ? false : openProject(path);
+    const QString directory = m_settings ? m_settings->defaultProjectDirectory() : QString();
+    const QString path =
+        QFileDialog::getOpenFileName(this, tr("Open Project"), directory,
+                                     tr("TierListMaker Projects (*.tlmproject)"));
+    if (path.isEmpty()) {
+        return false;
+    }
+    if (m_settings) {
+        m_settings->setDefaultProjectDirectory(QFileInfo(path).absolutePath());
+    }
+    return openProject(path);
 }
 
 bool EditPage::openProject(const QString& filePath) {
@@ -414,7 +329,26 @@ bool EditPage::saveProjectAs() {
     if (path.isEmpty()) {
         return false;
     }
-    return saveProjectToPath(path);
+    const bool saved = saveProjectToPath(path);
+    if (saved && m_settings) {
+        m_settings->setDefaultProjectDirectory(QFileInfo(path).absolutePath());
+    }
+    return saved;
+}
+
+void EditPage::showTemplateMenu(QWidget* anchor) {
+    QMenu menu(this);
+    QAction* saveTemplate = menu.addAction(vkui::icon(vkui::VkSymbol::Save), tr("Save Template"));
+    QAction* applyTemplate =
+        menu.addAction(vkui::icon(vkui::VkSymbol::Duplicate), tr("Apply Template"));
+    const QPoint position =
+        anchor ? anchor->mapToGlobal(QPoint(0, anchor->height())) : QCursor::pos();
+    QAction* chosen = menu.exec(position);
+    if (chosen == saveTemplate) {
+        saveTemplateFromDialog();
+    } else if (chosen == applyTemplate) {
+        applyTemplateFromDialog();
+    }
 }
 
 void EditPage::renameProject(const QString& name) {
@@ -823,12 +757,9 @@ void EditPage::toggleGallery(QWidget* anchor) {
         connect(popover, &ImageGalleryPopover::importRequested, this, [this]() {
             QPointer<ImageGalleryPopover> guard = m_galleryPopover;
             if (guard) {
-                guard->setOutsideDismissSuspended(true);
+                guard->closeImmediately();
             }
             const QStringList files = chooseImageImportFiles(this);
-            if (guard) {
-                guard->setOutsideDismissSuspended(false);
-            }
             if (!files.isEmpty()) {
                 importImages(files);
             } else {
@@ -999,12 +930,42 @@ void EditPage::showError(const QString& title, const Error& error) {
 QString EditPage::chooseSavePath() {
     QString suggested = m_project.filePath;
     if (suggested.isEmpty()) {
-        suggested = m_project.suggestedFileName();
+        const QString directory = m_settings ? m_settings->defaultProjectDirectory()
+                                             : QStandardPaths::writableLocation(
+                                                   QStandardPaths::DocumentsLocation);
+        suggested = QDir(directory.isEmpty() ? QDir::homePath() : directory)
+                        .filePath(m_project.suggestedFileName());
     }
     QString path = QFileDialog::getSaveFileName(this, tr("Save Project"), suggested,
                                                 tr("TierListMaker Projects (*.tlmproject)"));
     if (!path.isEmpty() && !path.endsWith(QStringLiteral(".tlmproject"), Qt::CaseInsensitive)) {
         path += QStringLiteral(".tlmproject");
+    }
+    return path;
+}
+
+QString EditPage::chooseTemplatePath(bool saveDialog) {
+    const QString directory =
+        m_settings ? m_settings->defaultProjectDirectory()
+                   : QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    const QString suffix = QStringLiteral(".tlmtemplate");
+    const QString suggested =
+        saveDialog ? QDir(directory.isEmpty() ? QDir::homePath() : directory)
+                         .filePath(QFileInfo(m_project.suggestedFileName()).completeBaseName() +
+                                   suffix)
+                   : directory;
+    const QString filter = tr("TierListMaker Templates (*.tlmtemplate);;TierListMaker Projects "
+                              "(*.tlmproject)");
+    QString path = saveDialog
+                       ? QFileDialog::getSaveFileName(this, tr("Save Template"), suggested, filter)
+                       : QFileDialog::getOpenFileName(this, tr("Apply Template"), suggested, filter);
+    if (saveDialog && !path.isEmpty() &&
+        !path.endsWith(QStringLiteral(".tlmtemplate"), Qt::CaseInsensitive) &&
+        !path.endsWith(QStringLiteral(".tlmproject"), Qt::CaseInsensitive)) {
+        path += suffix;
+    }
+    if (!path.isEmpty() && m_settings) {
+        m_settings->setDefaultProjectDirectory(QFileInfo(path).absolutePath());
     }
     return path;
 }
@@ -1019,6 +980,158 @@ QStringList EditPage::chooseImageImportFiles(QWidget* dialogParent) {
                       .arg(files.size())
                       .arg(dialogParent ? dialogParent->metaObject()->className() : "null"));
     return files;
+}
+
+bool EditPage::autosaveCurrentProject() {
+    if (!m_project.dirty) {
+        return true;
+    }
+    if (!m_project.filePath.isEmpty()) {
+        return saveProjectToPath(m_project.filePath);
+    }
+
+    const QString path = tempAutosavePath();
+    if (path.isEmpty() || !QDir().mkpath(QFileInfo(path).absolutePath())) {
+        Logger::warn(QStringLiteral("tier.edit.project.autosave.temp rejected path=\"%1\"")
+                         .arg(path));
+        return false;
+    }
+
+    TierProject snapshot = m_project;
+    snapshot.settings.insert(QStringLiteral("temporaryAutosave"), true);
+    auto result = m_repository->saveProject(snapshot, path);
+    if (!result) {
+        Logger::warn(QStringLiteral("tier.edit.project.autosave.temp failed path=\"%1\" error=\"%2\"")
+                         .arg(path, result.error().message));
+        return false;
+    }
+
+    Logger::debug(QStringLiteral("tier.edit.project.autosave.temp path=\"%1\"").arg(path));
+    return true;
+}
+
+QString EditPage::tempAutosavePath() const {
+    QString base = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    if (base.isEmpty()) {
+        base = QDir(QDir::tempPath()).filePath(QStringLiteral("TierListMaker"));
+    }
+    return QDir(base).filePath(QStringLiteral("autosave/current-temp.tlmproject"));
+}
+
+TierProject EditPage::templateSnapshot() const {
+    TierProject snapshot = m_project;
+    snapshot.id = QUuid::createUuid().toString(QUuid::WithoutBraces);
+    snapshot.filePath.clear();
+    snapshot.thumbnailPath.clear();
+    snapshot.images.clear();
+    for (TierRow& row : snapshot.rows) {
+        row.imageIds.clear();
+    }
+    snapshot.dirty = true;
+    return snapshot;
+}
+
+bool EditPage::saveTemplateFromDialog() {
+    const QString path = chooseTemplatePath(true);
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    const QString absolutePath = QFileInfo(path).absoluteFilePath();
+    TierProject snapshot = templateSnapshot();
+    const QString originalBackground =
+        m_project.canvas.value(QStringLiteral("backgroundImagePath")).toString();
+    const QString resolvedBackground = resolvedCanvasImagePath(m_project, originalBackground);
+    snapshot.canvas.remove(QStringLiteral("backgroundImagePath"));
+    snapshot.filePath = absolutePath;
+
+    if (!resolvedBackground.isEmpty()) {
+        if (resolvedBackground.startsWith(QStringLiteral(":/")) ||
+            resolvedBackground.startsWith(QStringLiteral("qrc:/"))) {
+            snapshot.canvas.insert(QStringLiteral("backgroundImagePath"), resolvedBackground);
+        } else {
+            auto imported = m_assetManager->importCanvasImage(
+                snapshot, resolvedBackground, QStringLiteral("backgroundImagePath"),
+                ImageImportBehavior::CopyIntoProject);
+            if (!imported) {
+                showError(tr("Save Template"), imported.error());
+                return false;
+            }
+        }
+    }
+
+    auto result = m_repository->saveProject(snapshot, absolutePath);
+    if (!result) {
+        showError(tr("Save Template"), result.error());
+        return false;
+    }
+
+    Logger::info(QStringLiteral("tier.edit.template.save path=\"%1\" rows=%2 hasBackground=%3")
+                     .arg(absolutePath)
+                     .arg(snapshot.rows.size())
+                     .arg(!snapshot.canvas.value(QStringLiteral("backgroundImagePath"))
+                               .toString()
+                               .isEmpty()));
+    return true;
+}
+
+bool EditPage::applyTemplateFromDialog() {
+    const QString path = chooseTemplatePath(false);
+    if (path.isEmpty()) {
+        return false;
+    }
+
+    auto result = m_repository->openProject(path);
+    if (!result) {
+        showError(tr("Apply Template"), result.error());
+        return false;
+    }
+
+    applyTemplateProject(result.value());
+    Logger::info(QStringLiteral("tier.edit.template.apply path=\"%1\"").arg(path));
+    return true;
+}
+
+void EditPage::applyTemplateProject(const TierProject& templateProject) {
+    TierProject previous = m_project;
+    QVector<TierRow> rows = templateProject.rows;
+    for (TierRow& row : rows) {
+        row.imageIds.clear();
+    }
+    for (TierImage& image : m_project.images) {
+        image.assignedTierRowId.reset();
+    }
+
+    const QString templateBackground =
+        templateProject.canvas.value(QStringLiteral("backgroundImagePath")).toString();
+    const QString resolvedBackground =
+        resolvedCanvasImagePath(templateProject, templateBackground);
+    QJsonObject nextCanvas = templateProject.canvas;
+    nextCanvas.remove(QStringLiteral("backgroundImagePath"));
+
+    m_project.rows = rows;
+    m_project.canvas = nextCanvas;
+    m_project.normalizeOrdering();
+
+    if (!resolvedBackground.isEmpty()) {
+        if (resolvedBackground.startsWith(QStringLiteral(":/")) ||
+            resolvedBackground.startsWith(QStringLiteral("qrc:/"))) {
+            m_project.canvas.insert(QStringLiteral("backgroundImagePath"), resolvedBackground);
+        } else {
+            auto imported = m_assetManager->importCanvasImage(
+                m_project, resolvedBackground, QStringLiteral("backgroundImagePath"),
+                ImageImportBehavior::CopyIntoProject);
+            if (!imported) {
+                m_project = previous;
+                showError(tr("Apply Template"), imported.error());
+                refreshUi();
+                return;
+            }
+        }
+    }
+
+    markDirty();
+    refreshUi();
 }
 
 void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int index) {

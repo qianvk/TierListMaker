@@ -69,6 +69,20 @@ Qt::KeyboardModifier physicalControlModifier() {
     return Qt::ControlModifier;
 #endif
 }
+
+QToolButton* makeTitleBarIconButton(const QString& tooltip, vkui::VkSymbol symbol,
+                                    QWidget* parent) {
+    auto* button = new QToolButton(parent);
+    button->setToolTip(tooltip);
+    button->setIcon(vkui::icon(symbol));
+    button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    button->setCursor(Qt::PointingHandCursor);
+    button->setFocusPolicy(Qt::NoFocus);
+    button->setFixedSize(34, 34);
+    button->setIconSize(QSize(20, 20));
+    button->setAutoRaise(true);
+    return button;
+}
 } // namespace
 
 RootWidget::RootWidget(ProjectRepository* repository, RecentProjectsStore* recentProjects,
@@ -107,6 +121,10 @@ void RootWidget::installWindowAgent(QWK::WidgetWindowAgent* agent) {
     if (m_sidebarToggleButton) {
         m_windowAgent->setHitTestVisible(m_sidebarTitleBar, m_sidebarToggleButton, true);
         m_windowAgent->setHitTestVisible(m_titleBar, m_sidebarToggleButton, true);
+    }
+    if (m_newProjectButton) {
+        m_windowAgent->setHitTestVisible(m_sidebarTitleBar, m_newProjectButton, true);
+        m_windowAgent->setHitTestVisible(m_titleBar, m_newProjectButton, true);
     }
     if (m_splitter && m_splitter->handle(1)) {
         m_windowAgent->setHitTestVisible(m_sidebarTitleBar, m_splitter->handle(1), true);
@@ -216,13 +234,11 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             m_lastExpandedSidebarWidth =
                 std::max(kSidebarMinimumExpandedWidth, m_currentSidebarWidth);
             if (m_sidebarToggleButton) {
-                m_sidebarToggleButton->setChecked(false);
                 m_sidebarToggleButton->setToolTip(tr("Collapse sidebar"));
             }
         } else {
             m_sidebarCollapsed = true;
             if (m_sidebarToggleButton) {
-                m_sidebarToggleButton->setChecked(true);
                 m_sidebarToggleButton->setToolTip(tr("Show sidebar"));
             }
         }
@@ -236,11 +252,19 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
                           .arg(m_currentSidebarWidth));
     });
 
+    m_newProjectButton = makeTitleBarIconButton(tr("New"), vkui::VkSymbol::Plus, this);
+    m_newProjectButton->setObjectName(QStringLiteral("NewProjectButton"));
+    connect(m_newProjectButton, &QToolButton::clicked, this, [this]() {
+        if (m_editPage && m_editPage->newProject()) {
+            switchToPage(AppPage::Edit);
+        }
+    });
+
     m_sidebarToggleButton = new SidebarToggleButton(this);
     m_sidebarToggleButton->setObjectName(QStringLiteral("SidebarToggleButton"));
     m_sidebarToggleButton->setToolTip(tr("Collapse sidebar"));
     connect(m_sidebarToggleButton, &QAbstractButton::clicked, this,
-            [this](bool checked) { setSidebarCollapsed(checked); });
+            [this]() { setSidebarCollapsed(!m_sidebarCollapsed); });
 
     if (updater) {
         connect(updater, &AppUpdater::updateNotificationChanged, this,
@@ -266,10 +290,11 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             m_titleBar->setDocumentTitle(title);
         }
     });
-    connect(m_titleBar, &AppTitleBar::newRequested, m_editPage, &EditPage::newProject);
     connect(m_titleBar, &AppTitleBar::openRequested, m_editPage, &EditPage::openProjectFromDialog);
     connect(m_titleBar, &AppTitleBar::saveRequested, m_editPage, &EditPage::saveProject);
     connect(m_titleBar, &AppTitleBar::saveAsRequested, m_editPage, &EditPage::saveProjectAs);
+    connect(m_titleBar, &AppTitleBar::templatesRequested, m_editPage,
+            &EditPage::showTemplateMenu);
     connect(m_titleBar, &AppTitleBar::backgroundRequested, m_editPage,
             &EditPage::configureBackground);
     connect(m_titleBar, &AppTitleBar::galleryRequested, m_editPage, &EditPage::toggleGallery);
@@ -302,6 +327,9 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
         if (m_sidebarToggleButton) {
             m_sidebarToggleButton->setToolTip(m_sidebarCollapsed ? tr("Show sidebar")
                                                                  : tr("Collapse sidebar"));
+        }
+        if (m_newProjectButton) {
+            m_newProjectButton->setToolTip(tr("New"));
         }
         if (m_preferencesButton) {
             m_preferencesButton->setToolTip(tr("Preferences"));
@@ -400,7 +428,6 @@ void RootWidget::setSidebarCollapsed(bool collapsed) {
     }
 
     m_sidebarCollapsed = collapsed;
-    m_sidebarToggleButton->setChecked(collapsed);
     m_sidebarToggleButton->setToolTip(collapsed ? tr("Show sidebar") : tr("Collapse sidebar"));
     layoutSidebarToggleButton();
 
@@ -499,6 +526,9 @@ void RootWidget::setTierFocusMode(bool enabled) {
         if (m_sidebarToggleButton) {
             m_sidebarToggleButton->hide();
         }
+        if (m_newProjectButton) {
+            m_newProjectButton->hide();
+        }
         if (m_titleBar) {
             m_titleBar->setTierFocusMode(true);
             m_titleBar->hide();
@@ -528,9 +558,11 @@ void RootWidget::setTierFocusMode(bool enabled) {
                                          kSidebarMaximumWidth));
         if (m_sidebarToggleButton) {
             m_sidebarToggleButton->show();
-            m_sidebarToggleButton->setChecked(m_sidebarCollapsed);
             m_sidebarToggleButton->setToolTip(m_sidebarCollapsed ? tr("Show sidebar")
                                                                  : tr("Collapse sidebar"));
+        }
+        if (m_newProjectButton) {
+            m_newProjectButton->show();
         }
         if (m_pages) {
             updateTitleBarForPage(static_cast<AppPage>(m_pages->currentIndex()));
@@ -580,6 +612,9 @@ void RootWidget::layoutTitleBars() {
         }
         m_titleBar->raise();
     }
+    if (m_newProjectButton) {
+        m_newProjectButton->raise();
+    }
     if (m_sidebarToggleButton) {
         m_sidebarToggleButton->raise();
     }
@@ -587,20 +622,24 @@ void RootWidget::layoutTitleBars() {
 }
 
 void RootWidget::layoutSidebarToggleButton() {
-    if (!m_sidebarToggleButton) {
+    if (!m_sidebarToggleButton || !m_newProjectButton) {
         return;
     }
 
-    const int buttonWidth = m_sidebarToggleButton->width();
+    constexpr int kChromeButtonGap = 6;
+    const int groupWidth = m_newProjectButton->width() + kChromeButtonGap +
+                           m_sidebarToggleButton->width();
     const int minimumX = minimumSidebarToggleX();
     const int titleBarWidth = m_sidebarTitleBar ? m_sidebarTitleBar->width() : width();
-    const int maximumX = std::max(minimumX, titleBarWidth - buttonWidth - kSidebarToggleInset);
+    const int maximumX = std::max(minimumX, titleBarWidth - groupWidth - kSidebarToggleInset);
     const int naturalX = m_currentSidebarWidth > 0
-                             ? m_currentSidebarWidth - buttonWidth - kSidebarToggleInset
+                             ? m_currentSidebarWidth - groupWidth - kSidebarToggleInset
                              : minimumX;
     const int x = std::clamp(std::max(naturalX, minimumX), minimumX, maximumX);
     const int y = std::max(0, (kTitleBarHeight - m_sidebarToggleButton->height()) / 2);
-    m_sidebarToggleButton->move(x, y);
+    m_newProjectButton->move(x, y);
+    m_sidebarToggleButton->move(x + m_newProjectButton->width() + kChromeButtonGap, y);
+    m_newProjectButton->raise();
     m_sidebarToggleButton->raise();
     updateTitleBarLeadingReservation();
 }
@@ -635,7 +674,9 @@ void RootWidget::updateTitleBarLeadingReservation() {
         return;
     }
 
-    const int toggleRightInContent = m_sidebarToggleButton->geometry().right() + 1 - m_content->x();
+    const int rightEdge = std::max(m_sidebarToggleButton->geometry().right(),
+                                   m_newProjectButton ? m_newProjectButton->geometry().right() : 0);
+    const int toggleRightInContent = rightEdge + 1 - m_content->x();
     const int reservedWidth =
         toggleRightInContent > 0 ? toggleRightInContent + kTitleBarControlGap : 0;
     m_titleBar->setLeadingReservedWidth(reservedWidth);

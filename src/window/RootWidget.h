@@ -96,6 +96,7 @@ private:
     QVBoxLayout* m_sidebarLayout{nullptr};
     SidebarModel* m_sidebarModel{nullptr};
     SidebarView* m_sidebarView{nullptr};
+    QToolButton* m_newProjectButton{nullptr};
     SidebarToggleButton* m_sidebarToggleButton{nullptr};
     QToolButton* m_preferencesButton{nullptr};
     QLabel* m_preferencesBadge{nullptr};

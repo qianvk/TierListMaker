@@ -31,6 +31,8 @@ public:
     void setAutosaveEnabled(bool enabled);
     int autosaveIntervalMinutes() const;
     void setAutosaveIntervalMinutes(int minutes);
+    QString defaultProjectDirectory() const;
+    void setDefaultProjectDirectory(const QString& path);
 
     bool autoUpdateEnabled() const;
     void setAutoUpdateEnabled(bool enabled);

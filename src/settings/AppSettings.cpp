@@ -2,6 +2,10 @@
 
 #include "settings/SettingsKeys.h"
 
+#include <QDir>
+#include <QFileInfo>
+#include <QStandardPaths>
+
 namespace tlm {
 
 namespace {
@@ -73,6 +77,14 @@ BlankAreaAction blankAreaActionFromString(const QString& value, BlankAreaAction 
     }
     return fallback;
 }
+
+QString fallbackProjectDirectory() {
+    QString path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    if (path.isEmpty()) {
+        path = QDir::homePath();
+    }
+    return QDir::cleanPath(path);
+}
 } // namespace
 
 AppSettings::AppSettings(QObject* parent)
@@ -130,6 +142,24 @@ int AppSettings::autosaveIntervalMinutes() const {
 
 void AppSettings::setAutosaveIntervalMinutes(int minutes) {
     m_settings.setValue(settings_keys::autosaveIntervalMinutes.toString(), qBound(1, minutes, 60));
+    emit changed();
+}
+
+QString AppSettings::defaultProjectDirectory() const {
+    const QString configured =
+        m_settings.value(settings_keys::defaultProjectDirectory.toString()).toString();
+    if (!configured.trimmed().isEmpty() && QFileInfo::exists(configured)) {
+        return QDir::cleanPath(configured);
+    }
+    return fallbackProjectDirectory();
+}
+
+void AppSettings::setDefaultProjectDirectory(const QString& path) {
+    const QString clean = QDir::cleanPath(path);
+    if (clean.isEmpty() || defaultProjectDirectory() == clean) {
+        return;
+    }
+    m_settings.setValue(settings_keys::defaultProjectDirectory.toString(), clean);
     emit changed();
 }
 

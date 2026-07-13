@@ -23,6 +23,8 @@
 #include <limits>
 
 #include <vkui/core/VkIcon.h>
+#include <vkui/core/VkTheme.h>
+#include <vkui/core/VkThemeManager.h>
 #include <vkui/widgets/overlays/VkPopover.h>
 
 namespace tlm {
@@ -33,11 +35,10 @@ constexpr int kPreferredTileExtent = 72;
 constexpr int kMaximumTileExtent = 86;
 
 int platformPopoverRadius() {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    return 16;
-#else
-    return 10;
-#endif
+    return std::max(0, qRound(vkui::VkThemeManager::instance()
+                                  ->theme()
+                                  .metrics()
+                                  .popoverCornerRadius));
 }
 
 QRect centeredCropSourceRect(const QPixmap& pixmap, const QSize& targetSize) {
@@ -261,7 +262,6 @@ protected:
         const QString imageId = ids.at(index);
         emit m_owner->imageSelected(imageId);
         QMenu menu(this);
-        menu.setAttribute(Qt::WA_TranslucentBackground, false);
         QAction* editAction = menu.addAction(tr("Edit"));
         QAction* removeAction = menu.addAction(tr("Remove from Image Gallery"));
         QPointer<ImageGalleryPopover> guard(m_owner);
@@ -446,6 +446,12 @@ void ImageGalleryPopover::openFor(QWidget* anchor) {
 void ImageGalleryPopover::closeAnimated() {
     if (m_popover) {
         m_popover->closeAnimated();
+    }
+}
+
+void ImageGalleryPopover::closeImmediately() {
+    if (m_popover) {
+        m_popover->closeImmediately();
     }
 }
 

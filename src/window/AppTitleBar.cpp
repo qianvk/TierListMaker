@@ -91,9 +91,9 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
         QStringLiteral("QLineEdit#ProjectTitleEdit{background:transparent;border:none;"
                        "border-radius:0px;padding:4px "
                        "10px;}"));
-    m_newButton = makeButton(tr("New"), vkui::VkSymbol::Plus, this);
     m_openButton = makeButton(tr("Open"), vkui::VkSymbol::Folder, this);
     m_saveButton = makeButton(tr("Save"), vkui::VkSymbol::Save, this);
+    m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Duplicate, this);
     m_backgroundButton = makeButton(tr("Background"), vkui::VkSymbol::Background, this);
     m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::Grid, this);
     m_resetButton = makeButton(tr("Reset Rows"), vkui::VkSymbol::Reset, this);
@@ -110,8 +110,9 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     auto* buttonsLayout = new QHBoxLayout(m_buttonGroup);
     buttonsLayout->setContentsMargins(0, 0, 0, 0);
     buttonsLayout->setSpacing(2);
-    for (QToolButton* button : {m_newButton, m_openButton, m_saveButton, m_backgroundButton,
-                                m_galleryButton, m_resetButton, m_focusButton}) {
+    for (QToolButton* button : {m_openButton, m_saveButton, m_templatesButton,
+                                m_backgroundButton, m_galleryButton, m_resetButton,
+                                m_focusButton}) {
         button->installEventFilter(this);
         buttonsLayout->addWidget(button);
     }
@@ -123,9 +124,10 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     layout->addStretch(1);
 #endif
 
-    connect(m_newButton, &QToolButton::clicked, this, &AppTitleBar::newRequested);
     connect(m_openButton, &QToolButton::clicked, this, &AppTitleBar::openRequested);
     connect(m_saveButton, &QToolButton::clicked, this, &AppTitleBar::saveRequested);
+    connect(m_templatesButton, &QToolButton::clicked, this,
+            [this]() { emit templatesRequested(m_templatesButton); });
     connect(m_backgroundButton, &QToolButton::clicked, this,
             [this]() { emit backgroundRequested(m_backgroundButton); });
     connect(m_galleryButton, &QToolButton::clicked, this,
@@ -158,14 +160,14 @@ void AppTitleBar::retranslateUi() {
     if (m_titleEdit) {
         m_titleEdit->setPlaceholderText(tr("Untitled Tier List"));
     }
-    if (m_newButton) {
-        m_newButton->setToolTip(tr("New"));
-    }
     if (m_openButton) {
         m_openButton->setToolTip(tr("Open"));
     }
     if (m_saveButton) {
         m_saveButton->setToolTip(tr("Save"));
+    }
+    if (m_templatesButton) {
+        m_templatesButton->setToolTip(tr("Templates"));
     }
     if (m_backgroundButton) {
         m_backgroundButton->setToolTip(tr("Background"));

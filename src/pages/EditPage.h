@@ -48,6 +48,7 @@ public slots:
     void importImagesFromDialog();
     void importImages(const QStringList& filePaths);
     void exportProjectFromDialog();
+    void showTemplateMenu(QWidget* anchor = nullptr);
     void configureBackground(QWidget* anchor = nullptr);
     void deleteSelectedImage();
     void previewSelectedImage();
@@ -76,7 +77,14 @@ private:
     void setProject(TierProject project);
     void showError(const QString& title, const Error& error);
     QString chooseSavePath();
+    QString chooseTemplatePath(bool saveDialog);
     QStringList chooseImageImportFiles(QWidget* dialogParent);
+    bool autosaveCurrentProject();
+    QString tempAutosavePath() const;
+    bool saveTemplateFromDialog();
+    bool applyTemplateFromDialog();
+    TierProject templateSnapshot() const;
+    void applyTemplateProject(const TierProject& templateProject);
     void moveImageToRow(const QString& imageId, const QString& rowId, int index);
     void moveRowToIndex(const QString& rowId, int destinationIndex);
     void editImage(const QString& imageId);
