@@ -4,6 +4,7 @@
 #include "window/AppDialog.h"
 
 #include <QPixmap>
+#include <QSizeF>
 
 class QLineEdit;
 
@@ -16,7 +17,8 @@ class ImageEditDialog final : public AppDialog {
     Q_OBJECT
 
 public:
-    ImageEditDialog(const TierImage& image, const QPixmap& pixmap, QWidget* parent = nullptr);
+    ImageEditDialog(const TierImage& image, const QPixmap& pixmap, QWidget* parent = nullptr,
+                    QSizeF aspectRatio = QSizeF(1.0, 1.0));
 
     QString displayName() const;
     QRectF cropRect() const;

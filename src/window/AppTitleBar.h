@@ -29,7 +29,6 @@ public:
     void setDocumentTitle(const QString& title);
     void setTitleEditable(bool editable);
     void setEditorActionsVisible(bool visible);
-    void setSaveActionEnabled(bool enabled);
     void setResetRowsActionEnabled(bool enabled);
     void setTierFocusMode(bool enabled);
     void setLeadingReservedWidth(int width);
@@ -38,9 +37,6 @@ public:
     QRect galleryButtonGlobalRect() const;
 
 signals:
-    void openRequested();
-    void saveRequested();
-    void saveAsRequested();
     void templatesRequested(QWidget* anchor);
     void backgroundRequested(QWidget* anchor);
     void galleryRequested(QWidget* anchor);
@@ -71,8 +67,6 @@ private:
 
     QLineEdit* m_titleEdit{nullptr};
     QHBoxLayout* m_contentLayout{nullptr};
-    QToolButton* m_openButton{nullptr};
-    QToolButton* m_saveButton{nullptr};
     QToolButton* m_templatesButton{nullptr};
     QToolButton* m_backgroundButton{nullptr};
     QToolButton* m_galleryButton{nullptr};

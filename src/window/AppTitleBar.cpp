@@ -91,8 +91,6 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
         QStringLiteral("QLineEdit#ProjectTitleEdit{background:transparent;border:none;"
                        "border-radius:0px;padding:4px "
                        "10px;}"));
-    m_openButton = makeButton(tr("Open"), vkui::VkSymbol::Folder, this);
-    m_saveButton = makeButton(tr("Save"), vkui::VkSymbol::Save, this);
     m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Templates, this);
     m_backgroundButton = makeButton(tr("Background"), vkui::VkSymbol::CanvasBackground, this);
     m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::PhotoLibrary, this);
@@ -110,8 +108,7 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     auto* buttonsLayout = new QHBoxLayout(m_buttonGroup);
     buttonsLayout->setContentsMargins(0, 0, 0, 0);
     buttonsLayout->setSpacing(2);
-    for (QToolButton* button : {m_openButton, m_saveButton, m_templatesButton,
-                                m_backgroundButton, m_galleryButton, m_resetButton,
+    for (QToolButton* button : {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton,
                                 m_focusButton}) {
         button->installEventFilter(this);
         buttonsLayout->addWidget(button);
@@ -124,8 +121,6 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     layout->addStretch(1);
 #endif
 
-    connect(m_openButton, &QToolButton::clicked, this, &AppTitleBar::openRequested);
-    connect(m_saveButton, &QToolButton::clicked, this, &AppTitleBar::saveRequested);
     connect(m_templatesButton, &QToolButton::clicked, this,
             [this]() { emit templatesRequested(m_templatesButton); });
     connect(m_backgroundButton, &QToolButton::clicked, this,
@@ -159,12 +154,6 @@ AppTitleBar::~AppTitleBar() {
 void AppTitleBar::retranslateUi() {
     if (m_titleEdit) {
         m_titleEdit->setPlaceholderText(tr("Untitled Tier List"));
-    }
-    if (m_openButton) {
-        m_openButton->setToolTip(tr("Open"));
-    }
-    if (m_saveButton) {
-        m_saveButton->setToolTip(tr("Save"));
     }
     if (m_templatesButton) {
         m_templatesButton->setToolTip(tr("Templates"));
@@ -203,6 +192,8 @@ void AppTitleBar::setTitleEditable(bool editable) {
     }
     m_titleEdit->setReadOnly(!editable);
     m_titleEdit->setFocusPolicy(editable ? Qt::ClickFocus : Qt::NoFocus);
+    m_titleEdit->setAttribute(Qt::WA_TransparentForMouseEvents, !editable);
+    m_titleEdit->setCursor(editable ? Qt::IBeamCursor : Qt::ArrowCursor);
     if (!editable) {
         m_titleEdit->clearFocus();
         m_titleEdit->deselect();
@@ -218,12 +209,6 @@ void AppTitleBar::setEditorActionsVisible(bool visible) {
     m_editorActionsVisible = visible;
     if (m_buttonGroup) {
         m_buttonGroup->setVisible(visible && !m_tierFocusMode);
-    }
-}
-
-void AppTitleBar::setSaveActionEnabled(bool enabled) {
-    if (m_saveButton) {
-        m_saveButton->setEnabled(enabled);
     }
 }
 

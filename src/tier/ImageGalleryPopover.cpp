@@ -262,8 +262,10 @@ protected:
         const QString imageId = ids.at(index);
         emit m_owner->imageSelected(imageId);
         QMenu menu(this);
-        QAction* editAction = menu.addAction(tr("Edit"));
-        QAction* removeAction = menu.addAction(tr("Remove from Image Gallery"));
+        QAction* editAction = menu.addAction(vkui::icon(vkui::VkSymbol::Edit), tr("Edit"));
+        QAction* removeAction =
+            menu.addAction(vkui::icon(vkui::VkSymbol::Trash, vkui::VkIconRole::Destructive),
+                           tr("Remove from Image Gallery"));
         QPointer<ImageGalleryPopover> guard(m_owner);
         m_owner->setOutsideDismissSuspended(true);
         QAction* chosen = menu.exec(event->globalPos());

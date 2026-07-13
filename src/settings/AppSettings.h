@@ -8,7 +8,6 @@
 namespace tlm {
 
 enum class AppearanceMode { System, Light, Dark };
-enum class ImageImportBehavior { CopyIntoProject, ReferenceOriginal, AskEveryTime };
 enum class BlankAreaAction { None, TierMissionControl, GalleryMissionControl };
 
 /** Persistent application preferences backed by QSettings. */
@@ -24,15 +23,14 @@ public:
     AppearanceMode appearance() const;
     void setAppearance(AppearanceMode mode);
 
-    ImageImportBehavior importBehavior() const;
-    void setImportBehavior(ImageImportBehavior behavior);
-
     bool autosaveEnabled() const;
     void setAutosaveEnabled(bool enabled);
     int autosaveIntervalMinutes() const;
     void setAutosaveIntervalMinutes(int minutes);
     QString defaultProjectDirectory() const;
     void setDefaultProjectDirectory(const QString& path);
+    QString defaultTemplateId() const;
+    void setDefaultTemplateId(const QString& id);
 
     bool autoUpdateEnabled() const;
     void setAutoUpdateEnabled(bool enabled);

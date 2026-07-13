@@ -380,16 +380,6 @@ QWidget* PreferencesPage::createGeneralPage() {
             [this](int index) { m_settings->setAppearance(static_cast<AppearanceMode>(index)); });
     settingsLayout->addWidget(createSettingRow(tr("Appearance"), appearance, page));
 
-    auto* importBehavior = new QComboBox(page);
-    importBehavior->addItems({tr("Copy images into project folder"), tr("Reference original path"),
-                              tr("Ask every time")});
-    importBehavior->setCurrentIndex(enumIndex(m_settings->importBehavior()));
-    connect(importBehavior, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            [this](int index) {
-                m_settings->setImportBehavior(static_cast<ImageImportBehavior>(index));
-            });
-    settingsLayout->addWidget(createSettingRow(tr("Image import behavior"), importBehavior, page));
-
     const auto addBlankAreaActionItems = [](QComboBox* combo) {
         combo->addItem(tr("Open Gallery Overview"),
                        static_cast<int>(BlankAreaAction::GalleryMissionControl));

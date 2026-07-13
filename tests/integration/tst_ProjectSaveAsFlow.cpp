@@ -23,7 +23,7 @@ private slots:
 
         TierProject project = TierProject::createUntitled();
         AssetManager assets;
-        auto imported = assets.importImages(project, {source}, ImageImportBehavior::CopyIntoProject);
+        auto imported = assets.importImages(project, {source});
         QVERIFY(imported);
         QVERIFY(QFileInfo(project.images.first().importedAssetPath).isAbsolute());
 

@@ -83,8 +83,11 @@ private:
     QString chooseSavePath();
     QString chooseTemplatePath(bool saveDialog);
     QStringList chooseImageImportFiles(QWidget* dialogParent);
+    void closeTransientPopovers();
+    bool ensureProjectFile();
+    TierProject createProjectFromDefaultTemplate() const;
+    QString uniqueDefaultProjectPath(QString* projectName = nullptr) const;
     bool autosaveCurrentProject();
-    QString tempAutosavePath() const;
     bool saveTemplateFromDialog();
     bool applyTemplateFromDialog();
     bool saveTemplateToPath(const QString& path);
@@ -98,6 +101,7 @@ private:
     void removeImageFromTierRow(const QString& imageId);
     void removeImageFromGallery(const QString& imageId);
     void editTierRow(const QString& rowId);
+    void clearTierRowImages(const QString& rowId);
     void deleteTierRow(const QString& rowId);
     void insertTierRow(const QString& rowId, bool below);
     bool saveProjectToPath(const QString& filePath);

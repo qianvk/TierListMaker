@@ -1566,6 +1566,8 @@ void TierListView::contextMenuEvent(QContextMenuEvent* event) {
                 const QString rowId = model->rowIdAt(index.row());
                 QMenu menu(this);
                 QAction* editAction = menu.addAction(vkui::icon(vkui::VkSymbol::Edit), tr("Edit"));
+                QAction* clearAction =
+                    menu.addAction(vkui::icon(vkui::VkSymbol::Clear), tr("Clear Images"));
                 QAction* deleteAction = menu.addAction(
                     vkui::icon(vkui::VkSymbol::Trash, vkui::VkIconRole::Destructive), tr("Delete"));
                 menu.addSeparator();
@@ -1576,6 +1578,8 @@ void TierListView::contextMenuEvent(QContextMenuEvent* event) {
                 QAction* chosen = menu.exec(event->globalPos());
                 if (chosen == editAction) {
                     emit rowEditRequested(rowId);
+                } else if (chosen == clearAction) {
+                    emit rowClearRequested(rowId);
                 } else if (chosen == deleteAction) {
                     emit rowDeleteRequested(rowId);
                 } else if (chosen == insertAboveAction) {
@@ -1609,10 +1613,14 @@ void TierListView::contextMenuEvent(QContextMenuEvent* event) {
     emit imageSelected(imageId);
 
     QMenu menu(this);
-    QAction* editAction = menu.addAction(tr("Edit"));
-    QAction* removeAction =
-        menu.addAction(image->assignedTierRowId.has_value() ? tr("Remove from Tier Row")
-                                                            : tr("Remove from Image Gallery"));
+    QAction* editAction = menu.addAction(vkui::icon(vkui::VkSymbol::Edit), tr("Edit"));
+    QAction* removeAction = menu.addAction(
+        vkui::icon(image->assignedTierRowId.has_value() ? vkui::VkSymbol::Remove
+                                                        : vkui::VkSymbol::Trash,
+                   image->assignedTierRowId.has_value() ? vkui::VkIconRole::Primary
+                                                        : vkui::VkIconRole::Destructive),
+        image->assignedTierRowId.has_value() ? tr("Remove from Tier Row")
+                                             : tr("Remove from Image Gallery"));
     QAction* chosen = menu.exec(event->globalPos());
     if (chosen == editAction) {
         Logger::info(QStringLiteral("tier.list.context.edit imageId=%1 mission=%2")

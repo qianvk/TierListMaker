@@ -43,6 +43,7 @@ private:
     QWidget* m_titleBar{nullptr};
     QLabel* m_titleLabel{nullptr};
     QToolButton* m_fallbackCloseButton{nullptr};
+    QWidget* m_nativeButtonArea{nullptr};
     QWidget* m_nativeButtonSpacer{nullptr};
     QWidget* m_content{nullptr};
     QVBoxLayout* m_contentLayout{nullptr};

@@ -31,28 +31,6 @@ AppearanceMode appearanceFromString(const QString& value) {
     return AppearanceMode::System;
 }
 
-QString importToString(ImageImportBehavior behavior) {
-    switch (behavior) {
-    case ImageImportBehavior::ReferenceOriginal:
-        return QStringLiteral("reference");
-    case ImageImportBehavior::AskEveryTime:
-        return QStringLiteral("ask");
-    case ImageImportBehavior::CopyIntoProject:
-    default:
-        return QStringLiteral("copy");
-    }
-}
-
-ImageImportBehavior importFromString(const QString& value) {
-    if (value == QStringLiteral("reference")) {
-        return ImageImportBehavior::ReferenceOriginal;
-    }
-    if (value == QStringLiteral("ask")) {
-        return ImageImportBehavior::AskEveryTime;
-    }
-    return ImageImportBehavior::CopyIntoProject;
-}
-
 QString blankAreaActionToString(BlankAreaAction action) {
     switch (action) {
     case BlankAreaAction::TierMissionControl:
@@ -117,16 +95,6 @@ void AppSettings::setAppearance(AppearanceMode mode) {
     emit changed();
 }
 
-ImageImportBehavior AppSettings::importBehavior() const {
-    return importFromString(
-        m_settings.value(settings_keys::importBehavior.toString(), QStringLiteral("copy")).toString());
-}
-
-void AppSettings::setImportBehavior(ImageImportBehavior behavior) {
-    m_settings.setValue(settings_keys::importBehavior.toString(), importToString(behavior));
-    emit changed();
-}
-
 bool AppSettings::autosaveEnabled() const {
     return m_settings.value(settings_keys::autosaveEnabled.toString(), true).toBool();
 }
@@ -160,6 +128,23 @@ void AppSettings::setDefaultProjectDirectory(const QString& path) {
         return;
     }
     m_settings.setValue(settings_keys::defaultProjectDirectory.toString(), clean);
+    emit changed();
+}
+
+QString AppSettings::defaultTemplateId() const {
+    return m_settings.value(settings_keys::defaultTemplate.toString()).toString();
+}
+
+void AppSettings::setDefaultTemplateId(const QString& id) {
+    const QString clean = id.trimmed();
+    if (defaultTemplateId() == clean) {
+        return;
+    }
+    if (clean.isEmpty()) {
+        m_settings.remove(settings_keys::defaultTemplate.toString());
+    } else {
+        m_settings.setValue(settings_keys::defaultTemplate.toString(), clean);
+    }
     emit changed();
 }
 

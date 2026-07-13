@@ -41,9 +41,9 @@
 namespace tlm {
 
 namespace {
-constexpr int kSidebarInitialWidth = 240;
-constexpr int kSidebarMinimumExpandedWidth = 188;
-constexpr int kSidebarMaximumWidth = 420;
+constexpr int kSidebarInitialWidth = 236;
+constexpr int kSidebarMinimumExpandedWidth = 208;
+constexpr int kSidebarMaximumWidth = 360;
 constexpr int kSplitterHandleWidth = 0;
 constexpr int kTitleBarHeight = 54;
 constexpr int kSidebarToggleInset = 14;
@@ -302,9 +302,6 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             m_titleBar->setDocumentTitle(title);
         }
     });
-    connect(m_titleBar, &AppTitleBar::openRequested, m_editPage, &EditPage::openProjectFromDialog);
-    connect(m_titleBar, &AppTitleBar::saveRequested, m_editPage, &EditPage::saveProject);
-    connect(m_titleBar, &AppTitleBar::saveAsRequested, m_editPage, &EditPage::saveProjectAs);
     connect(m_titleBar, &AppTitleBar::templatesRequested, m_editPage,
             &EditPage::showTemplateMenu);
     connect(m_titleBar, &AppTitleBar::backgroundRequested, m_editPage,
@@ -319,10 +316,8 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             m_editPage->toggleGalleryMissionControlMode(m_titleBar->galleryButtonGlobalRect());
         }
     });
-    connect(m_editPage, &EditPage::dirtyChanged, m_titleBar, &AppTitleBar::setSaveActionEnabled);
     connect(m_editPage, &EditPage::resetRowsAvailableChanged, m_titleBar,
             &AppTitleBar::setResetRowsActionEnabled);
-    m_titleBar->setSaveActionEnabled(m_editPage->isDirty());
     m_titleBar->setResetRowsActionEnabled(false);
     connect(languageManager, &LanguageManager::languageChanged, m_sidebarModel,
             &SidebarModel::retranslate);
@@ -417,7 +412,7 @@ QFrame* RootWidget::createContent(ProjectRepository* repository,
     m_pages->setContentsMargins(0, 0, 0, 0);
     m_editPage =
         new EditPage(repository, recentProjects, assetManager, thumbnailCache, settings, content);
-    m_projectsPage = new ProjectsPage(repository, recentProjects, content);
+    m_projectsPage = new ProjectsPage(repository, recentProjects, settings, content);
     m_pages->addWidget(m_editPage);
     m_pages->addWidget(m_projectsPage);
     contentLayout->addWidget(m_pages, 1);
@@ -476,7 +471,7 @@ void RootWidget::setSidebarWidth(int width) {
     m_sidebarShell->show();
     m_sidebar->show();
     m_currentSidebarWidth = sidebarWidth;
-    m_sidebarShell->setMaximumWidth(sidebarWidth == 0 ? 0 : QWIDGETSIZE_MAX);
+    m_sidebarShell->setMaximumWidth(sidebarWidth == 0 ? 0 : kSidebarMaximumWidth);
     m_splitter->setSizes({sidebarWidth, std::max(1, totalWidth - sidebarWidth)});
 
     syncSidebarPresentation(sidebarWidth);
@@ -748,14 +743,13 @@ void RootWidget::setupShortcuts() {
         connect(shortcut, SIGNAL(activated()), receiver, slot);
     };
     addShortcut(QKeySequence::New, m_editPage, SLOT(newProject()));
-    addShortcut(QKeySequence::Open, m_editPage, SLOT(openProjectFromDialog()));
+    addShortcut(QKeySequence::Open, m_projectsPage, SLOT(openProjectFromDialog()));
     auto* saveShortcut = new QShortcut(QKeySequence::Save, this);
     connect(saveShortcut, &QShortcut::activated, this, [this]() {
-        if (m_editPage && m_editPage->isDirty()) {
+        if (m_editPage) {
             m_editPage->saveProject();
         }
     });
-    addShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_S), m_editPage, SLOT(saveProjectAs()));
     auto* missionShortcut =
         new QShortcut(QKeySequence(QKeyCombination(physicalControlModifier(), Qt::Key_I)), this);
     connect(missionShortcut, &QShortcut::activated, m_editPage,

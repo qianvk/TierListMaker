@@ -16,21 +16,35 @@
 namespace tlm {
 
 namespace {
-QRectF defaultCropRect(const QSize& size) {
+QSizeF normalizedAspectRatio(QSizeF ratio) {
+    if (ratio.width() <= 0.0 || ratio.height() <= 0.0) {
+        return QSizeF(1.0, 1.0);
+    }
+    return ratio;
+}
+
+qreal aspectValue(QSizeF ratio) {
+    ratio = normalizedAspectRatio(ratio);
+    return ratio.width() / ratio.height();
+}
+
+QRectF defaultCropRect(const QSize& size, QSizeF aspectRatio) {
     if (!size.isValid()) {
         return QRectF(0.0, 0.0, 1.0, 1.0);
     }
-    if (size.width() > size.height()) {
-        const qreal side = static_cast<qreal>(size.height()) / size.width();
-        return QRectF((1.0 - side) / 2.0, 0.0, side, 1.0);
+    const qreal targetRatio = aspectValue(aspectRatio);
+    const qreal sourceRatio = static_cast<qreal>(size.width()) / qMax(1, size.height());
+    if (sourceRatio > targetRatio) {
+        const qreal width = static_cast<qreal>(size.height()) * targetRatio / size.width();
+        return QRectF((1.0 - width) / 2.0, 0.0, width, 1.0);
     }
-    const qreal side = static_cast<qreal>(size.width()) / size.height();
-    return QRectF(0.0, (1.0 - side) / 2.0, 1.0, side);
+    const qreal height = static_cast<qreal>(size.width()) / targetRatio / size.height();
+    return QRectF(0.0, (1.0 - height) / 2.0, 1.0, height);
 }
 
-QRectF normalizedCrop(QRectF rect, const QSize& sourceSize) {
+QRectF normalizedCrop(QRectF rect, const QSize& sourceSize, QSizeF aspectRatio) {
     if (!rect.isValid() || rect.width() <= 0.001 || rect.height() <= 0.001) {
-        return defaultCropRect(sourceSize);
+        return defaultCropRect(sourceSize, aspectRatio);
     }
     if (!sourceSize.isValid()) {
         rect = rect.intersected(QRectF(0.0, 0.0, 1.0, 1.0));
@@ -40,12 +54,32 @@ QRectF normalizedCrop(QRectF rect, const QSize& sourceSize) {
     const qreal sourceW = qMax<qreal>(1.0, sourceSize.width());
     const qreal sourceH = qMax<qreal>(1.0, sourceSize.height());
     const QPointF center = rect.center();
-    const qreal requestedPixelSide = qMin(rect.width() * sourceW, rect.height() * sourceH);
-    const qreal maxPixelSide = qMin(sourceW, sourceH);
-    const qreal pixelSide = qBound<qreal>(maxPixelSide * 0.08, requestedPixelSide, maxPixelSide);
-    rect =
-        QRectF(center.x() - (pixelSide / sourceW) / 2.0, center.y() - (pixelSide / sourceH) / 2.0,
-               pixelSide / sourceW, pixelSide / sourceH);
+    const qreal targetRatio = aspectValue(aspectRatio);
+    qreal pixelWidth = rect.width() * sourceW;
+    qreal pixelHeight = rect.height() * sourceH;
+    if (pixelWidth / qMax<qreal>(1.0, pixelHeight) > targetRatio) {
+        pixelWidth = pixelHeight * targetRatio;
+    } else {
+        pixelHeight = pixelWidth / targetRatio;
+    }
+
+    qreal maxWidth = sourceW;
+    qreal maxHeight = sourceH;
+    if (maxWidth / maxHeight > targetRatio) {
+        maxWidth = maxHeight * targetRatio;
+    } else {
+        maxHeight = maxWidth / targetRatio;
+    }
+    pixelWidth = qBound<qreal>(maxWidth * 0.08, pixelWidth, maxWidth);
+    pixelHeight = pixelWidth / targetRatio;
+    if (pixelHeight > maxHeight) {
+        pixelHeight = maxHeight;
+        pixelWidth = pixelHeight * targetRatio;
+    }
+
+    rect = QRectF(center.x() - (pixelWidth / sourceW) / 2.0,
+                  center.y() - (pixelHeight / sourceH) / 2.0,
+                  pixelWidth / sourceW, pixelHeight / sourceH);
     rect.moveLeft(qBound<qreal>(0.0, rect.left(), 1.0 - rect.width()));
     rect.moveTop(qBound<qreal>(0.0, rect.top(), 1.0 - rect.height()));
     return rect;
@@ -54,8 +88,10 @@ QRectF normalizedCrop(QRectF rect, const QSize& sourceSize) {
 
 class CropEditorWidget final : public QWidget {
 public:
-    CropEditorWidget(const QPixmap& pixmap, QRectF cropRect, QWidget* parent = nullptr)
-        : QWidget(parent), m_pixmap(pixmap), m_cropRect(normalizedCrop(cropRect, pixmap.size())) {
+    CropEditorWidget(const QPixmap& pixmap, QRectF cropRect, QSizeF aspectRatio,
+                     QWidget* parent = nullptr)
+        : QWidget(parent), m_pixmap(pixmap), m_aspectRatio(normalizedAspectRatio(aspectRatio)),
+          m_cropRect(normalizedCrop(cropRect, pixmap.size(), m_aspectRatio)) {
         setMinimumSize(360, 360);
         setMouseTracking(true);
         setFocusPolicy(Qt::StrongFocus);
@@ -63,7 +99,7 @@ public:
     }
 
     QRectF cropRect() const {
-        return normalizedCrop(m_cropRect, m_pixmap.size());
+        return normalizedCrop(m_cropRect, m_pixmap.size(), m_aspectRatio);
     }
 
 protected:
@@ -133,7 +169,7 @@ protected:
         // cursor.
         next.translate(-delta.x() * m_dragStartCrop.width() / frame.width(),
                        -delta.y() * m_dragStartCrop.height() / frame.height());
-        m_cropRect = normalizedCrop(next, m_pixmap.size());
+        m_cropRect = normalizedCrop(next, m_pixmap.size(), m_aspectRatio);
         update();
         event->accept();
     }
@@ -155,38 +191,55 @@ protected:
         }
         const qreal factor = std::pow(0.88, steps);
         const QPointF center = m_cropRect.center();
-        qreal side = qBound<qreal>(0.08, m_cropRect.width() * factor, 1.0);
-        QRectF next(center.x() - side / 2.0, center.y() - side / 2.0, side, side);
-        m_cropRect = normalizedCrop(next, m_pixmap.size());
+        const qreal sourceW = qMax<qreal>(1.0, m_pixmap.width());
+        const qreal sourceH = qMax<qreal>(1.0, m_pixmap.height());
+        const qreal targetRatio = aspectValue(m_aspectRatio);
+        const qreal pixelWidth = m_cropRect.width() * sourceW * factor;
+        const qreal pixelHeight = pixelWidth / targetRatio;
+        QRectF next(center.x() - (pixelWidth / sourceW) / 2.0,
+                    center.y() - (pixelHeight / sourceH) / 2.0,
+                    pixelWidth / sourceW, pixelHeight / sourceH);
+        m_cropRect = normalizedCrop(next, m_pixmap.size(), m_aspectRatio);
         update();
         event->accept();
     }
 
 private:
     QRectF cropFrame() const {
-        const int side = qMax(1, qMin(width(), height()) - 34);
-        return QRectF((width() - side) / 2.0, (height() - side) / 2.0, side, side);
+        const qreal targetRatio = aspectValue(m_aspectRatio);
+        QSizeF frameSize(qMax(1, width() - 34), qMax(1, height() - 34));
+        if (frameSize.width() / frameSize.height() > targetRatio) {
+            frameSize.setWidth(frameSize.height() * targetRatio);
+        } else {
+            frameSize.setHeight(frameSize.width() / targetRatio);
+        }
+        return QRectF((width() - frameSize.width()) / 2.0,
+                      (height() - frameSize.height()) / 2.0,
+                      frameSize.width(), frameSize.height());
     }
 
     QRectF sourceRect() const {
         if (m_pixmap.isNull()) {
             return {};
         }
-        const QRectF crop = normalizedCrop(m_cropRect, m_pixmap.size());
+        const QRectF crop = normalizedCrop(m_cropRect, m_pixmap.size(), m_aspectRatio);
         return QRectF(crop.x() * m_pixmap.width(), crop.y() * m_pixmap.height(),
                       crop.width() * m_pixmap.width(), crop.height() * m_pixmap.height());
     }
 
     QPixmap m_pixmap;
+    QSizeF m_aspectRatio;
     QRectF m_cropRect;
     QPoint m_dragStart;
     QRectF m_dragStartCrop;
 };
 
-ImageEditDialog::ImageEditDialog(const TierImage& image, const QPixmap& pixmap, QWidget* parent)
+ImageEditDialog::ImageEditDialog(const TierImage& image, const QPixmap& pixmap, QWidget* parent,
+                                 QSizeF aspectRatio)
     : AppDialog(QObject::tr("Edit Image"), parent), m_nameEdit(new QLineEdit(this)),
       m_cropEditor(new CropEditorWidget(
-          pixmap, image.hasCropRect() ? image.cropRect : defaultCropRect(pixmap.size()), this)) {
+          pixmap, image.hasCropRect() ? image.cropRect : defaultCropRect(pixmap.size(), aspectRatio),
+          aspectRatio, this)) {
     setWindowTitle(tr("Edit Image"));
     setMinimumWidth(440);
     setObjectName(QStringLiteral("ImageEditDialog"));

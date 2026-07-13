@@ -1,9 +1,13 @@
 #include "pages/ProjectsPage.h"
 
 #include "logging/Logger.h"
+#include "pages/ProjectLocationDialog.h"
 #include "persistence/ProjectRepository.h"
 #include "platform/Platform.h"
+#include "settings/AppSettings.h"
 #include "theme/Theme.h"
+#include "tier/ImageEditDialog.h"
+#include "tier/TierImage.h"
 
 #include <QAbstractListModel>
 #include <QAction>
@@ -15,19 +19,22 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QHBoxLayout>
+#include <QImage>
 #include <QInputDialog>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QLineEdit>
 #include <QListView>
+#include <QMenu>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
-#include <QPushButton>
 #include <QSignalBlocker>
+#include <QStandardPaths>
 #include <QStyledItemDelegate>
 #include <QVBoxLayout>
+#include <QUuid>
 
 #include <algorithm>
 
@@ -89,6 +96,79 @@ QString storedPathForProject(const QString& projectPath, const QString& imagePat
         return QDir(projectDir).relativeFilePath(imageInfo.absoluteFilePath());
     }
     return imageInfo.absoluteFilePath();
+}
+
+QString fallbackProjectDirectory() {
+    QString path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
+    if (path.isEmpty()) {
+        path = QDir::homePath();
+    }
+    return QDir::cleanPath(path);
+}
+
+QString projectParentDirectoryForPath(const QString& projectPath) {
+    const QFileInfo projectFile(projectPath);
+    const QFileInfo projectFolder(projectFile.absolutePath());
+    return projectFolder.fileName().compare(projectFile.completeBaseName(),
+                                            Qt::CaseInsensitive) == 0
+               ? projectFolder.absolutePath()
+               : projectFile.absolutePath();
+}
+
+QString standardProjectFolderForPath(const QString& projectPath) {
+    const QFileInfo projectFile(projectPath);
+    const QFileInfo folder(projectFile.absolutePath());
+    if (folder.fileName().compare(projectFile.completeBaseName(), Qt::CaseInsensitive) == 0 &&
+        QFileInfo(QDir(folder.absoluteFilePath()).filePath(projectFile.fileName())).exists()) {
+        return folder.absoluteFilePath();
+    }
+    return {};
+}
+
+bool copyDirectoryRecursively(const QString& sourcePath, const QString& destinationPath) {
+    QDir source(sourcePath);
+    if (!source.exists()) {
+        return true;
+    }
+    if (!QDir().mkpath(destinationPath)) {
+        return false;
+    }
+    const QFileInfoList entries =
+        source.entryInfoList(QDir::NoDotAndDotDot | QDir::Files | QDir::Dirs);
+    for (const QFileInfo& entry : entries) {
+        const QString destination = QDir(destinationPath).filePath(entry.fileName());
+        if (entry.isDir()) {
+            if (!copyDirectoryRecursively(entry.absoluteFilePath(), destination)) {
+                return false;
+            }
+        } else if (QFile::exists(destination) && !QFile::remove(destination)) {
+            return false;
+        } else if (!QFile::copy(entry.absoluteFilePath(), destination)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool deleteProjectFromDisk(const QString& projectPath) {
+    const QString standardFolder = standardProjectFolderForPath(projectPath);
+    if (!standardFolder.isEmpty()) {
+        const QFileInfo folder(standardFolder);
+        const QString absoluteFolder = folder.absoluteFilePath();
+        if (absoluteFolder == QDir::rootPath() || absoluteFolder == QDir::homePath()) {
+            return false;
+        }
+        return QDir(absoluteFolder).removeRecursively();
+    }
+    return QFile::remove(projectPath);
+}
+
+QRect cropSourceRect(const QRectF& normalized, const QSize& sourceSize) {
+    const QRectF sourceRect(normalized.x() * sourceSize.width(),
+                            normalized.y() * sourceSize.height(),
+                            normalized.width() * sourceSize.width(),
+                            normalized.height() * sourceSize.height());
+    return sourceRect.toAlignedRect().intersected(QRect(QPoint(0, 0), sourceSize));
 }
 } // namespace
 
@@ -162,8 +242,8 @@ private:
         beginResetModel();
         m_entries.clear();
         for (const RecentProjectEntry& entry : m_all) {
-            const QString haystack = entry.name + QStringLiteral("\n") + entry.filePath;
-            if (m_filter.trimmed().isEmpty() || haystack.contains(m_filter, Qt::CaseInsensitive)) {
+            const QString term = m_filter.trimmed();
+            if (term.isEmpty() || entry.name.contains(term, Qt::CaseInsensitive)) {
                 m_entries.append(entry);
             }
         }
@@ -291,8 +371,9 @@ public:
 };
 
 ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* recentProjects,
-                           QWidget* parent)
-    : QWidget(parent), m_repository(repository), m_recentProjects(recentProjects) {
+                           AppSettings* settings, QWidget* parent)
+    : QWidget(parent), m_repository(repository), m_recentProjects(recentProjects),
+      m_settings(settings) {
     auto* root = new QVBoxLayout(this);
     root->setContentsMargins(22, 18, 22, 18);
     root->setSpacing(12);
@@ -319,25 +400,9 @@ ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* r
     m_view->setFrameShape(QFrame::NoFrame);
     m_view->setSelectionMode(QAbstractItemView::SingleSelection);
     m_view->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    m_view->setContextMenuPolicy(Qt::CustomContextMenu);
     m_view->setStyleSheet(QStringLiteral("QListView{background:transparent;outline:0;}"));
     root->addWidget(m_view, 1);
-
-    auto* actions = new QHBoxLayout;
-    m_openButton = new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Open"), this);
-    m_renameButton = new QPushButton(vkui::icon(vkui::VkSymbol::Rename), tr("Rename"), this);
-    m_coverButton = new QPushButton(vkui::icon(vkui::VkSymbol::Image), tr("Choose Cover"), this);
-    m_revealButton = new QPushButton(vkui::icon(vkui::VkSymbol::Reveal), tr("Reveal"), this);
-    m_duplicateButton =
-        new QPushButton(vkui::icon(vkui::VkSymbol::Duplicate), tr("Duplicate"), this);
-    m_removeButton = new QPushButton(vkui::icon(vkui::VkSymbol::Remove), tr("Remove"), this);
-    m_deleteFileButton = new QPushButton(
-        vkui::icon(vkui::VkSymbol::Trash, vkui::VkIconRole::Destructive), tr("Delete File"), this);
-    for (auto* button : {m_openButton, m_renameButton, m_coverButton, m_revealButton,
-                         m_duplicateButton, m_removeButton, m_deleteFileButton}) {
-        actions->addWidget(button);
-    }
-    actions->addStretch();
-    root->addLayout(actions);
 
     connect(m_recentProjects, &RecentProjectsStore::changed, this, &ProjectsPage::refresh);
     connect(m_search, &QLineEdit::textChanged, m_model, &RecentProjectsModel::setFilter);
@@ -350,60 +415,8 @@ ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* r
             emit openProjectRequested(entry.filePath);
         }
     });
-    connect(m_openButton, &QPushButton::clicked, this, [this]() {
-        const QString path = selectedPath();
-        if (!path.isEmpty() && QFileInfo::exists(path)) {
-            emit openProjectRequested(path);
-        }
-    });
-    connect(m_renameButton, &QPushButton::clicked, this, [this]() {
-        const QString path = selectedPath();
-        if (path.isEmpty()) {
-            return;
-        }
-        const QString name =
-            QInputDialog::getText(this, tr("Rename Recent Project"), tr("Display name:"));
-        if (!name.trimmed().isEmpty()) {
-            m_recentProjects->renameDisplayName(path, name.trimmed());
-        }
-    });
-    connect(m_coverButton, &QPushButton::clicked, this,
-            &ProjectsPage::chooseCoverForSelectedProject);
-    connect(m_revealButton, &QPushButton::clicked, this,
-            [this]() { platform::revealInFileManager(selectedPath()); });
-    connect(m_removeButton, &QPushButton::clicked, this, [this]() {
-        const QString path = selectedPath();
-        if (!path.isEmpty()) {
-            m_recentProjects->remove(path);
-        }
-    });
-    connect(m_duplicateButton, &QPushButton::clicked, this, [this]() {
-        const QString path = selectedPath();
-        if (path.isEmpty() || !QFileInfo::exists(path)) {
-            return;
-        }
-        const QFileInfo info(path);
-        const QString destination = QFileDialog::getSaveFileName(
-            this, tr("Duplicate Project"),
-            info.dir().filePath(info.completeBaseName() + QStringLiteral(" Copy.tlmproject")),
-            tr("TierListMaker Projects (*.tlmproject)"));
-        if (!destination.isEmpty() && QFile::copy(path, destination)) {
-            emit openProjectRequested(destination);
-        }
-    });
-    connect(m_deleteFileButton, &QPushButton::clicked, this, [this]() {
-        const QString path = selectedPath();
-        if (path.isEmpty()) {
-            return;
-        }
-        if (QMessageBox::warning(this, tr("Delete Project File"),
-                                 tr("Delete this project file from disk? This cannot be undone."),
-                                 QMessageBox::Yes | QMessageBox::Cancel,
-                                 QMessageBox::Cancel) == QMessageBox::Yes) {
-            QFile::remove(path);
-            m_recentProjects->remove(path);
-        }
-    });
+    connect(m_view, &QListView::customContextMenuRequested, this,
+            &ProjectsPage::showProjectContextMenu);
 
     refresh();
 }
@@ -417,6 +430,17 @@ void ProjectsPage::focusSearch() {
     m_search->selectAll();
 }
 
+void ProjectsPage::openProjectFromDialog() {
+    const QString directory =
+        m_settings ? m_settings->defaultProjectDirectory() : fallbackProjectDirectory();
+    const QString path =
+        QFileDialog::getOpenFileName(this, tr("Open Project"), directory,
+                                     tr("TierListMaker Projects (*.tlmproject)"));
+    if (!path.isEmpty()) {
+        emit openProjectRequested(path);
+    }
+}
+
 void ProjectsPage::retranslateUi() {
     if (m_search) {
         m_search->setPlaceholderText(tr("Search"));
@@ -428,27 +452,6 @@ void ProjectsPage::retranslateUi() {
         m_sort->addItems({tr("Last Edited"), tr("Name"), tr("Created"), tr("Path")});
         m_sort->setCurrentIndex(qBound(0, current, m_sort->count() - 1));
     }
-    if (m_openButton) {
-        m_openButton->setText(tr("Open"));
-    }
-    if (m_renameButton) {
-        m_renameButton->setText(tr("Rename"));
-    }
-    if (m_coverButton) {
-        m_coverButton->setText(tr("Choose Cover"));
-    }
-    if (m_revealButton) {
-        m_revealButton->setText(tr("Reveal"));
-    }
-    if (m_duplicateButton) {
-        m_duplicateButton->setText(tr("Duplicate"));
-    }
-    if (m_removeButton) {
-        m_removeButton->setText(tr("Remove"));
-    }
-    if (m_deleteFileButton) {
-        m_deleteFileButton->setText(tr("Delete File"));
-    }
     if (m_view && m_view->viewport()) {
         m_view->viewport()->update();
     }
@@ -456,6 +459,97 @@ void ProjectsPage::retranslateUi() {
 
 QString ProjectsPage::selectedPath() const {
     return m_view->currentIndex().data(FilePathRole).toString();
+}
+
+RecentProjectEntry ProjectsPage::selectedEntry() const {
+    return m_model ? m_model->entryAt(m_view->currentIndex()) : RecentProjectEntry{};
+}
+
+void ProjectsPage::showProjectContextMenu(const QPoint& point) {
+    const QModelIndex index = m_view->indexAt(point);
+    if (!index.isValid()) {
+        QMenu emptyMenu(this);
+        QAction* openProjectAction =
+            emptyMenu.addAction(vkui::icon(vkui::VkSymbol::Folder), tr("Open Project..."));
+        if (emptyMenu.exec(m_view->viewport()->mapToGlobal(point)) == openProjectAction) {
+            openProjectFromDialog();
+        }
+        return;
+    }
+    m_view->setCurrentIndex(index);
+    const RecentProjectEntry entry = selectedEntry();
+    const bool exists = QFileInfo::exists(entry.filePath);
+
+    QMenu menu(this);
+    QAction* openAction = menu.addAction(vkui::icon(vkui::VkSymbol::Folder), tr("Open"));
+    QAction* saveAsAction = menu.addAction(vkui::icon(vkui::VkSymbol::Save),
+                                           tr("Save As Project..."));
+    QAction* renameAction = menu.addAction(vkui::icon(vkui::VkSymbol::Rename), tr("Rename"));
+    QAction* coverAction = menu.addAction(vkui::icon(vkui::VkSymbol::Image), tr("Choose Cover"));
+    QAction* revealAction = menu.addAction(vkui::icon(vkui::VkSymbol::Reveal), tr("Reveal"));
+    menu.addSeparator();
+    QAction* deleteAction =
+        menu.addAction(vkui::icon(vkui::VkSymbol::Trash, vkui::VkIconRole::Destructive),
+                       tr("Delete Project"));
+
+    for (QAction* action : {openAction, saveAsAction, renameAction, coverAction, revealAction,
+                            deleteAction}) {
+        action->setEnabled(exists);
+    }
+
+    QAction* chosen = menu.exec(m_view->viewport()->mapToGlobal(point));
+    if (chosen == openAction) {
+        openSelectedProject();
+    } else if (chosen == saveAsAction) {
+        saveSelectedProjectAs();
+    } else if (chosen == renameAction) {
+        renameSelectedProject();
+    } else if (chosen == coverAction) {
+        chooseCoverForSelectedProject();
+    } else if (chosen == revealAction) {
+        revealSelectedProject();
+    } else if (chosen == deleteAction) {
+        deleteSelectedProject();
+    }
+}
+
+void ProjectsPage::openSelectedProject() {
+    const QString path = selectedPath();
+    if (!path.isEmpty() && QFileInfo::exists(path)) {
+        emit openProjectRequested(path);
+    }
+}
+
+void ProjectsPage::renameSelectedProject() {
+    const QString path = selectedPath();
+    if (path.isEmpty() || !QFileInfo::exists(path) || !m_repository) {
+        return;
+    }
+
+    auto projectResult = m_repository->openProject(path);
+    if (!projectResult) {
+        QMessageBox::warning(this, tr("Rename Project"), projectResult.error().message);
+        return;
+    }
+
+    TierProject project = projectResult.takeValue();
+    bool accepted = false;
+    const QString name =
+        QInputDialog::getText(this, tr("Rename Project"), tr("Project name:"), QLineEdit::Normal,
+                              project.name, &accepted)
+            .trimmed();
+    if (!accepted || name.isEmpty() || name == project.name) {
+        return;
+    }
+
+    project.name = name;
+    project.touch();
+    auto result = m_repository->saveProject(project, path);
+    if (!result) {
+        QMessageBox::warning(this, tr("Rename Project"), result.error().message);
+        return;
+    }
+    m_recentProjects->addOrUpdate(project);
 }
 
 void ProjectsPage::chooseCoverForSelectedProject() {
@@ -483,7 +577,46 @@ void ProjectsPage::chooseCoverForSelectedProject() {
     }
 
     TierProject project = projectResult.takeValue();
-    project.thumbnailPath = storedPathForProject(projectPath, imagePath);
+    QImage image(imagePath);
+    if (image.isNull()) {
+        QMessageBox::warning(this, tr("Cover Image"), tr("Could not read the selected image."));
+        return;
+    }
+
+    TierImage coverImage;
+    const QFileInfo imageInfo(imagePath);
+    coverImage.sourcePath = imageInfo.absoluteFilePath();
+    coverImage.originalFileName = imageInfo.fileName();
+    coverImage.displayName = imageInfo.completeBaseName();
+    coverImage.width = image.width();
+    coverImage.height = image.height();
+
+    QPixmap pixmap = QPixmap::fromImage(image);
+    ImageEditDialog dialog(coverImage, pixmap, this, QSizeF(74.0, 54.0));
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const QString assetDirectory = QDir(QFileInfo(projectPath).absolutePath()).filePath(
+        QStringLiteral("assets"));
+    if (!QDir().mkpath(assetDirectory)) {
+        QMessageBox::warning(this, tr("Cover Image"),
+                             tr("Could not create the project assets folder."));
+        return;
+    }
+
+    const QRect sourceRect = cropSourceRect(dialog.cropRect(), image.size());
+    const QImage cropped = image.copy(sourceRect.isValid() ? sourceRect : image.rect());
+    const QString coverPath =
+        QDir(assetDirectory)
+            .filePath(QStringLiteral("cover-%1.png").arg(QUuid::createUuid().toString(
+                QUuid::WithoutBraces)));
+    if (!cropped.save(coverPath, "PNG")) {
+        QMessageBox::warning(this, tr("Cover Image"), tr("Could not save the cover image."));
+        return;
+    }
+
+    project.thumbnailPath = storedPathForProject(projectPath, coverPath);
     project.updatedAt = QDateTime::currentDateTimeUtc();
     project.dirty = true;
     auto saveResult = m_repository->saveProject(project, projectPath);
@@ -500,6 +633,114 @@ void ProjectsPage::chooseCoverForSelectedProject() {
     m_recentProjects->addOrUpdate(project);
     Logger::info(QStringLiteral("projects.cover.choose project=\"%1\" image=\"%2\"")
                      .arg(projectPath, project.thumbnailPath));
+}
+
+void ProjectsPage::revealSelectedProject() {
+    const QString path = selectedPath();
+    if (!path.isEmpty()) {
+        platform::revealInFileManager(path);
+    }
+}
+
+void ProjectsPage::saveSelectedProjectAs() {
+    const QString sourcePath = selectedPath();
+    if (sourcePath.isEmpty() || !QFileInfo::exists(sourcePath) || !m_repository) {
+        return;
+    }
+
+    auto projectResult = m_repository->openProject(sourcePath);
+    if (!projectResult) {
+        QMessageBox::warning(this, tr("Save As Project"), projectResult.error().message);
+        return;
+    }
+    TierProject project = projectResult.takeValue();
+
+    const QString defaultDirectory =
+        m_settings ? m_settings->defaultProjectDirectory() : fallbackProjectDirectory();
+    ProjectLocationDialog dialog(project.name, projectParentDirectoryForPath(sourcePath),
+                                 defaultDirectory, this);
+    if (dialog.exec() != QDialog::Accepted) {
+        return;
+    }
+
+    const QString targetPath = QFileInfo(dialog.projectFilePath()).absoluteFilePath();
+    const QString sourceAbsolute = QFileInfo(sourcePath).absoluteFilePath();
+    if (targetPath == sourceAbsolute) {
+        return;
+    }
+    if (QFileInfo::exists(targetPath)) {
+        QMessageBox::warning(this, tr("Save As Project"),
+                             tr("A project with this name already exists."));
+        return;
+    }
+    const QString sourceRoot = standardProjectFolderForPath(sourcePath);
+    if (!sourceRoot.isEmpty() &&
+        QDir::cleanPath(targetPath).startsWith(QDir::cleanPath(sourceRoot) + QLatin1Char('/'),
+                                               Qt::CaseInsensitive)) {
+        QMessageBox::warning(this, tr("Save As Project"),
+                             tr("Choose a location outside the current project folder."));
+        return;
+    }
+
+    const QString targetDir = QFileInfo(targetPath).absolutePath();
+    if (!QDir().mkpath(targetDir)) {
+        QMessageBox::warning(this, tr("Save As Project"),
+                             tr("Could not create the project folder."));
+        return;
+    }
+
+    const QString sourceAssets =
+        QDir(QFileInfo(sourcePath).absolutePath()).filePath(QStringLiteral("assets"));
+    const QString targetAssets = QDir(targetDir).filePath(QStringLiteral("assets"));
+    if (!copyDirectoryRecursively(sourceAssets, targetAssets)) {
+        QMessageBox::warning(this, tr("Save As Project"),
+                             tr("Could not copy the project assets."));
+        return;
+    }
+
+    project.name = dialog.projectName();
+    project.filePath = targetPath;
+    project.touch();
+    auto saveResult = m_repository->saveProject(project, targetPath);
+    if (!saveResult) {
+        QMessageBox::warning(this, tr("Save As Project"), saveResult.error().message);
+        return;
+    }
+
+    if (!deleteProjectFromDisk(sourcePath)) {
+        QMessageBox::warning(this, tr("Save As Project"),
+                             tr("The project was saved, but the old project could not be removed."));
+    }
+    m_recentProjects->remove(sourcePath);
+    m_recentProjects->addOrUpdate(project);
+    if (m_settings && dialog.shouldUseAsDefaultDirectory()) {
+        m_settings->setDefaultProjectDirectory(dialog.parentDirectory());
+    }
+    Logger::info(QStringLiteral("projects.save_as.move source=\"%1\" target=\"%2\"")
+                     .arg(sourceAbsolute, targetPath));
+}
+
+void ProjectsPage::deleteSelectedProject() {
+    const RecentProjectEntry entry = selectedEntry();
+    if (entry.filePath.isEmpty() || !QFileInfo::exists(entry.filePath)) {
+        return;
+    }
+
+    const int choice = QMessageBox::warning(
+        this, tr("Delete Project"),
+        tr("Delete \"%1\" and its project files? This cannot be undone.").arg(entry.name),
+        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+    if (choice != QMessageBox::Yes) {
+        return;
+    }
+
+    if (!deleteProjectFromDisk(entry.filePath)) {
+        QMessageBox::warning(this, tr("Delete Project"),
+                             tr("Could not delete the project from disk."));
+        return;
+    }
+    m_recentProjects->remove(entry.filePath);
+    Logger::info(QStringLiteral("projects.delete path=\"%1\"").arg(entry.filePath));
 }
 
 } // namespace tlm

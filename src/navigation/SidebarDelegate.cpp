@@ -32,13 +32,15 @@ void SidebarDelegate::paint(QPainter* painter, const QStyleOptionViewItem& optio
 
     painter->setPen(option.state.testFlag(QStyle::State_Enabled) ? colors.primaryText
                                                                  : colors.disabledText);
-    painter->drawText(r.adjusted(40, 0, -8, 0), Qt::AlignVCenter | Qt::AlignLeft,
-                      index.data(Qt::DisplayRole).toString());
+    const QRect textRect = r.adjusted(40, 0, -8, 0);
+    painter->drawText(textRect, Qt::AlignVCenter | Qt::AlignLeft,
+                      painter->fontMetrics().elidedText(index.data(Qt::DisplayRole).toString(),
+                                                        Qt::ElideRight, textRect.width()));
     painter->restore();
 }
 
 QSize SidebarDelegate::sizeHint(const QStyleOptionViewItem&, const QModelIndex&) const {
-    return QSize(180, 38);
+    return QSize(160, 38);
 }
 
 } // namespace tlm

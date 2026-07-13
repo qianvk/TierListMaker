@@ -63,7 +63,9 @@ void AppDialog::buildUi(const QString& title) {
     titleLayout->setSpacing(8);
 
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    titleLayout->addSpacing(kSystemButtonReserve);
+    m_nativeButtonArea = new QWidget(m_titleBar);
+    m_nativeButtonArea->setFixedWidth(kSystemButtonReserve);
+    titleLayout->addWidget(m_nativeButtonArea);
 #endif
     m_titleLabel = new QLabel(title, m_titleBar);
     m_titleLabel->setObjectName(QStringLiteral("AppDialogTitleLabel"));
@@ -102,6 +104,15 @@ void AppDialog::installWindowChrome() {
         platformCloseAvailable = m_windowAgent->installSystemButtons();
         m_windowAgent->addTitleBar(m_titleBar);
         m_windowAgent->setSystemButtonVisibility(QWK::WindowAgentBase::AlwaysVisible);
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+        if (m_nativeButtonArea) {
+            m_windowAgent->setSystemButtonArea(m_nativeButtonArea);
+        }
+#elif defined(Q_OS_WIN)
+        if (auto* closeButton = m_windowAgent->systemButton(QWK::WindowAgentBase::Close)) {
+            closeButton->setProperty("_qwk_top_right_corner_radius", 12.0);
+        }
+#endif
         if (m_fallbackCloseButton) {
             m_windowAgent->setHitTestVisible(m_fallbackCloseButton, true);
         }
@@ -110,8 +121,17 @@ void AppDialog::installWindowChrome() {
     if (m_fallbackCloseButton) {
         m_fallbackCloseButton->setVisible(!platformCloseAvailable);
     }
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    if (m_nativeButtonArea) {
+        m_nativeButtonArea->setVisible(platformCloseAvailable);
+    }
+#endif
     if (m_nativeButtonSpacer) {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+        m_nativeButtonSpacer->setVisible(false);
+#else
         m_nativeButtonSpacer->setVisible(platformCloseAvailable);
+#endif
     }
 }
 

@@ -18,12 +18,11 @@ QStringList AssetManager::supportedNameFilters() const {
     return ImageLoader::supportedNameFilters();
 }
 
-Result<QStringList> AssetManager::importImages(TierProject& project, const QStringList& sourcePaths,
-                                               ImageImportBehavior behavior) {
+Result<QStringList> AssetManager::importImages(TierProject& project, const QStringList& sourcePaths) {
     QStringList ids;
     int order = static_cast<int>(project.unassignedImages().size());
     for (const QString& sourcePath : sourcePaths) {
-        auto result = importOne(project, sourcePath, behavior, order++);
+        auto result = importOne(project, sourcePath, order++);
         if (!result) {
             return Result<QStringList>::failure(result.error().message, result.error().details);
         }
@@ -38,8 +37,7 @@ Result<QStringList> AssetManager::importImages(TierProject& project, const QStri
 }
 
 Result<QString> AssetManager::importCanvasImage(TierProject& project, const QString& sourcePath,
-                                                const QString& canvasKey,
-                                                ImageImportBehavior behavior) {
+                                                const QString& canvasKey) {
     QFileInfo sourceInfo(sourcePath);
     if (!sourceInfo.exists() || !sourceInfo.isFile()) {
         return Result<QString>::failure(tr("The selected image does not exist."), sourcePath);
@@ -52,20 +50,17 @@ Result<QString> AssetManager::importCanvasImage(TierProject& project, const QStr
                                         reader.errorString());
     }
 
-    QString storedPath = sourceInfo.absoluteFilePath();
-    if (behavior != ImageImportBehavior::ReferenceOriginal) {
-        const QString destinationDir =
-            project.filePath.isEmpty()
-                ? QDir(m_sessionDir.path()).filePath(QStringLiteral("assets"))
-                : assetsDirectoryForProjectPath(project.filePath);
-        auto copied = copyAsset(sourcePath, destinationDir);
-        if (!copied) {
-            return Result<QString>::failure(copied.error().message, copied.error().details);
-        }
-        storedPath = project.filePath.isEmpty()
-                         ? copied.value()
-                         : QDir(QFileInfo(project.filePath).absolutePath()).relativeFilePath(copied.value());
+    const QString destinationDir =
+        project.filePath.isEmpty() ? QDir(m_sessionDir.path()).filePath(QStringLiteral("assets"))
+                                   : assetsDirectoryForProjectPath(project.filePath);
+    auto copied = copyAsset(sourcePath, destinationDir);
+    if (!copied) {
+        return Result<QString>::failure(copied.error().message, copied.error().details);
     }
+    const QString storedPath = project.filePath.isEmpty()
+                                   ? copied.value()
+                                   : QDir(QFileInfo(project.filePath).absolutePath())
+                                         .relativeFilePath(copied.value());
 
     project.canvas.insert(canvasKey, storedPath);
     project.touch();
@@ -144,7 +139,7 @@ QString AssetManager::sessionDirectory() const {
 }
 
 Result<TierImage> AssetManager::importOne(TierProject& project, const QString& sourcePath,
-                                          ImageImportBehavior behavior, int order) {
+                                          int order) {
     QFileInfo sourceInfo(sourcePath);
     if (!sourceInfo.exists() || !sourceInfo.isFile()) {
         return Result<TierImage>::failure(tr("The selected image does not exist."), sourcePath);
@@ -167,21 +162,18 @@ Result<TierImage> AssetManager::importOne(TierProject& project, const QString& s
     image.height = imageSize.height();
     image.order = order;
 
-    if (behavior != ImageImportBehavior::ReferenceOriginal) {
-        const QString destinationDir =
-            project.filePath.isEmpty()
-                ? QDir(m_sessionDir.path()).filePath(QStringLiteral("assets"))
-                : assetsDirectoryForProjectPath(project.filePath);
-        auto copied = copyAsset(sourcePath, destinationDir);
-        if (!copied) {
-            return Result<TierImage>::failure(copied.error().message, copied.error().details);
-        }
-        if (project.filePath.isEmpty()) {
-            image.importedAssetPath = copied.value();
-        } else {
-            image.importedAssetPath =
-                QDir(QFileInfo(project.filePath).absolutePath()).relativeFilePath(copied.value());
-        }
+    const QString destinationDir =
+        project.filePath.isEmpty() ? QDir(m_sessionDir.path()).filePath(QStringLiteral("assets"))
+                                   : assetsDirectoryForProjectPath(project.filePath);
+    auto copied = copyAsset(sourcePath, destinationDir);
+    if (!copied) {
+        return Result<TierImage>::failure(copied.error().message, copied.error().details);
+    }
+    if (project.filePath.isEmpty()) {
+        image.importedAssetPath = copied.value();
+    } else {
+        image.importedAssetPath =
+            QDir(QFileInfo(project.filePath).absolutePath()).relativeFilePath(copied.value());
     }
 
     return Result<TierImage>::success(image);

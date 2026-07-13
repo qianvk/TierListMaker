@@ -41,6 +41,7 @@ signals:
     void imageRemoveFromTierRowRequested(const QString& imageId);
     void imageRemoveFromGalleryRequested(const QString& imageId);
     void rowEditRequested(const QString& rowId);
+    void rowClearRequested(const QString& rowId);
     void rowDeleteRequested(const QString& rowId);
     void rowInsertAboveRequested(const QString& rowId);
     void rowInsertBelowRequested(const QString& rowId);

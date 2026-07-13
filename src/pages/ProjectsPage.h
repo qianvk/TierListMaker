@@ -4,13 +4,15 @@
 
 #include <QWidget>
 
+class QModelIndex;
+class QPoint;
 class QListView;
 class QComboBox;
 class QLineEdit;
-class QPushButton;
 
 namespace tlm {
 
+class AppSettings;
 class ProjectRepository;
 class RecentProjectsModel;
 
@@ -20,11 +22,13 @@ class ProjectsPage : public QWidget {
 
 public:
     ProjectsPage(ProjectRepository* repository, RecentProjectsStore* recentProjects,
+                 AppSettings* settings,
                  QWidget* parent = nullptr);
 
 public slots:
     void refresh();
     void focusSearch();
+    void openProjectFromDialog();
     void retranslateUi();
 
 signals:
@@ -32,21 +36,22 @@ signals:
 
 private:
     QString selectedPath() const;
+    RecentProjectEntry selectedEntry() const;
+    void showProjectContextMenu(const QPoint& point);
+    void openSelectedProject();
+    void renameSelectedProject();
     void chooseCoverForSelectedProject();
+    void revealSelectedProject();
+    void saveSelectedProjectAs();
+    void deleteSelectedProject();
 
     ProjectRepository* m_repository{nullptr};
     RecentProjectsStore* m_recentProjects{nullptr};
+    AppSettings* m_settings{nullptr};
     QLineEdit* m_search{nullptr};
     QComboBox* m_sort{nullptr};
     QListView* m_view{nullptr};
     RecentProjectsModel* m_model{nullptr};
-    QPushButton* m_openButton{nullptr};
-    QPushButton* m_renameButton{nullptr};
-    QPushButton* m_coverButton{nullptr};
-    QPushButton* m_revealButton{nullptr};
-    QPushButton* m_duplicateButton{nullptr};
-    QPushButton* m_removeButton{nullptr};
-    QPushButton* m_deleteFileButton{nullptr};
 };
 
 } // namespace tlm
