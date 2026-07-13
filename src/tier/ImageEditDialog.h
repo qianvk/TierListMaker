@@ -1,8 +1,8 @@
 #pragma once
 
 #include "tier/TierImage.h"
+#include "window/AppDialog.h"
 
-#include <QDialog>
 #include <QPixmap>
 
 class QLineEdit;
@@ -12,7 +12,7 @@ namespace tlm {
 class CropEditorWidget;
 
 /** Modal editor for image metadata and the square thumbnail crop used by tier/gallery tiles. */
-class ImageEditDialog final : public QDialog {
+class ImageEditDialog final : public AppDialog {
     Q_OBJECT
 
 public:

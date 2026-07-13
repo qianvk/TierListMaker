@@ -83,6 +83,8 @@ set(TLM_APP_SOURCES
     src/pages/EditPage.h
     src/pages/PreferencesPage.cpp
     src/pages/PreferencesPage.h
+    src/pages/ProjectLocationDialog.cpp
+    src/pages/ProjectLocationDialog.h
     src/pages/ProjectsPage.cpp
     src/pages/ProjectsPage.h
     src/preview/PreviewOverlay.cpp
@@ -91,6 +93,8 @@ set(TLM_APP_SOURCES
     src/tier/ImageGalleryPopover.h
     src/tier/ImageEditDialog.cpp
     src/tier/ImageEditDialog.h
+    src/tier/TierRowEditDialog.cpp
+    src/tier/TierRowEditDialog.h
     src/tier/TierBoardWidget.cpp
     src/tier/TierBoardWidget.h
     src/tier/TierDragController.cpp
@@ -109,6 +113,8 @@ set(TLM_APP_SOURCES
     src/widgets/FlowLayout.h
     src/widgets/SectionHeader.cpp
     src/widgets/SectionHeader.h
+    src/window/AppDialog.cpp
+    src/window/AppDialog.h
     src/window/AppTitleBar.cpp
     src/window/AppTitleBar.h
     src/window/MainWindow.cpp

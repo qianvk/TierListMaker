@@ -37,6 +37,8 @@
 #include <limits>
 #include <utility>
 
+#include <vkui/core/VkIcon.h>
+
 namespace tlm {
 
 namespace {
@@ -1009,9 +1011,13 @@ void TierListView::setGalleryMissionControlActive(bool active, const QRect& sour
 }
 
 void TierListView::setMissionControlActiveForSource(bool active, MissionControlSource source,
-                                                    const QRect& sourceGlobalRect) {
+                                                    const QRect& sourceGlobalRect,
+                                                    const QString& tierRowId) {
     const bool gallerySource = source == MissionControlSource::Gallery;
+    const bool tierRowSource = source == MissionControlSource::TierRow;
+    const QString nextTierRowId = active && tierRowSource ? tierRowId : QString();
     if (m_missionControlActive == active && m_missionFromGallery == gallerySource &&
+        m_missionTierRowId == nextTierRowId &&
         ((active && m_missionTransitionProgress >= 0.999) ||
          (!active && m_missionTransitionProgress <= 0.001))) {
         return;
@@ -1034,6 +1040,7 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
         m_missionNormalRects = normalImageRects();
     }
     m_missionFromGallery = gallerySource;
+    m_missionTierRowId = nextTierRowId;
     invalidateMissionControlLayout();
     ensureMissionControlLayout();
     m_missionControlActive = active;
@@ -1048,14 +1055,18 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
     }
     if (active) {
         setCursor(Qt::ArrowCursor);
+        viewport()->setToolTip(tr("Click to exit display"));
     } else {
         unsetCursor();
+        viewport()->setToolTip({});
     }
     Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=%3 "
                                 "algorithm=justified-gallery")
                      .arg(active)
                      .arg(entering ? QStringLiteral("enter") : QStringLiteral("exit"))
-                     .arg(gallerySource ? QStringLiteral("gallery") : QStringLiteral("row")));
+                     .arg(gallerySource ? QStringLiteral("gallery")
+                                        : (tierRowSource ? QStringLiteral("tier-row")
+                                                         : QStringLiteral("row"))));
     animateMissionTransition(active ? 1.0 : 0.0);
     viewport()->update();
 }
@@ -1389,6 +1400,9 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
 void TierListView::mouseMoveEvent(QMouseEvent* event) {
     if (m_missionControlActive) {
         updateMissionHover(event->pos());
+        viewport()->setToolTip(missionImageAt(event->pos()).isEmpty()
+                                   ? tr("Click to exit display")
+                                   : tr("Double-click to preview. Drag to move."));
         event->accept();
         return;
     }
@@ -1433,7 +1447,6 @@ void TierListView::mouseReleaseEvent(QMouseEvent* event) {
 
     if (event->button() == Qt::LeftButton && m_pressKind == PressKind::RowLabel &&
         !m_pressedRowId.isEmpty()) {
-        emit rowEditRequested(m_pressedRowId);
         resetPressState();
         unsetCursor();
         event->accept();
@@ -1489,9 +1502,22 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
     }
 
     TierListDelegate* delegate = tierDelegate();
+    TierListModel* model = tierModel();
     const QModelIndex index = indexAt(event->pos());
     if (delegate && index.isValid()) {
         const QRect rowRect = visualRect(index);
+        if (delegate->labelRect(rowRect).contains(event->pos())) {
+            const QString rowId = model ? model->rowIdAt(index.row()) : QString();
+            if (!rowId.isEmpty()) {
+                Logger::info(QStringLiteral(
+                                 "tier.list.mission.request source=label-double-click rowId=%1 row=%2")
+                                 .arg(rowId)
+                                 .arg(index.row()));
+                setMissionControlActiveForSource(true, MissionControlSource::TierRow, {}, rowId);
+                event->accept();
+                return;
+            }
+        }
         const QString imageId = delegate->imageIdAt(index, rowRect, event->pos());
         if (!imageId.isEmpty()) {
             const QRect imageRect = delegate->imageRectForId(index, rowRect, imageId);
@@ -1530,6 +1556,37 @@ void TierListView::contextMenuEvent(QContextMenuEvent* event) {
     if (!model || !delegate || !project) {
         QListView::contextMenuEvent(event);
         return;
+    }
+
+    if (!m_missionControlActive) {
+        const QModelIndex index = indexAt(event->pos());
+        if (index.isValid()) {
+            const QRect rowRect = visualRect(index);
+            if (delegate->labelRect(rowRect).contains(event->pos())) {
+                const QString rowId = model->rowIdAt(index.row());
+                QMenu menu(this);
+                QAction* editAction = menu.addAction(vkui::icon(vkui::VkSymbol::Edit), tr("Edit"));
+                QAction* deleteAction = menu.addAction(
+                    vkui::icon(vkui::VkSymbol::Trash, vkui::VkIconRole::Destructive), tr("Delete"));
+                menu.addSeparator();
+                QAction* insertAboveAction =
+                    menu.addAction(vkui::icon(vkui::VkSymbol::Plus), tr("Insert Row Above"));
+                QAction* insertBelowAction =
+                    menu.addAction(vkui::icon(vkui::VkSymbol::Plus), tr("Insert Row Below"));
+                QAction* chosen = menu.exec(event->globalPos());
+                if (chosen == editAction) {
+                    emit rowEditRequested(rowId);
+                } else if (chosen == deleteAction) {
+                    emit rowDeleteRequested(rowId);
+                } else if (chosen == insertAboveAction) {
+                    emit rowInsertAboveRequested(rowId);
+                } else if (chosen == insertBelowAction) {
+                    emit rowInsertBelowRequested(rowId);
+                }
+                event->accept();
+                return;
+            }
+        }
     }
 
     QString imageId;
@@ -3008,6 +3065,10 @@ void TierListView::updateBlankAreaToolTip(const QPoint& viewportPoint) {
     }
 
     const QRect rowRect = visualRect(index);
+    if (delegate->labelRect(rowRect).contains(viewportPoint)) {
+        viewport()->setToolTip(tr("Double-click to display this tier. Right-click for tier actions."));
+        return;
+    }
     const bool overEmptyTierArea = !delegate->labelRect(rowRect).contains(viewportPoint) &&
                                    delegate->imageIdAt(index, rowRect, viewportPoint).isEmpty();
     viewport()->setToolTip(overEmptyTierArea ? hint : QString());
@@ -3261,6 +3322,7 @@ void TierListView::completeMissionExitForLift() {
     stopMissionHoverAnimation();
     m_missionControlActive = false;
     m_missionFromGallery = false;
+    m_missionTierRowId.clear();
     m_missionTransitionProgress = 0.0;
     m_missionNormalRects.clear();
     m_missionGallerySourceRect = {};
@@ -3286,6 +3348,17 @@ QStringList TierListView::missionImageIds() const {
         for (const TierImage& image : model->project()->images) {
             if (!image.id.isEmpty() && !image.assignedTierRowId.has_value()) {
                 imageIds.append(image.id);
+            }
+        }
+        return imageIds;
+    }
+
+    if (!m_missionTierRowId.isEmpty()) {
+        if (const TierRow* row = model->project()->rowById(m_missionTierRowId)) {
+            for (const QString& imageId : row->imageIds) {
+                if (!imageId.isEmpty()) {
+                    imageIds.append(imageId);
+                }
             }
         }
         return imageIds;
@@ -3519,8 +3592,10 @@ void TierListView::paintMissionControl(QPainter* painter) {
     if (tiles.isEmpty()) {
         painter->setPen(colors.secondaryText);
         painter->drawText(viewport()->rect(), Qt::AlignCenter,
-                          m_missionFromGallery ? tr("No imported images")
-                                               : tr("No images in tier list"));
+                          m_missionFromGallery
+                              ? tr("No imported images")
+                              : (!m_missionTierRowId.isEmpty() ? tr("No images in this tier")
+                                                               : tr("No images in tier list")));
         return;
     }
 

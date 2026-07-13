@@ -93,11 +93,11 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
                        "10px;}"));
     m_openButton = makeButton(tr("Open"), vkui::VkSymbol::Folder, this);
     m_saveButton = makeButton(tr("Save"), vkui::VkSymbol::Save, this);
-    m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Duplicate, this);
-    m_backgroundButton = makeButton(tr("Background"), vkui::VkSymbol::Background, this);
-    m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::Grid, this);
+    m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Templates, this);
+    m_backgroundButton = makeButton(tr("Background"), vkui::VkSymbol::CanvasBackground, this);
+    m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::PhotoLibrary, this);
     m_resetButton = makeButton(tr("Reset Rows"), vkui::VkSymbol::Reset, this);
-    m_focusButton = makeButton(tr("Enter Tier Focus"), vkui::VkSymbol::Focus, this);
+    m_focusButton = makeButton(tr("Enter Tier Focus"), vkui::VkSymbol::FocusTarget, this);
     m_buttonGroup = new QWidget(this);
     m_buttonGroup->setObjectName(QStringLiteral("ToolbarButtonGroup"));
     m_buttonGroup->setMouseTracking(true);

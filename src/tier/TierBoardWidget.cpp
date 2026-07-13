@@ -36,6 +36,11 @@ TierBoardWidget::TierBoardWidget(QWidget* parent) : QWidget(parent) {
     connect(m_view, &TierListView::imageRemoveFromGalleryRequested, this,
             &TierBoardWidget::imageRemoveFromGalleryRequested);
     connect(m_view, &TierListView::rowEditRequested, this, &TierBoardWidget::rowEditRequested);
+    connect(m_view, &TierListView::rowDeleteRequested, this, &TierBoardWidget::rowDeleteRequested);
+    connect(m_view, &TierListView::rowInsertAboveRequested, this,
+            &TierBoardWidget::rowInsertAboveRequested);
+    connect(m_view, &TierListView::rowInsertBelowRequested, this,
+            &TierBoardWidget::rowInsertBelowRequested);
     connect(m_view, &TierListView::rowMovedToIndex, this, &TierBoardWidget::rowMovedToIndex);
 }
 

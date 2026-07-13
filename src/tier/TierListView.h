@@ -69,6 +69,9 @@ signals:
     void imageRemoveFromTierRowRequested(const QString& imageId);
     void imageRemoveFromGalleryRequested(const QString& imageId);
     void rowEditRequested(const QString& rowId);
+    void rowDeleteRequested(const QString& rowId);
+    void rowInsertAboveRequested(const QString& rowId);
+    void rowInsertBelowRequested(const QString& rowId);
     void rowMovedToIndex(const QString& rowId, int destinationIndex);
 
 public slots:
@@ -95,6 +98,7 @@ protected:
 private:
     enum class MissionControlSource {
         TierRows,
+        TierRow,
         Gallery
     };
 
@@ -142,7 +146,8 @@ private:
     void animateDockHover(qreal targetProgress);
     void stopDockHoverAnimation();
     void setMissionControlActiveForSource(bool active, MissionControlSource source,
-                                          const QRect& sourceGlobalRect = {});
+                                          const QRect& sourceGlobalRect = {},
+                                          const QString& tierRowId = {});
     void animateMissionTransition(qreal targetProgress);
     void stopMissionTransitionAnimation();
     void updateMissionHover(const QPoint& viewportPoint);
@@ -219,6 +224,7 @@ private:
     QPixmap m_canvasBackgroundCache;
     bool m_missionControlActive{false};
     bool m_missionFromGallery{false};
+    QString m_missionTierRowId;
     qreal m_missionTransitionProgress{0.0};
     QVariantAnimation* m_missionTransitionAnimation{nullptr};
     QHash<QString, QRectF> m_missionNormalRects;

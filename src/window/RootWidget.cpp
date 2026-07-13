@@ -7,6 +7,7 @@
 #include "pages/ProjectsPage.h"
 #include "theme/Theme.h"
 #include "update/AppUpdater.h"
+#include "window/AppDialog.h"
 #include "window/AppTitleBar.h"
 #include "window/SidebarToggleButton.h"
 
@@ -675,19 +676,15 @@ void RootWidget::showPreferencesDialog() {
         return;
     }
 
-    auto* dialog = new QDialog(window());
+    auto* dialog = new AppDialog(tr("Preferences"), window());
     dialog->setObjectName(QStringLiteral("PreferencesDialog"));
-    dialog->setWindowTitle(tr("Preferences"));
     dialog->setAttribute(Qt::WA_DeleteOnClose);
-    dialog->setModal(false);
     dialog->setMinimumSize(720, 480);
     dialog->resize(860, 560);
 
-    auto* layout = new QVBoxLayout(dialog);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->setSpacing(0);
     auto* page = new PreferencesPage(m_settings, m_languageManager, m_updater, dialog);
-    layout->addWidget(page, 1);
+    dialog->contentLayout()->setContentsMargins(0, 0, 0, 0);
+    dialog->contentLayout()->addWidget(page, 1);
 
     m_preferencesDialog = dialog;
     connect(dialog, &QObject::destroyed, this, [this]() { m_preferencesDialog = nullptr; });

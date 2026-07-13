@@ -14,6 +14,10 @@
 class QTimer;
 class QVBoxLayout;
 
+namespace vkui {
+class VkPopover;
+}
+
 namespace tlm {
 
 class ImageGalleryPopover;
@@ -83,6 +87,9 @@ private:
     QString tempAutosavePath() const;
     bool saveTemplateFromDialog();
     bool applyTemplateFromDialog();
+    bool saveTemplateToPath(const QString& path);
+    bool saveManagedTemplateFromPrompt(QWidget* reopenAnchor);
+    QString managedTemplateDirectory() const;
     TierProject templateSnapshot() const;
     void applyTemplateProject(const TierProject& templateProject);
     void moveImageToRow(const QString& imageId, const QString& rowId, int index);
@@ -91,6 +98,8 @@ private:
     void removeImageFromTierRow(const QString& imageId);
     void removeImageFromGallery(const QString& imageId);
     void editTierRow(const QString& rowId);
+    void deleteTierRow(const QString& rowId);
+    void insertTierRow(const QString& rowId, bool below);
     bool saveProjectToPath(const QString& filePath);
     void removeImageFromRows(const QString& imageId);
     void layoutOverlays();
@@ -109,6 +118,7 @@ private:
     QVBoxLayout* m_rootLayout{nullptr};
     TierBoardWidget* m_board{nullptr};
     QPointer<ImageGalleryPopover> m_galleryPopover;
+    QPointer<vkui::VkPopover> m_templatePopover;
     PreviewOverlay* m_previewOverlay{nullptr};
     QTimer* m_autosaveTimer{nullptr};
     bool m_tierFocusMode{false};

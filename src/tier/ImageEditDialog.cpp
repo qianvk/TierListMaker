@@ -184,16 +184,14 @@ private:
 };
 
 ImageEditDialog::ImageEditDialog(const TierImage& image, const QPixmap& pixmap, QWidget* parent)
-    : QDialog(parent), m_nameEdit(new QLineEdit(this)),
+    : AppDialog(QObject::tr("Edit Image"), parent), m_nameEdit(new QLineEdit(this)),
       m_cropEditor(new CropEditorWidget(
           pixmap, image.hasCropRect() ? image.cropRect : defaultCropRect(pixmap.size()), this)) {
     setWindowTitle(tr("Edit Image"));
-    setModal(true);
     setMinimumWidth(440);
     setObjectName(QStringLiteral("ImageEditDialog"));
 
-    auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(18, 18, 18, 18);
+    auto* layout = contentLayout();
     layout->setSpacing(14);
 
     auto* title = new QLabel(tr("Edit thumbnail crop"), this);

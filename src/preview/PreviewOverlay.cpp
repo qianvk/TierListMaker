@@ -14,6 +14,8 @@ namespace tlm {
 PreviewOverlay::PreviewOverlay(QWidget* parent) : QWidget(parent) {
     setAttribute(Qt::WA_StyledBackground, false);
     setFocusPolicy(Qt::StrongFocus);
+    setMouseTracking(true);
+    setToolTip(tr("Click outside to close. Double-click image to close."));
     hide();
 }
 
@@ -67,6 +69,21 @@ void PreviewOverlay::mousePressEvent(QMouseEvent* event) {
     if (!m_previewGeometry.contains(event->pos())) {
         closePreview();
     }
+}
+
+void PreviewOverlay::mouseMoveEvent(QMouseEvent* event) {
+    setToolTip(m_previewGeometry.contains(event->pos()) ? tr("Double-click image to close")
+                                                        : tr("Click to close preview"));
+    QWidget::mouseMoveEvent(event);
+}
+
+void PreviewOverlay::mouseDoubleClickEvent(QMouseEvent* event) {
+    if (m_previewGeometry.contains(event->pos())) {
+        closePreview();
+        event->accept();
+        return;
+    }
+    QWidget::mouseDoubleClickEvent(event);
 }
 
 void PreviewOverlay::keyPressEvent(QKeyEvent* event) {
