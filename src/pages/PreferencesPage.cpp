@@ -436,6 +436,14 @@ QWidget* PreferencesPage::createGeneralPage() {
     settingsLayout->addWidget(
         createSettingRow(tr("Empty tier area long press"), blankLongPress, page));
 
+    auto* tierListToolTips = new vkui::VkSwitch(page);
+    tierListToolTips->setAccessibleName(tr("Show tier list tooltips"));
+    tierListToolTips->setChecked(m_settings->tierListToolTipsEnabled());
+    connect(tierListToolTips, &QAbstractButton::toggled, m_settings,
+            &AppSettings::setTierListToolTipsEnabled);
+    settingsLayout->addWidget(
+        createSettingRow(tr("Tier list tooltips"), tierListToolTips, page));
+
     auto* autosave = new vkui::VkSwitch(page);
     autosave->setAccessibleName(tr("Enable autosave"));
     autosave->setChecked(m_settings->autosaveEnabled());

@@ -13,6 +13,7 @@
 #include "window/MainWindow.h"
 
 #include <QDateTime>
+#include <QDynamicPropertyChangeEvent>
 #include <QFont>
 #include <QGuiApplication>
 #include <QHelpEvent>
@@ -24,6 +25,7 @@
 #include <QScreen>
 #include <QTimer>
 #include <QToolTip>
+#include <QVariant>
 #include <QWidget>
 
 #include <vkui/Widgets.h>
@@ -116,12 +118,13 @@ protected:
         }
 
         if (event->type() == QEvent::ToolTip) {
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-            if (widget->property("tlmDynamicToolTip").toBool()) {
-                return QObject::eventFilter(watched, event);
-            }
-#endif
             auto* helpEvent = static_cast<QHelpEvent*>(event);
+            const QVariant toolTipsEnabled = widget->property("tlmToolTipsEnabled");
+            if (toolTipsEnabled.isValid() && !toolTipsEnabled.toBool()) {
+                hideTip();
+                event->ignore();
+                return true;
+            }
             QString text;
             QObject* provider = widget->property("tlmToolTipProvider").value<QObject*>();
             if (provider) {
@@ -141,6 +144,14 @@ protected:
             showTip(text, helpEvent->globalPos(), widget);
             event->accept();
             return true;
+        }
+
+        if (widget == m_owner && event->type() == QEvent::DynamicPropertyChange) {
+            const auto* propertyEvent = static_cast<QDynamicPropertyChangeEvent*>(event);
+            if (propertyEvent->propertyName() == QByteArrayLiteral("tlmToolTipsEnabled") &&
+                !widget->property("tlmToolTipsEnabled").toBool()) {
+                hideTip();
+            }
         }
 
         if (widget == m_owner &&

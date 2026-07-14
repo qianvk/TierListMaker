@@ -211,8 +211,10 @@ protected:
 
         const int releasedIndex = m_owner->cellIndexAt(event->pos());
         const QStringList ids = m_owner->imageIds();
-        if (!m_dragging && releasedIndex == m_pressedIndex && releasedIndex >= 0) {
-            if (releasedIndex >= ids.size()) {
+        if (!m_dragging && releasedIndex == m_pressedIndex) {
+            if (releasedIndex < 0) {
+                emit m_owner->imageSelected({});
+            } else if (releasedIndex >= ids.size()) {
                 Logger::info(QStringLiteral("tier.gallery.import.request"));
                 emit m_owner->importRequested();
             } else {

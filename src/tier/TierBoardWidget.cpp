@@ -121,4 +121,16 @@ void TierBoardWidget::setBlankAreaActions(BlankAreaAction doubleClickAction,
     }
 }
 
+void TierBoardWidget::setTierFocusMode(bool enabled) {
+    if (m_view) {
+        m_view->setTierFocusMode(enabled);
+    }
+}
+
+void TierBoardWidget::setToolTipsEnabled(bool enabled) {
+    if (m_view) {
+        m_view->setToolTipsEnabled(enabled);
+    }
+}
+
 } // namespace tlm

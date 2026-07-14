@@ -62,6 +62,8 @@ public:
                (m_missionControlActive || m_missionTransitionProgress > 0.001);
     }
     void setBlankAreaActions(BlankAreaAction doubleClickAction, BlankAreaAction longPressAction);
+    void setTierFocusMode(bool enabled);
+    void setToolTipsEnabled(bool enabled);
     void updateImageVisual(const QString& imageId);
     Q_INVOKABLE QString toolTipTextAt(QPoint viewportPoint) const;
 
@@ -87,9 +89,6 @@ public slots:
     void toggleGalleryMissionControlActive(const QRect& sourceGlobalRect);
 
 protected:
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    bool viewportEvent(QEvent* event) override;
-#endif
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -112,6 +111,8 @@ private:
     TierListModel* tierModel() const;
     TierListDelegate* tierDelegate() const;
 
+    QRect imageViewportRect(const QString& imageId) const;
+    void clearImageSelection();
     void resetPressState();
     void beginRowReorderVisuals(const QModelIndex& index);
     void finishRowReorderVisuals(bool accepted);
@@ -158,6 +159,7 @@ private:
                             const QPoint& viewportPoint);
     QString blankAreaToolTipAt(const QPoint& viewportPoint) const;
     QString blankAreaHintText() const;
+    QString focusModeHintText() const;
     void updateInteractionMouseTracking();
     QRect tierRowImageRectForLift(const QString& imageId) const;
     void completeMissionExitForLift();
@@ -234,6 +236,8 @@ private:
     bool m_suppressBlankDoubleClick{false};
     BlankAreaAction m_blankDoubleClickAction{BlankAreaAction::GalleryMissionControl};
     BlankAreaAction m_blankLongPressAction{BlankAreaAction::TierMissionControl};
+    bool m_tierFocusMode{false};
+    bool m_toolTipsEnabled{true};
     mutable bool m_missionLayoutDirty{true};
     mutable QSize m_missionLayoutViewportSize;
     mutable QStringList m_missionLayoutImageIds;

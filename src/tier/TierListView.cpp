@@ -18,9 +18,6 @@
 #include <QDragMoveEvent>
 #include <QDropEvent>
 #include <QFileInfo>
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-#include <QHelpEvent>
-#endif
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMenu>
@@ -32,9 +29,6 @@
 #include <QScrollBar>
 #include <QSet>
 #include <QTimer>
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-#include <QToolTip>
-#endif
 #include <QVariant>
 #include <QVariantAnimation>
 
@@ -988,11 +982,8 @@ TierListView::TierListView(QWidget* parent) : QListView(parent) {
     setViewportMargins(0, 0, 0, 0);
     viewport()->setMouseTracking(false);
     viewport()->setAutoFillBackground(false);
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    viewport()->setProperty("tlmDynamicToolTip", true);
-#else
     viewport()->setProperty("tlmToolTipProvider", QVariant::fromValue(static_cast<QObject*>(this)));
-#endif
+    viewport()->setProperty("tlmToolTipsEnabled", true);
     setAcceptDrops(true);
     viewport()->setAcceptDrops(true);
     setStyleSheet(QStringLiteral("QListView{background:transparent;outline:0;}"));
@@ -1007,12 +998,21 @@ void TierListView::setBlankAreaActions(BlankAreaAction doubleClickAction,
 
     m_blankDoubleClickAction = doubleClickAction;
     m_blankLongPressAction = longPressAction;
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    viewport()->setToolTip({});
-#endif
     Logger::info(QStringLiteral("tier.list.blank.actions doubleClick=%1 longPress=%2")
                      .arg(blankAreaActionLogName(m_blankDoubleClickAction),
                           blankAreaActionLogName(m_blankLongPressAction)));
+}
+
+void TierListView::setTierFocusMode(bool enabled) {
+    m_tierFocusMode = enabled;
+}
+
+void TierListView::setToolTipsEnabled(bool enabled) {
+    if (m_toolTipsEnabled == enabled) {
+        return;
+    }
+    m_toolTipsEnabled = enabled;
+    viewport()->setProperty("tlmToolTipsEnabled", enabled);
 }
 
 void TierListView::setMissionControlActive(bool active) {
@@ -1031,7 +1031,7 @@ void TierListView::updateImageVisual(const QString& imageId) {
         viewport()->update();
         return;
     }
-    const QRect rect = imageSourceRect(imageId).adjusted(-3, -3, 3, 3);
+    const QRect rect = imageViewportRect(imageId).adjusted(-3, -3, 3, 3);
     if (rect.isValid()) {
         viewport()->update(rect);
     } else {
@@ -1081,14 +1081,8 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
     }
     if (active) {
         setCursor(Qt::ArrowCursor);
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-        viewport()->setToolTip(tr("Click to exit display"));
-#endif
     } else {
         unsetCursor();
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-        viewport()->setToolTip({});
-#endif
     }
     Logger::info(QStringLiteral("tier.list.mission.toggle enabled=%1 direction=%2 source=%3 "
                                 "algorithm=justified-gallery")
@@ -1264,10 +1258,15 @@ QPointF TierListView::visualOffsetForImage(const QString& imageId) const {
 }
 
 QRect TierListView::imageSourceRect(const QString& imageId) const {
+    const QRect localRect = imageViewportRect(imageId);
+    return localRect.isValid()
+               ? QRect(viewport()->mapTo(window(), localRect.topLeft()), localRect.size())
+               : QRect();
+}
+
+QRect TierListView::imageViewportRect(const QString& imageId) const {
     if (m_missionControlActive) {
-        const QRect rect = missionImageRect(imageId);
-        return rect.isValid() ? QRect(viewport()->mapTo(window(), rect.topLeft()), rect.size())
-                              : QRect();
+        return missionImageRect(imageId);
     }
 
     TierListModel* model = tierModel();
@@ -1278,12 +1277,18 @@ QRect TierListView::imageSourceRect(const QString& imageId) const {
 
     for (int row = 0; row < model->rowCount(); ++row) {
         const QModelIndex index = model->index(row, 0);
-        const QRect local = delegate->imageRectForId(index, visualRect(index), imageId);
+        const QRect local = viewportImageRect(index, imageId);
         if (local.isValid()) {
-            return QRect(viewport()->mapTo(window(), local.topLeft()), local.size());
+            return local;
         }
     }
     return {};
+}
+
+void TierListView::clearImageSelection() {
+    m_activeImageId.clear();
+    m_activeImageIndex = {};
+    emit imageSelected({});
 }
 
 void TierListView::mousePressEvent(QMouseEvent* event) {
@@ -1336,6 +1341,7 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
     TierListModel* model = tierModel();
     const QModelIndex index = indexAt(event->pos());
     if (!delegate || !model || !index.isValid()) {
+        clearImageSelection();
         QListView::mousePressEvent(event);
         return;
     }
@@ -1379,6 +1385,7 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
 
     if (!delegate->labelRect(rowRect).contains(event->pos())) {
         m_pressKind = PressKind::BlankArea;
+        clearImageSelection();
         setFocus(Qt::MouseFocusReason);
         scheduleBlankMissionControl(event->pos());
         Logger::debug(QStringLiteral("tier.list.mouse.press kind=blank rowId=%1 row=%2 pos=(%3,%4)")
@@ -1393,32 +1400,9 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
     QListView::mousePressEvent(event);
 }
 
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-bool TierListView::viewportEvent(QEvent* event) {
-    if (event && event->type() == QEvent::ToolTip && !m_missionControlActive &&
-        m_missionTransitionProgress <= 0.001) {
-        const auto* helpEvent = static_cast<QHelpEvent*>(event);
-        const QString text = blankAreaToolTipAt(helpEvent->pos());
-        if (!text.isEmpty()) {
-            QToolTip::showText(helpEvent->globalPos(), text, viewport());
-        } else {
-            QToolTip::hideText();
-        }
-        event->accept();
-        return true;
-    }
-    return QListView::viewportEvent(event);
-}
-#endif
-
 void TierListView::mouseMoveEvent(QMouseEvent* event) {
     if (m_missionControlActive) {
         updateMissionHover(event->pos());
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-        viewport()->setToolTip(missionImageAt(event->pos()).isEmpty()
-                                   ? tr("Click to exit display")
-                                   : tr("Double-click to preview. Drag to move."));
-#endif
         event->accept();
         return;
     }
@@ -2985,15 +2969,14 @@ bool TierListView::runBlankAreaAction(BlankAreaAction action, const char* trigge
 }
 
 QString TierListView::blankAreaToolTipAt(const QPoint& viewportPoint) const {
-    const QString hint = blankAreaHintText();
-    if (hint.isEmpty() || m_missionControlActive || m_missionTransitionProgress > 0.001) {
+    if (m_missionControlActive || m_missionTransitionProgress > 0.001) {
         return {};
     }
 
     TierListDelegate* delegate = tierDelegate();
     const QModelIndex index = indexAt(viewportPoint);
     if (!delegate || !index.isValid()) {
-        return {};
+        return m_tierFocusMode ? focusModeHintText() : QString();
     }
 
     const QRect rowRect = visualRect(index);
@@ -3002,14 +2985,34 @@ QString TierListView::blankAreaToolTipAt(const QPoint& viewportPoint) const {
     }
     const bool overEmptyTierArea = !delegate->labelRect(rowRect).contains(viewportPoint) &&
                                    delegate->imageIdAt(index, rowRect, viewportPoint).isEmpty();
-    return overEmptyTierArea ? hint : QString();
+    if (!overEmptyTierArea) {
+        return {};
+    }
+
+    QStringList hints;
+    const QString blankAreaHint = blankAreaHintText();
+    if (!blankAreaHint.isEmpty()) {
+        hints.append(blankAreaHint);
+    }
+    if (m_tierFocusMode) {
+        hints.append(focusModeHintText());
+    }
+    return hints.join(QLatin1Char('\n'));
 }
 
 QString TierListView::toolTipTextAt(QPoint viewportPoint) const {
+    if (!m_toolTipsEnabled) {
+        return {};
+    }
     if (m_missionControlActive) {
-        return missionImageAt(viewportPoint).isEmpty()
-                   ? tr("Click to exit display")
-                   : tr("Double-click to preview. Drag to move.");
+        if (!missionImageAt(viewportPoint).isEmpty()) {
+            return tr("Double-click to preview. Drag to move.");
+        }
+        QStringList hints{tr("Click to exit display")};
+        if (m_tierFocusMode) {
+            hints.append(focusModeHintText());
+        }
+        return hints.join(QLatin1Char('\n'));
     }
     return blankAreaToolTipAt(viewportPoint);
 }
@@ -3036,7 +3039,16 @@ QString TierListView::blankAreaHintText() const {
     if (!longPress.isEmpty()) {
         hints.append(tr("Long press: %1").arg(longPress));
     }
-    return hints.join(QStringLiteral("  "));
+    return hints.join(QLatin1Char('\n'));
+}
+
+QString TierListView::focusModeHintText() const {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    const QString modifier = tr("Option");
+#else
+    const QString modifier = tr("Alt");
+#endif
+    return tr("Hold %1 and drag: Move window\nEsc: Exit Focus Mode").arg(modifier);
 }
 
 void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoint& viewportPoint,

@@ -60,10 +60,8 @@ private:
     void updateLayoutMargins();
     void updateTitleWidth();
     void updateTitleGeometry();
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     void installTitleEditOutsideClickFilter();
     void removeTitleEditOutsideClickFilter();
-#endif
 
     QLineEdit* m_titleEdit{nullptr};
     QLabel* m_unsavedIndicator{nullptr};
@@ -80,9 +78,7 @@ private:
     bool m_submittingTitle{false};
     bool m_cancelingTitleEdit{false};
     int m_leadingReservedWidth{0};
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     bool m_titleEditOutsideClickFilterInstalled{false};
-#endif
     QString m_titleEditBaseline;
 };
 

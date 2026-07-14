@@ -1063,6 +1063,9 @@ void EditPage::setTierFocusMode(bool enabled) {
         return;
     }
     m_tierFocusMode = enabled;
+    if (m_board) {
+        m_board->setTierFocusMode(enabled);
+    }
     Logger::info(QStringLiteral("tier.edit.focus.mode enabled=%1").arg(enabled));
 
     if (enabled) {
@@ -1237,6 +1240,9 @@ void EditPage::buildUi() {
                 [applyBlankAreaActions](BlankAreaAction) { applyBlankAreaActions(); });
         connect(m_settings, &AppSettings::blankLongPressActionChanged, this,
                 [applyBlankAreaActions](BlankAreaAction) { applyBlankAreaActions(); });
+        m_board->setToolTipsEnabled(m_settings->tierListToolTipsEnabled());
+        connect(m_settings, &AppSettings::tierListToolTipsEnabledChanged, m_board,
+                &TierBoardWidget::setToolTipsEnabled);
     }
 
     m_previewOverlay = new PreviewOverlay(this);

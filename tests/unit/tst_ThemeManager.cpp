@@ -61,6 +61,20 @@ private slots:
         QCOMPARE(qApp->palette().color(QPalette::Base), bridge.tokens().contentBackground);
         settings.setAppearance(AppearanceMode::System);
     }
+
+    void tierListToolTipsSettingPersistsAndSignals() {
+        QStandardPaths::setTestModeEnabled(true);
+        AppSettings settings;
+        const bool original = settings.tierListToolTipsEnabled();
+        QSignalSpy changed(&settings, &AppSettings::tierListToolTipsEnabledChanged);
+
+        settings.setTierListToolTipsEnabled(!original);
+        QCOMPARE(settings.tierListToolTipsEnabled(), !original);
+        QCOMPARE(changed.count(), 1);
+        QCOMPARE(changed.constFirst().constFirst().toBool(), !original);
+
+        settings.setTierListToolTipsEnabled(original);
+    }
 };
 
 QTEST_MAIN(tst_ThemeManager)

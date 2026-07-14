@@ -13,6 +13,7 @@
 #include "window/SidebarToggleButton.h"
 
 #include <QAbstractButton>
+#include <QApplication>
 #include <QDialog>
 #include <QDir>
 #include <QEasingCurve>
@@ -23,6 +24,7 @@
 #include <QKeySequence>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QResizeEvent>
@@ -38,6 +40,7 @@
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QVariantAnimation>
+#include <QWindow>
 
 #include <QWKWidgets/widgetwindowagent.h>
 #include <vkui/core/VkIcon.h>
@@ -336,6 +339,11 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             [this](const QVariant& value) { setSidebarWidth(qRound(value.toReal())); });
 
     connect(m_projectsPage, &ProjectsPage::openProjectRequested, this, [this](const QString& path) {
+        if (sameProjectPath(m_editPage->currentProjectPath(), path)) {
+            setActiveProjectAvailable(true);
+            switchToPage(AppPage::Edit);
+            return;
+        }
         if (m_editPage->confirmSaveIfDirty() && m_editPage->openProject(path)) {
             setActiveProjectAvailable(true);
             switchToPage(AppPage::Edit);
@@ -580,6 +588,11 @@ void RootWidget::setTierFocusMode(bool enabled) {
     }
 
     m_tierFocusMode = enabled;
+    if (enabled) {
+        qApp->installEventFilter(this);
+    } else {
+        qApp->removeEventFilter(this);
+    }
     UiPerformanceMonitor::setTierFocusMode(enabled);
     Logger::info(QStringLiteral("ui.tier.focus.mode enabled=%1").arg(enabled));
 
@@ -644,6 +657,24 @@ void RootWidget::setTierFocusMode(bool enabled) {
 
     layoutTitleBars();
     layoutSidebarToggleButton();
+}
+
+bool RootWidget::eventFilter(QObject* watched, QEvent* event) {
+    if (m_tierFocusMode && event && event->type() == QEvent::MouseButtonPress) {
+        auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        auto* target = qobject_cast<QWidget*>(watched);
+        if (mouseEvent->button() == Qt::LeftButton &&
+            mouseEvent->modifiers().testFlag(Qt::AltModifier) && target &&
+            target->window() == window()) {
+            QWindow* nativeWindow = windowHandle();
+            if (nativeWindow && nativeWindow->startSystemMove()) {
+                Logger::debug(QStringLiteral("ui.tier.focus.window.move"));
+                mouseEvent->accept();
+                return true;
+            }
+        }
+    }
+    return QWidget::eventFilter(watched, event);
 }
 
 void RootWidget::syncSidebarPresentation(int sidebarWidth) {

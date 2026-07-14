@@ -9,8 +9,8 @@
         <translation>保存项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectLocationDialog.cpp" line="161"/>
         <location filename="../../src/tier/TierProject.cpp" line="26"/>
+        <location filename="../../src/pages/ProjectLocationDialog.cpp" line="161"/>
         <source>Untitled Tier List</source>
         <translation>未命名分级列表</translation>
     </message>
@@ -101,13 +101,13 @@
         <translation>更新响应中没有最新版本信息。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="87"/>
+        <location filename="../../src/pages/EditPage.cpp" line="90"/>
         <source>Untitled Template</source>
         <translation>未命名模板</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="118"/>
-        <location filename="../../src/pages/EditPage.cpp" line="119"/>
+        <location filename="../../src/pages/EditPage.cpp" line="120"/>
+        <location filename="../../src/pages/EditPage.cpp" line="121"/>
         <source>S,A,B,C,D</source>
         <translation>S,A,B,C,D</translation>
     </message>
@@ -119,6 +119,30 @@
         <location filename="../../src/tier/ImageEditDialog.cpp" line="15"/>
         <source>Edit Image</source>
         <translation>编辑图片</translation>
+    </message>
+</context>
+<context>
+    <name>QWK::WindowsCaptionButton</name>
+    <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="72"/>
+        <source>Minimize</source>
+        <translation>最小化</translation>
+    </message>
+    <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="79"/>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="94"/>
+        <source>Maximize</source>
+        <translation>最大化</translation>
+    </message>
+    <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="84"/>
+        <source>Close</source>
+        <translation>关闭</translation>
+    </message>
+    <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="94"/>
+        <source>Restore Down</source>
+        <translation>向下还原</translation>
     </message>
 </context>
 <context>
@@ -137,8 +161,8 @@
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="78"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="157"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="189"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="155"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="186"/>
         <source>Untitled Tier List</source>
         <translation>未命名分级列表</translation>
     </message>
@@ -156,44 +180,44 @@
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="97"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="175"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="173"/>
         <source>Unsaved changes</source>
         <translation>有未保存的更改</translation>
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="100"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="160"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="158"/>
         <source>Templates</source>
         <translation>模板</translation>
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="101"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="163"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="161"/>
         <source>Background</source>
         <translation>背景</translation>
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="102"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="166"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="164"/>
         <source>Gallery</source>
         <translation>图库</translation>
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="103"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="169"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="167"/>
         <source>Reset Rows</source>
         <translation>重置行</translation>
     </message>
     <message>
         <location filename="../../src/window/AppTitleBar.cpp" line="104"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="172"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="240"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="170"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="237"/>
         <source>Enter Tier Focus</source>
         <translation>进入 Tier 专注</translation>
     </message>
     <message>
-        <location filename="../../src/window/AppTitleBar.cpp" line="172"/>
-        <location filename="../../src/window/AppTitleBar.cpp" line="240"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="170"/>
+        <location filename="../../src/window/AppTitleBar.cpp" line="237"/>
         <source>Exit Tier Focus</source>
         <translation>退出 Tier 专注</translation>
     </message>
@@ -265,22 +289,22 @@
 <context>
     <name>tlm::EditPage</name>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="424"/>
+        <location filename="../../src/pages/EditPage.cpp" line="425"/>
         <source>Open Project</source>
         <translation>打开项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="425"/>
+        <location filename="../../src/pages/EditPage.cpp" line="426"/>
         <source>TierListMaker Projects (*.tlmproject)</source>
         <translation>TierListMaker 项目 (*.tlmproject)</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="438"/>
+        <location filename="../../src/pages/EditPage.cpp" line="439"/>
         <source>Open Failed</source>
         <translation>打开失败</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="488"/>
+        <location filename="../../src/pages/EditPage.cpp" line="489"/>
         <source>Templates</source>
         <translation>模板</translation>
     </message>
@@ -310,33 +334,33 @@
         <translation>内置</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="622"/>
+        <location filename="../../src/pages/EditPage.cpp" line="623"/>
         <source>Custom</source>
         <translation>自定义</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="627"/>
+        <location filename="../../src/pages/EditPage.cpp" line="628"/>
         <source>No custom templates saved.</source>
         <translation>尚未保存自定义模板。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="643"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1365"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1623"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1640"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1646"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1691"/>
+        <location filename="../../src/pages/EditPage.cpp" line="645"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1368"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1626"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1644"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1649"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1689"/>
         <source>Apply Template</source>
         <translation>应用模板</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="654"/>
+        <location filename="../../src/pages/EditPage.cpp" line="655"/>
         <location filename="../../src/pages/EditPage.cpp" line="660"/>
         <source>Delete Template</source>
         <translation>删除模板</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="655"/>
+        <location filename="../../src/pages/EditPage.cpp" line="656"/>
         <source>Delete the custom template &quot;%1&quot;?</source>
         <translation>删除自定义模板“%1”？</translation>
     </message>
@@ -361,108 +385,108 @@
         <translation>导出模板文件...</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="853"/>
+        <location filename="../../src/pages/EditPage.cpp" line="852"/>
         <source>Background visibility: %1%</source>
         <translation>背景显示强度：%1%</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1361"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1364"/>
         <source>TierListMaker Templates (*.tlmtemplate);;TierListMaker Projects (*.tlmproject)</source>
         <translation>TierListMaker 模板 (*.tlmtemplate);;TierListMaker 项目 (*.tlmproject)</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1364"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1525"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1533"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1562"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1578"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1367"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1528"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1536"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1565"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1581"/>
         <source>Save Template</source>
         <translation>保存模板</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1547"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1550"/>
         <source>Save Current Template</source>
         <translation>保存当前模板</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1553"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1556"/>
         <source>Template name</source>
         <translation>模板名称</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1562"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1565"/>
         <source>Enter a template name.</source>
         <translation>请输入模板名称。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1579"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1582"/>
         <source>Could not create the template folder.</source>
         <translation>无法创建模板文件夹。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1585"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1589"/>
         <source>Replace Template</source>
         <translation>替换模板</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1586"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1590"/>
         <source>Replace the existing template &quot;%1&quot;?</source>
         <translation>替换已有模板“%1”？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1641"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1645"/>
         <source>Applying a template replaces the current tiers and background. %1 image(s) placed in tiers will be moved back to the gallery. No images will be deleted from the project.</source>
         <translation>应用模板会替换当前的分级和背景。当前分级中的 %1 张图片将移回图库，但不会从项目中删除任何图片。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1877"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1875"/>
         <source>Tier name</source>
         <translation>分级名称</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1902"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1900"/>
         <source>Clear Tier Images</source>
         <translation>清空该分级图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1903"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1901"/>
         <source>Remove all images from &quot;%1&quot;?</source>
         <translation>移除“%1”中的所有图片？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1935"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1930"/>
         <source>Delete &quot;%1&quot; and remove its image assignments?</source>
         <translation>删除“%1”并移除其图片分配？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1973"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1967"/>
         <source>Insert Row Below</source>
         <translation>在下方插入一行</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1973"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1967"/>
         <source>Insert Row Above</source>
         <translation>在上方插入一行</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1974"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1979"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1968"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1973"/>
         <source>New Tier</source>
         <translation>新分级</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="2002"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1996"/>
         <source>A project with this name already exists.</source>
         <translation>已存在同名项目。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="2019"/>
-        <location filename="../../src/pages/EditPage.cpp" line="2027"/>
+        <location filename="../../src/pages/EditPage.cpp" line="2013"/>
+        <location filename="../../src/pages/EditPage.cpp" line="2021"/>
         <source>Save Failed</source>
         <translation>保存失败</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1382"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1385"/>
         <source>Import Images</source>
         <translation>导入图片</translation>
     </message>
@@ -472,8 +496,8 @@
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="1169"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1435"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1449"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1438"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1452"/>
         <source>Untitled Tier List</source>
         <translation>未命名分级列表</translation>
     </message>
@@ -520,22 +544,22 @@
         <translation type="vanished">是否将导入的图片复制到项目文件夹？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="745"/>
+        <location filename="../../src/pages/EditPage.cpp" line="744"/>
         <source>Import Failed</source>
         <translation>导入失败</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="762"/>
+        <location filename="../../src/pages/EditPage.cpp" line="761"/>
         <source>Export Tier List</source>
         <translation>导出分级列表</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="763"/>
+        <location filename="../../src/pages/EditPage.cpp" line="762"/>
         <source>PNG (*.png);;JPEG (*.jpg);;PDF (*.pdf)</source>
         <translation>PNG (*.png);;JPEG (*.jpg);;PDF (*.pdf)</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="769"/>
+        <location filename="../../src/pages/EditPage.cpp" line="768"/>
         <source>Export Failed</source>
         <translation>导出失败</translation>
     </message>
@@ -544,9 +568,9 @@
         <translation type="vanished">Tier List 背景</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="807"/>
+        <location filename="../../src/pages/EditPage.cpp" line="806"/>
+        <location filename="../../src/pages/EditPage.cpp" line="810"/>
         <location filename="../../src/pages/EditPage.cpp" line="811"/>
-        <location filename="../../src/pages/EditPage.cpp" line="812"/>
         <source>Default Background</source>
         <translation>默认背景</translation>
     </message>
@@ -555,12 +579,12 @@
         <translation type="vanished">未选择图片。tierlist 将使用当前的简洁背景。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="838"/>
+        <location filename="../../src/pages/EditPage.cpp" line="837"/>
         <source>Choose Image</source>
         <translation>选择图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="839"/>
+        <location filename="../../src/pages/EditPage.cpp" line="838"/>
         <source>Use Default</source>
         <translation>使用默认</translation>
     </message>
@@ -577,17 +601,17 @@
         <translation type="vanished">Tier list 透明度：%1%</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="870"/>
+        <location filename="../../src/pages/EditPage.cpp" line="869"/>
         <source>Images (*.png *.jpg *.jpeg *.webp *.bmp *.gif)</source>
         <translation>图片 (*.png *.jpg *.jpeg *.webp *.bmp *.gif)</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="873"/>
+        <location filename="../../src/pages/EditPage.cpp" line="872"/>
         <source>Choose Background Image</source>
         <translation>选择背景图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="969"/>
+        <location filename="../../src/pages/EditPage.cpp" line="968"/>
         <source>Background Image</source>
         <translation>背景图片</translation>
     </message>
@@ -596,32 +620,32 @@
         <translation type="vanished">是否将背景图片复制到项目资源中？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1007"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1005"/>
         <source>Remove Image</source>
         <translation>移除图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1007"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1006"/>
         <source>Remove the selected image from this project?</source>
         <translation>从此项目中移除所选图片？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1053"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1050"/>
         <source>Unsaved Changes</source>
         <translation>未保存的更改</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1053"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1050"/>
         <source>Save changes to &quot;%1&quot;?</source>
         <translation>保存对“%1”的更改？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1380"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1383"/>
         <source>Images (*.png *.jpg *.jpeg *.bmp *.gif *.webp)</source>
         <translation>图片 (*.png *.jpg *.jpeg *.bmp *.gif *.webp)</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="2034"/>
+        <location filename="../../src/pages/EditPage.cpp" line="2028"/>
         <source>Recent Projects</source>
         <translation>最近项目</translation>
     </message>
@@ -652,7 +676,7 @@
         <translation type="vanished">背景图片不透明度：%1%</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1877"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1875"/>
         <source>Edit Tier</source>
         <translation>编辑 Tier</translation>
     </message>
@@ -673,13 +697,13 @@
         <translation type="vanished">删除</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1926"/>
-        <location filename="../../src/pages/EditPage.cpp" line="1934"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1921"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1929"/>
         <source>Delete Row</source>
         <translation>删除行</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="1926"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1921"/>
         <source>At least one row is required.</source>
         <translation>至少需要保留一行。</translation>
     </message>
@@ -688,7 +712,7 @@
         <translation type="vanished">删除此行并清除其中图片的行归属？</translation>
     </message>
     <message>
-        <location filename="../../src/pages/EditPage.cpp" line="2001"/>
+        <location filename="../../src/pages/EditPage.cpp" line="1995"/>
         <source>Save Project</source>
         <translation>保存项目</translation>
     </message>
@@ -696,12 +720,12 @@
 <context>
     <name>tlm::GalleryGridWidget</name>
     <message>
-        <location filename="../../src/tier/ImageGalleryPopover.cpp" line="265"/>
+        <location filename="../../src/tier/ImageGalleryPopover.cpp" line="267"/>
         <source>Edit</source>
         <translation>编辑</translation>
     </message>
     <message>
-        <location filename="../../src/tier/ImageGalleryPopover.cpp" line="268"/>
+        <location filename="../../src/tier/ImageGalleryPopover.cpp" line="270"/>
         <source>Remove from Image Gallery</source>
         <translation>移出图库</translation>
     </message>
@@ -740,7 +764,7 @@
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
         <location filename="../../src/pages/PreferencesPage.cpp" line="272"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="514"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="522"/>
         <source>General</source>
         <translation>通用</translation>
     </message>
@@ -751,7 +775,7 @@
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
         <location filename="../../src/pages/PreferencesPage.cpp" line="274"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="579"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -779,8 +803,8 @@
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
         <location filename="../../src/pages/PreferencesPage.cpp" line="273"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="512"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="526"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="520"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="534"/>
         <source>Updates</source>
         <translation>更新</translation>
     </message>
@@ -866,56 +890,66 @@ The project may not have published update metadata yet.</source>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <source>Show tier list tooltips</source>
+        <translation>显示分级列表操作提示</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="445"/>
+        <source>Tier list tooltips</source>
+        <translation>分级列表操作提示</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="448"/>
         <source>Enable autosave</source>
         <translation>启用自动保存</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="442"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="450"/>
         <source>Save behavior</source>
         <translation>保存行为</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="446"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
         <source> min</source>
         <translation> 分钟</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="451"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
         <source>Autosave interval</source>
         <translation>自动保存间隔</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="466"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="474"/>
         <source>Default project folder</source>
         <translation>默认项目文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="469"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="477"/>
         <source>Choose</source>
         <translation>选择</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="494"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="502"/>
         <source>Default Project Folder</source>
         <translation>默认项目文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="504"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="512"/>
         <source>Enable automatic update checks</source>
         <translation>启用自动检查更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="535"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="543"/>
         <source>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</source>
         <translation>点击“立即检查”时会执行手动检查。启用自动检查后，最多每天检查一次。不会自动下载或执行任何更新。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="545"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="553"/>
         <source>Check Now</source>
         <translation>立即检查</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="581"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="589"/>
         <source>TierListMaker
 Version: %1
 License: MIT
@@ -974,7 +1008,7 @@ https://github.com/qianvk/TierListMaker</translation>
         <translation type="vanished">TierListMaker 不上传用户数据，默认不包含遥测。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="528"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="536"/>
         <source>Update definition:
 %1</source>
         <translation>更新定义：
@@ -989,7 +1023,7 @@ https://github.com/qianvk/TierListMaker</translation>
         <translation type="vanished">检查更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="547"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="555"/>
         <source>Open Release Page</source>
         <translation>打开发布页</translation>
     </message>
@@ -1071,35 +1105,35 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::ProjectCoverDialog</name>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="490"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="492"/>
         <source>Choose an image to use as the project cover.</source>
         <translation>选择一张图片作为项目封面。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="496"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="498"/>
         <source>Project cover crop</source>
         <translation>裁剪项目封面</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="516"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="614"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="518"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="615"/>
         <source>Choose Image</source>
         <translation>选择图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="519"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="521"/>
         <source>Clear Custom Cover</source>
         <translation>清除自定义封面</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="488"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="538"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="490"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="539"/>
         <location filename="../../src/pages/ProjectsPage.cpp" line="581"/>
         <source>Project Cover</source>
         <translation>项目封面</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="538"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="539"/>
         <source>Choose a cover image.</source>
         <translation>请选择封面图片。</translation>
     </message>
@@ -1109,7 +1143,7 @@ https://github.com/qianvk/vkframeless</translation>
         <translation>图片 (*.png *.jpg *.jpeg *.webp *.bmp *.gif);;所有文件 (*)</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="570"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="569"/>
         <source>Choose Project Cover</source>
         <translation>选择项目封面</translation>
     </message>
@@ -1119,12 +1153,12 @@ https://github.com/qianvk/vkframeless</translation>
         <translation>无法读取所选图片。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="600"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="601"/>
         <source>Change Image</source>
         <translation>更换图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="612"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="613"/>
         <source>Custom cover will be removed when you save.</source>
         <translation>保存后将移除自定义封面。</translation>
     </message>
@@ -1194,189 +1228,189 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::ProjectsPage</name>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="460"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="462"/>
         <source>Updated %1  |  Created %2  |  %3 rows, %4 images%5</source>
         <translation>更新于 %1  |  创建于 %2  |  %3 行，%4 张图片%5</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="466"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="468"/>
         <source>  |  Missing</source>
         <translation>  |  文件缺失</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="641"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="717"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="726"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="642"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="714"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="723"/>
         <source>Open Project</source>
         <translation>打开项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="651"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="729"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="652"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="726"/>
         <source>Search</source>
         <translation>搜索</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="655"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="735"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="656"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="732"/>
         <source>Last Edited</source>
         <translation>最近编辑</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="655"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="735"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="656"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="732"/>
         <source>Name</source>
         <translation>名称</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="655"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="735"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="656"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="732"/>
         <source>Created</source>
         <translation>创建时间</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="655"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="735"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="656"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="732"/>
         <source>Path</source>
         <translation>路径</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="761"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="758"/>
         <source>Open</source>
         <translation>打开</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="763"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="760"/>
         <source>Save As Project...</source>
         <translation>另存为项目...</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="764"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="761"/>
         <source>Rename</source>
         <translation>重命名</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="765"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="762"/>
         <source>Choose Cover</source>
         <translation>选择封面</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="766"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="763"/>
         <source>Reveal</source>
         <translation>在文件管理器中显示</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="768"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="765"/>
         <source>Remove from Recent Projects</source>
         <translation>从最近项目中移除</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="772"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1146"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1154"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="768"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1141"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1147"/>
         <source>Delete Project</source>
         <translation>删除项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="813"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="818"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="832"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="857"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="868"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="874"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="883"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="891"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="902"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="909"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="809"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="814"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="828"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="853"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="864"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="870"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="878"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="886"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="897"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="904"/>
         <source>Rename Project</source>
         <translation>重命名项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="824"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="820"/>
         <source>Project name</source>
         <translation>项目名称</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="832"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="828"/>
         <source>Enter a project name.</source>
         <translation>请输入项目名称。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="858"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1089"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="854"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1084"/>
         <source>A project with this name already exists.</source>
         <translation>已存在同名项目。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="869"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="865"/>
         <source>A project folder with this name already exists.</source>
         <translation>已存在同名项目文件夹。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="875"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="871"/>
         <source>Could not rename the project folder.</source>
         <translation>无法重命名项目文件夹。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="884"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1104"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="879"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1099"/>
         <source>Could not create the project folder.</source>
         <translation>无法创建项目文件夹。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="892"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1113"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="887"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1107"/>
         <source>Could not copy the project assets.</source>
         <translation>无法复制项目资源。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="910"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="905"/>
         <source>The project was renamed, but the old project file could not be removed.</source>
         <translation>项目已重命名，但无法移除旧项目文件。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="954"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="949"/>
         <source>Could not create the project assets folder.</source>
         <translation>无法创建项目资源文件夹。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="992"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="987"/>
         <source>Could not save the cover source image.</source>
         <translation>无法保存封面原图。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1006"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1001"/>
         <source>Could not save the cover image.</source>
         <translation>无法保存封面图片。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1069"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1088"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1096"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1103"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1112"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1064"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1083"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1091"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1098"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1107"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1116"/>
         <location filename="../../src/pages/ProjectsPage.cpp" line="1122"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1127"/>
         <source>Save As Project</source>
         <translation>另存为项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1097"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1092"/>
         <source>Choose a location outside the current project folder.</source>
         <translation>请选择当前项目文件夹之外的位置。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1128"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1123"/>
         <source>The project was saved, but the old project could not be removed.</source>
         <translation>项目已保存，但无法移除旧项目。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1147"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1142"/>
         <source>Delete &quot;%1&quot; and its project files? This cannot be undone.</source>
         <translation>删除“%1”及其项目文件？此操作无法撤销。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1155"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1148"/>
         <source>Could not delete the project from disk.</source>
         <translation>无法从磁盘删除该项目。</translation>
     </message>
@@ -1405,7 +1439,7 @@ https://github.com/qianvk/vkframeless</translation>
         <translation type="vanished">复制项目</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="718"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="715"/>
         <source>TierListMaker Projects (*.tlmproject)</source>
         <translation>TierListMaker 项目 (*.tlmproject)</translation>
     </message>
@@ -1418,12 +1452,12 @@ https://github.com/qianvk/vkframeless</translation>
         <translation type="vanished">从磁盘删除此项目文件？此操作无法撤销。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="928"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="953"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="965"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="991"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1006"/>
-        <location filename="../../src/pages/ProjectsPage.cpp" line="1025"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="923"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="948"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="960"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="986"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1001"/>
+        <location filename="../../src/pages/ProjectsPage.cpp" line="1020"/>
         <source>Cover Image</source>
         <translation>封面图片</translation>
     </message>
@@ -1457,38 +1491,38 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::RootWidget</name>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="275"/>
-        <location filename="../../src/window/RootWidget.cpp" line="304"/>
-        <location filename="../../src/window/RootWidget.cpp" line="383"/>
-        <location filename="../../src/window/RootWidget.cpp" line="488"/>
-        <location filename="../../src/window/RootWidget.cpp" line="619"/>
+        <location filename="../../src/window/RootWidget.cpp" line="293"/>
+        <location filename="../../src/window/RootWidget.cpp" line="322"/>
+        <location filename="../../src/window/RootWidget.cpp" line="404"/>
+        <location filename="../../src/window/RootWidget.cpp" line="509"/>
+        <location filename="../../src/window/RootWidget.cpp" line="640"/>
         <source>Collapse sidebar</source>
         <translation>折叠侧边栏</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="280"/>
-        <location filename="../../src/window/RootWidget.cpp" line="382"/>
-        <location filename="../../src/window/RootWidget.cpp" line="488"/>
-        <location filename="../../src/window/RootWidget.cpp" line="618"/>
+        <location filename="../../src/window/RootWidget.cpp" line="298"/>
+        <location filename="../../src/window/RootWidget.cpp" line="403"/>
+        <location filename="../../src/window/RootWidget.cpp" line="509"/>
+        <location filename="../../src/window/RootWidget.cpp" line="639"/>
         <source>Show sidebar</source>
         <translation>显示侧边栏</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="293"/>
-        <location filename="../../src/window/RootWidget.cpp" line="386"/>
+        <location filename="../../src/window/RootWidget.cpp" line="311"/>
+        <location filename="../../src/window/RootWidget.cpp" line="407"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="389"/>
-        <location filename="../../src/window/RootWidget.cpp" line="432"/>
-        <location filename="../../src/window/RootWidget.cpp" line="729"/>
-        <location filename="../../src/window/RootWidget.cpp" line="876"/>
+        <location filename="../../src/window/RootWidget.cpp" line="410"/>
+        <location filename="../../src/window/RootWidget.cpp" line="453"/>
+        <location filename="../../src/window/RootWidget.cpp" line="750"/>
+        <location filename="../../src/window/RootWidget.cpp" line="897"/>
         <source>Preferences</source>
         <translation>偏好设置</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="870"/>
+        <location filename="../../src/window/RootWidget.cpp" line="891"/>
         <source>Projects</source>
         <translation>项目</translation>
     </message>
@@ -1524,7 +1558,7 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::ThumbnailCache</name>
     <message>
-        <location filename="../../src/assets/ThumbnailCache.cpp" line="123"/>
+        <location filename="../../src/assets/ThumbnailCache.cpp" line="134"/>
         <source>Thumbnail generation failed.</source>
         <translation>缩略图生成失败。</translation>
     </message>
@@ -1550,89 +1584,105 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::TierListView</name>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3507"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3589"/>
         <source>No images in tier list</source>
         <translation>tier list 中没有图片</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2990"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3063"/>
         <source>Open Tier Overview</source>
         <translation>打开 tier 总览</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1073"/>
-        <location filename="../../src/tier/TierListView.cpp" line="1401"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3050"/>
         <source>Click to exit display</source>
         <translation>点击退出展示</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1402"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3048"/>
         <source>Double-click to preview. Drag to move.</source>
         <translation>双击预览，拖拽移动。</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1561"/>
-        <location filename="../../src/tier/TierListView.cpp" line="1609"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1569"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1617"/>
         <source>Edit</source>
         <translation>编辑</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1563"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1571"/>
         <source>Clear Images</source>
         <translation>清空图片</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1565"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1573"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1568"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1576"/>
         <source>Insert Row Above</source>
         <translation>在上方插入一行</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1570"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1578"/>
         <source>Insert Row Below</source>
         <translation>在下方插入一行</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1615"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1623"/>
         <source>Remove from Tier Row</source>
         <translation>移出分级行</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1616"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1624"/>
         <source>Remove from Image Gallery</source>
         <translation>移出图库</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2979"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3023"/>
         <source>Double-click to display this tier. Right-click for tier actions.</source>
         <translation>双击展示该分级。右键打开分级操作。</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2992"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3065"/>
         <source>Open Gallery Overview</source>
         <translation>打开图库总览</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3002"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3075"/>
         <source>Double-click: %1</source>
         <translation>双击：%1</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3006"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3079"/>
         <source>Long press: %1</source>
         <translation>长按：%1</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3505"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3086"/>
+        <source>Option</source>
+        <translation>Option</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="3088"/>
+        <source>Alt</source>
+        <translation>Alt</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="3090"/>
+        <source>Hold %1 and drag: Move window
+Esc: Exit Focus Mode</source>
+        <translation>按住 %1 并拖动：移动窗口
+Esc：退出专注模式</translation>
+    </message>
+    <message>
+        <location filename="../../src/tier/TierListView.cpp" line="3587"/>
         <source>No imported images</source>
         <translation>暂无已导入图片</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3506"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3588"/>
         <source>No images in this tier</source>
         <translation>该分级中没有图片</translation>
     </message>

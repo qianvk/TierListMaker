@@ -218,6 +218,19 @@ void AppSettings::setBlankLongPressAction(BlankAreaAction action) {
     emit changed();
 }
 
+bool AppSettings::tierListToolTipsEnabled() const {
+    return m_settings.value(settings_keys::tierListToolTipsEnabled.toString(), true).toBool();
+}
+
+void AppSettings::setTierListToolTipsEnabled(bool enabled) {
+    if (tierListToolTipsEnabled() == enabled) {
+        return;
+    }
+    m_settings.setValue(settings_keys::tierListToolTipsEnabled.toString(), enabled);
+    emit tierListToolTipsEnabledChanged(enabled);
+    emit changed();
+}
+
 QString AppSettings::defaultExportFormat() const {
     return m_settings.value(settings_keys::exportFormat.toString(), QStringLiteral("png")).toString();
 }

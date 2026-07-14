@@ -31,6 +31,8 @@ public:
     void setMissionControlMode(bool active);
     bool isMissionControlModeActive() const;
     void setBlankAreaActions(BlankAreaAction doubleClickAction, BlankAreaAction longPressAction);
+    void setTierFocusMode(bool enabled);
+    void setToolTipsEnabled(bool enabled);
 
 signals:
     void imageDropped(const QString& imageId, const QString& rowId, int index);

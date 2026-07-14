@@ -58,6 +58,7 @@ public slots:
     void switchToPage(AppPage page);
 
 protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
     void showEvent(QShowEvent* event) override;
     void changeEvent(QEvent* event) override;

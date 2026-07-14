@@ -42,6 +42,8 @@ public:
     void setBlankDoubleClickAction(BlankAreaAction action);
     BlankAreaAction blankLongPressAction() const;
     void setBlankLongPressAction(BlankAreaAction action);
+    bool tierListToolTipsEnabled() const;
+    void setTierListToolTipsEnabled(bool enabled);
 
     QString defaultExportFormat() const;
     void setDefaultExportFormat(const QString& format);
@@ -63,6 +65,7 @@ signals:
     void autoUpdateEnabledChanged(bool enabled);
     void blankDoubleClickActionChanged(BlankAreaAction action);
     void blankLongPressActionChanged(BlankAreaAction action);
+    void tierListToolTipsEnabledChanged(bool enabled);
 
 private:
     QSettings m_settings;

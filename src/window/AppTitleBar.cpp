@@ -147,9 +147,7 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
 }
 
 AppTitleBar::~AppTitleBar() {
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     removeTitleEditOutsideClickFilter();
-#endif
 }
 
 void AppTitleBar::retranslateUi() {
@@ -339,7 +337,6 @@ QLineEdit* AppTitleBar::titleEditor() const {
 }
 
 bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
     if (m_titleEditOutsideClickFilterInstalled && m_titleEdit && m_titleEdit->hasFocus() &&
         (event->type() == QEvent::MouseButtonPress ||
          event->type() == QEvent::NonClientAreaMouseButtonPress)) {
@@ -349,7 +346,6 @@ bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
             submitTitleEdit(true);
         }
     }
-#endif
     if (event->type() == QEvent::MouseButtonPress && watched != m_titleEdit && m_titleEdit &&
         m_titleEdit->hasFocus()) {
         submitTitleEdit(true);
@@ -357,15 +353,11 @@ bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
     if (watched == m_titleEdit) {
         if (event->type() == QEvent::FocusIn) {
             rememberTitleEditBaseline();
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
             installTitleEditOutsideClickFilter();
-#endif
         } else if (event->type() == QEvent::FocusOut && !m_submittingTitle &&
                    !m_cancelingTitleEdit) {
             submitTitleEdit(false);
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
             removeTitleEditOutsideClickFilter();
-#endif
         } else if (event->type() == QEvent::ShortcutOverride) {
             auto* keyEvent = static_cast<QKeyEvent*>(event);
             if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter ||
@@ -451,7 +443,6 @@ void AppTitleBar::updateLayoutMargins() {
 #endif
 }
 
-#if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)
 void AppTitleBar::installTitleEditOutsideClickFilter() {
     if (m_titleEditOutsideClickFilterInstalled || !qApp) {
         return;
@@ -467,6 +458,5 @@ void AppTitleBar::removeTitleEditOutsideClickFilter() {
     qApp->removeEventFilter(this);
     m_titleEditOutsideClickFilterInstalled = false;
 }
-#endif
 
 } // namespace tlm

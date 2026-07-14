@@ -116,12 +116,18 @@ void ThumbnailCache::requestThumbnail(const QString& cacheKey, const QString& fi
     }
     m_pending.insert(key);
     UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailRequestStarted);
+    const quint64 generation = m_generation;
 
     auto* watcher = new QFutureWatcher<QImage>(static_cast<QObject*>(this));
     connect(watcher, &QFutureWatcher<QImage>::finished, this,
-            [this, watcher, cacheKey, requestSize, key]() {
+            [this, watcher, cacheKey, requestSize, key, generation]() {
                 const QImage image = watcher->result();
                 watcher->deleteLater();
+                // A project switch invalidates in-flight work. Do not let an older decode erase
+                // or overwrite a request that belongs to the new project generation.
+                if (generation != m_generation) {
+                    return;
+                }
                 m_pending.remove(key);
                 if (image.isNull()) {
                     UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailFailed);
@@ -148,6 +154,7 @@ void ThumbnailCache::requestThumbnail(const QString& cacheKey, const QString& fi
 }
 
 void ThumbnailCache::clear() {
+    ++m_generation;
     m_cache.clear();
     m_pending.clear();
     m_cacheCostBytes = 0;

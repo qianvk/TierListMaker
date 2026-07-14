@@ -46,6 +46,7 @@ private:
     QSet<QString> m_pending;
     qsizetype m_cacheCostBytes{0};
     quint64 m_serial{0};
+    quint64 m_generation{0};
 };
 
 } // namespace tlm
