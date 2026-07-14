@@ -2,20 +2,18 @@
 #include "window/MainWindow.h"
 
 #include <QApplication>
-#include <QEasingCurve>
 #include <QEvent>
 #include <QFont>
 #include <QFontMetrics>
-#include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QKeyEvent>
+#include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QSizePolicy>
 #include <QToolButton>
-#include <QVariantAnimation>
 #include <QWidget>
 
 #include <algorithm>
@@ -91,6 +89,14 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
         QStringLiteral("QLineEdit#ProjectTitleEdit{background:transparent;border:none;"
                        "border-radius:0px;padding:4px "
                        "10px;}"));
+    m_unsavedIndicator = new QLabel(this);
+    m_unsavedIndicator->setObjectName(QStringLiteral("UnsavedIndicator"));
+    m_unsavedIndicator->setFixedSize(16, 16);
+    m_unsavedIndicator->setPixmap(
+        vkui::icon(vkui::VkSymbol::UnsavedIndicator, vkui::VkIconRole::Accent).pixmap(14, 14));
+    m_unsavedIndicator->setToolTip(tr("Unsaved changes"));
+    m_unsavedIndicator->setAttribute(Qt::WA_TransparentForMouseEvents);
+    m_unsavedIndicator->hide();
     m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Templates, this);
     m_backgroundButton = makeButton(tr("Background"), vkui::VkSymbol::CanvasBackground, this);
     m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::PhotoLibrary, this);
@@ -98,18 +104,13 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     m_focusButton = makeButton(tr("Enter Tier Focus"), vkui::VkSymbol::FocusTarget, this);
     m_buttonGroup = new QWidget(this);
     m_buttonGroup->setObjectName(QStringLiteral("ToolbarButtonGroup"));
-    m_buttonGroup->setMouseTracking(true);
-    m_buttonGroup->installEventFilter(this);
     m_buttonGroup->setStyleSheet(
         QStringLiteral("QWidget#ToolbarButtonGroup{background:transparent;border:none;}"));
-    m_buttonGroupOpacity = new QGraphicsOpacityEffect(m_buttonGroup);
-    m_buttonGroupOpacity->setOpacity(1.0);
-    m_buttonGroup->setGraphicsEffect(m_buttonGroupOpacity);
     auto* buttonsLayout = new QHBoxLayout(m_buttonGroup);
     buttonsLayout->setContentsMargins(0, 0, 0, 0);
     buttonsLayout->setSpacing(2);
-    for (QToolButton* button : {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton,
-                                m_focusButton}) {
+    for (QToolButton* button :
+         {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton, m_focusButton}) {
         button->installEventFilter(this);
         buttonsLayout->addWidget(button);
     }
@@ -169,6 +170,11 @@ void AppTitleBar::retranslateUi() {
     }
     if (m_focusButton) {
         m_focusButton->setToolTip(m_tierFocusMode ? tr("Exit Tier Focus") : tr("Enter Tier Focus"));
+    }
+    if (m_unsavedIndicator) {
+        m_unsavedIndicator->setToolTip(tr("Unsaved changes"));
+        m_unsavedIndicator->setPixmap(
+            vkui::icon(vkui::VkSymbol::UnsavedIndicator, vkui::VkIconRole::Accent).pixmap(14, 14));
     }
 }
 
@@ -233,7 +239,14 @@ void AppTitleBar::setTierFocusMode(bool enabled) {
         m_focusButton->setToolTip(enabled ? tr("Exit Tier Focus") : tr("Enter Tier Focus"));
         m_focusButton->setIconSize(enabled ? QSize(15, 15) : QSize(19, 19));
     }
-    setToolbarReveal(enabled ? 0.0 : 1.0);
+}
+
+void AppTitleBar::setUnsavedIndicatorVisible(bool visible) {
+    if (!m_unsavedIndicator || m_unsavedIndicator->isVisible() == visible) {
+        return;
+    }
+    m_unsavedIndicator->setVisible(visible);
+    updateTitleGeometry();
 }
 
 void AppTitleBar::setLeadingReservedWidth(int width) {
@@ -374,13 +387,6 @@ bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
             }
         }
     }
-    if (watched == m_buttonGroup && m_tierFocusMode) {
-        if (event->type() == QEvent::Enter) {
-            setToolbarReveal(1.0);
-        } else if (event->type() == QEvent::Leave) {
-            setToolbarReveal(0.0);
-        }
-    }
     return QWidget::eventFilter(watched, event);
 }
 
@@ -420,6 +426,13 @@ void AppTitleBar::updateTitleGeometry() {
     const int y = qMax(0, (height() - titleHeight) / 2);
     m_titleEdit->setGeometry(x, y, titleWidth, titleHeight);
     m_titleEdit->raise();
+    if (m_unsavedIndicator) {
+        const int indicatorX =
+            qMin(width() - m_unsavedIndicator->width() - 4, m_titleEdit->geometry().right() + 4);
+        const int indicatorY = qMax(0, (height() - m_unsavedIndicator->height()) / 2);
+        m_unsavedIndicator->move(qMax(0, indicatorX), indicatorY);
+        m_unsavedIndicator->raise();
+    }
     if (m_buttonGroup) {
         m_buttonGroup->raise();
     }
@@ -436,38 +449,6 @@ void AppTitleBar::updateLayoutMargins() {
     layout->setContentsMargins(kTitleBarHorizontalMargin + m_leadingReservedWidth, 0,
                                kTitleBarHorizontalMargin, 0);
 #endif
-}
-
-void AppTitleBar::setToolbarReveal(qreal targetOpacity) {
-    if (!m_buttonGroupOpacity) {
-        return;
-    }
-    targetOpacity = qBound<qreal>(0.0, targetOpacity, 1.0);
-    if (m_revealAnimation && qAbs(m_revealAnimation->endValue().toReal() - targetOpacity) < 0.01) {
-        return;
-    }
-    if (m_revealAnimation) {
-        m_revealAnimation->stop();
-        m_revealAnimation->deleteLater();
-        m_revealAnimation = nullptr;
-    }
-
-    auto* animation = new QVariantAnimation(this);
-    m_revealAnimation = animation;
-    animation->setDuration(160);
-    animation->setEasingCurve(QEasingCurve::OutCubic);
-    animation->setStartValue(m_buttonGroupOpacity->opacity());
-    animation->setEndValue(targetOpacity);
-    connect(animation, &QVariantAnimation::valueChanged, this,
-            [this](const QVariant& value) { m_buttonGroupOpacity->setOpacity(value.toReal()); });
-    connect(animation, &QVariantAnimation::finished, this, [this, animation, targetOpacity]() {
-        if (m_revealAnimation == animation) {
-            m_revealAnimation = nullptr;
-        }
-        m_buttonGroupOpacity->setOpacity(targetOpacity);
-        animation->deleteLater();
-    });
-    animation->start();
 }
 
 #if !defined(Q_OS_MACOS) && !defined(Q_OS_MAC)

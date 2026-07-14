@@ -114,6 +114,30 @@ Result<bool> AssetManager::migrateSessionAssets(TierProject& project, const QStr
     }
     changed = changed || thumbnailMigrated.value();
 
+    if (!project.cover.isEmpty()) {
+        QString coverSource = project.cover.value(QStringLiteral("sourceImagePath")).toString();
+        auto coverSourceMigrated =
+            migratePath(coverSource, tr("Could not migrate the project cover source image."));
+        if (!coverSourceMigrated) {
+            return coverSourceMigrated;
+        }
+        if (coverSourceMigrated.value()) {
+            project.cover.insert(QStringLiteral("sourceImagePath"), coverSource);
+            changed = true;
+        }
+
+        QString coverCropped = project.cover.value(QStringLiteral("croppedImagePath")).toString();
+        auto coverCroppedMigrated =
+            migratePath(coverCropped, tr("Could not migrate the project cover image."));
+        if (!coverCroppedMigrated) {
+            return coverCroppedMigrated;
+        }
+        if (coverCroppedMigrated.value()) {
+            project.cover.insert(QStringLiteral("croppedImagePath"), coverCropped);
+            changed = true;
+        }
+    }
+
     return Result<bool>::success(changed);
 }
 

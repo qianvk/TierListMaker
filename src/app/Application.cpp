@@ -4,6 +4,7 @@
 #include "assets/ThumbnailCache.h"
 #include "i18n/LanguageManager.h"
 #include "logging/Logger.h"
+#include "logging/UiPerformanceMonitor.h"
 #include "persistence/ProjectRepository.h"
 #include "persistence/RecentProjectsStore.h"
 #include "settings/AppSettings.h"
@@ -115,8 +116,22 @@ protected:
         }
 
         if (event->type() == QEvent::ToolTip) {
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+            if (widget->property("tlmDynamicToolTip").toBool()) {
+                return QObject::eventFilter(watched, event);
+            }
+#endif
             auto* helpEvent = static_cast<QHelpEvent*>(event);
-            const QString text = widget->toolTip().trimmed();
+            QString text;
+            QObject* provider = widget->property("tlmToolTipProvider").value<QObject*>();
+            if (provider) {
+                QMetaObject::invokeMethod(provider, "toolTipTextAt", Qt::DirectConnection,
+                                          Q_RETURN_ARG(QString, text),
+                                          Q_ARG(QPoint, helpEvent->pos()));
+            } else {
+                text = widget->toolTip();
+            }
+            text = text.trimmed();
             if (text.isEmpty()) {
                 hideTip();
                 event->ignore();
@@ -183,6 +198,7 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv) {
 
     m_logger = std::make_unique<Logger>();
     m_logger->installMessageHandler();
+    m_performanceMonitor = std::make_unique<UiPerformanceMonitor>(this, this);
     m_settings = std::make_unique<AppSettings>();
     m_languageManager = std::make_unique<LanguageManager>(this);
     m_languageManager->setLanguage(m_settings->language());

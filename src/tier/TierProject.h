@@ -19,6 +19,7 @@ public:
     QDateTime createdAt;
     QDateTime updatedAt;
     QString thumbnailPath;
+    QJsonObject cover;
     QJsonObject canvas;
     QVector<TierRow> rows;
     QVector<TierImage> images;

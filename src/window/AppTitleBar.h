@@ -5,15 +5,14 @@
 #include <QWidget>
 
 class QEvent;
-class QGraphicsOpacityEffect;
 class QHBoxLayout;
 class QKeyEvent;
+class QLabel;
 class QLineEdit;
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
 class QToolButton;
-class QVariantAnimation;
 class QWidget;
 
 namespace tlm {
@@ -31,6 +30,7 @@ public:
     void setEditorActionsVisible(bool visible);
     void setResetRowsActionEnabled(bool enabled);
     void setTierFocusMode(bool enabled);
+    void setUnsavedIndicatorVisible(bool visible);
     void setLeadingReservedWidth(int width);
     void retranslateUi();
     QSize focusRevealSizeHint() const;
@@ -57,7 +57,6 @@ private:
     void cancelTitleEdit();
     void rememberTitleEditBaseline();
     QRect globalRectFor(QWidget* widget) const;
-    void setToolbarReveal(qreal targetOpacity);
     void updateLayoutMargins();
     void updateTitleWidth();
     void updateTitleGeometry();
@@ -67,6 +66,7 @@ private:
 #endif
 
     QLineEdit* m_titleEdit{nullptr};
+    QLabel* m_unsavedIndicator{nullptr};
     QHBoxLayout* m_contentLayout{nullptr};
     QToolButton* m_templatesButton{nullptr};
     QToolButton* m_backgroundButton{nullptr};
@@ -74,8 +74,6 @@ private:
     QToolButton* m_resetButton{nullptr};
     QToolButton* m_focusButton{nullptr};
     QWidget* m_buttonGroup{nullptr};
-    QGraphicsOpacityEffect* m_buttonGroupOpacity{nullptr};
-    QVariantAnimation* m_revealAnimation{nullptr};
     bool m_tierFocusMode{false};
     bool m_editorActionsVisible{true};
     bool m_titleEditable{true};

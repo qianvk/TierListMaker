@@ -1,6 +1,6 @@
 #include "assets/ThumbnailCache.h"
 
-#include "logging/Logger.h"
+#include "logging/UiPerformanceMonitor.h"
 
 #include <QFutureWatcher>
 #include <QImage>
@@ -35,7 +35,8 @@ QSize adaptiveDecodeSize(const QSize& sourceSize, QSize requestedSize) {
     const int sourceLong = qMax(sourceSize.width(), sourceSize.height());
     const int requestedLong = qMax(requestedSize.width(), requestedSize.height());
     const qint64 sourceArea = static_cast<qint64>(sourceSize.width()) * sourceSize.height();
-    const qint64 requestedArea = static_cast<qint64>(requestedSize.width()) * requestedSize.height();
+    const qint64 requestedArea =
+        static_cast<qint64>(requestedSize.width()) * requestedSize.height();
 
     // Decode native pixels only when the display is close enough to native size, or when
     // the original is modest. Otherwise QImageReader scales during decode to avoid loading
@@ -48,9 +49,11 @@ QSize adaptiveDecodeSize(const QSize& sourceSize, QSize requestedSize) {
         return sourceSize;
     }
 
-    const QSize oversampled(qRound(requestedSize.width() * 1.18), qRound(requestedSize.height() * 1.18));
-    return sourceSize.scaled(oversampled.boundedTo(QSize(kMaxCachedDecodeSide, kMaxCachedDecodeSide)),
-                             Qt::KeepAspectRatio);
+    const QSize oversampled(qRound(requestedSize.width() * 1.18),
+                            qRound(requestedSize.height() * 1.18));
+    return sourceSize.scaled(
+        oversampled.boundedTo(QSize(kMaxCachedDecodeSide, kMaxCachedDecodeSide)),
+        Qt::KeepAspectRatio);
 }
 } // namespace
 
@@ -70,40 +73,65 @@ bool ThumbnailCache::hasThumbnail(const QString& cacheKey) const {
 
 bool ThumbnailCache::hasThumbnail(const QString& cacheKey, QSize minimumPixelSize) const {
     minimumPixelSize = normalizedRequestSize(minimumPixelSize);
+    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageCheck);
     for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
         const CacheEntry& entry = it.value();
         if (entry.baseKey != cacheKey || entry.pixmap.isNull()) {
             continue;
         }
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+        // requestSize describes the decode quality. The decoded pixmap keeps its aspect ratio,
+        // so comparing both pixmap dimensions against a square paint request permanently marks
+        // wide and tall images as undersized.
+        const QSize coveredSize = entry.requestSize;
+#else
         const QSize pixmapSize = entry.pixmap.size();
-        if (pixmapSize.width() >= minimumPixelSize.width() &&
-            pixmapSize.height() >= minimumPixelSize.height()) {
+        const QSize coveredSize = pixmapSize;
+#endif
+        if (coveredSize.width() >= minimumPixelSize.width() &&
+            coveredSize.height() >= minimumPixelSize.height()) {
+            UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageHit);
             return true;
         }
     }
+    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageMiss);
     return false;
 }
 
-void ThumbnailCache::requestThumbnail(const QString& cacheKey, const QString& filePath, QSize size) {
+void ThumbnailCache::requestThumbnail(const QString& cacheKey, const QString& filePath,
+                                      QSize size) {
     const QSize requestSize = normalizedRequestSize(size);
     const QString key = variantKey(cacheKey, requestSize);
-    if (m_cache.contains(key) || m_pending.contains(key) || filePath.isEmpty()) {
+    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailRequest);
+    if (m_cache.contains(key)) {
+        UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailRequestCached);
+        return;
+    }
+    if (m_pending.contains(key)) {
+        UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailRequestPending);
+        return;
+    }
+    if (filePath.isEmpty()) {
         return;
     }
     m_pending.insert(key);
+    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailRequestStarted);
 
     auto* watcher = new QFutureWatcher<QImage>(static_cast<QObject*>(this));
-    connect(watcher, &QFutureWatcher<QImage>::finished, this, [this, watcher, cacheKey, requestSize, key]() {
-        const QImage image = watcher->result();
-        watcher->deleteLater();
-        m_pending.remove(key);
-        if (image.isNull()) {
-            emit thumbnailFailed(cacheKey, tr("Thumbnail generation failed."));
-            return;
-        }
-        insertEntry(cacheKey, requestSize, QPixmap::fromImage(image));
-        emit thumbnailReady(cacheKey);
-    });
+    connect(watcher, &QFutureWatcher<QImage>::finished, this,
+            [this, watcher, cacheKey, requestSize, key]() {
+                const QImage image = watcher->result();
+                watcher->deleteLater();
+                m_pending.remove(key);
+                if (image.isNull()) {
+                    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailFailed);
+                    emit thumbnailFailed(cacheKey, tr("Thumbnail generation failed."));
+                    return;
+                }
+                insertEntry(cacheKey, requestSize, QPixmap::fromImage(image));
+                UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailReady);
+                emit thumbnailReady(cacheKey);
+            });
 
     watcher->setFuture(QtConcurrent::run([filePath, requestSize]() {
         QImageReader reader(filePath);
@@ -147,6 +175,7 @@ qsizetype ThumbnailCache::pixmapCostBytes(const QPixmap& pixmap) {
 }
 
 QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixelSize) const {
+    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailPixmapLookup);
     const bool hasMinimum = !minimumPixelSize.isEmpty();
     const CacheEntry* bestCovering = nullptr;
     const CacheEntry* largestFallback = nullptr;
@@ -164,9 +193,16 @@ QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixe
             largestArea = area;
             largestFallback = &entry;
         }
-        if (hasMinimum && pixmapSize.width() >= minimumPixelSize.width() &&
-            pixmapSize.height() >= minimumPixelSize.height() && area < bestCoveringArea) {
-            bestCoveringArea = area;
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+        const QSize coveredSize = entry.requestSize;
+        const qint64 coveringArea = static_cast<qint64>(coveredSize.width()) * coveredSize.height();
+#else
+        const QSize coveredSize = pixmapSize;
+        const qint64 coveringArea = area;
+#endif
+        if (hasMinimum && coveredSize.width() >= minimumPixelSize.width() &&
+            coveredSize.height() >= minimumPixelSize.height() && coveringArea < bestCoveringArea) {
+            bestCoveringArea = coveringArea;
             bestCovering = &entry;
         }
         if (!hasMinimum && area < bestCoveringArea) {
@@ -184,7 +220,8 @@ QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixe
     return {};
 }
 
-void ThumbnailCache::insertEntry(const QString& cacheKey, QSize requestSize, const QPixmap& pixmap) {
+void ThumbnailCache::insertEntry(const QString& cacheKey, QSize requestSize,
+                                 const QPixmap& pixmap) {
     const QString key = variantKey(cacheKey, requestSize);
     const qsizetype nextCost = pixmapCostBytes(pixmap);
     if (m_cache.contains(key)) {
@@ -192,14 +229,6 @@ void ThumbnailCache::insertEntry(const QString& cacheKey, QSize requestSize, con
     }
     m_cache.insert(key, CacheEntry{cacheKey, requestSize, pixmap, nextCost, ++m_serial});
     m_cacheCostBytes += nextCost;
-    Logger::debug(QStringLiteral("thumbnail.cache.insert key=%1 request=(%2,%3) pixmap=(%4,%5) costMB=%6 totalMB=%7")
-                      .arg(cacheKey)
-                      .arg(requestSize.width())
-                      .arg(requestSize.height())
-                      .arg(pixmap.width())
-                      .arg(pixmap.height())
-                      .arg(static_cast<double>(nextCost) / (1024.0 * 1024.0), 0, 'f', 2)
-                      .arg(static_cast<double>(m_cacheCostBytes) / (1024.0 * 1024.0), 0, 'f', 2));
     trimToBudget();
 }
 
@@ -217,11 +246,7 @@ void ThumbnailCache::trimToBudget() {
             break;
         }
         m_cacheCostBytes -= victim.value().costBytes;
-        Logger::debug(QStringLiteral("thumbnail.cache.evict key=%1 request=(%2,%3) totalMB=%4")
-                          .arg(victim.value().baseKey)
-                          .arg(victim.value().requestSize.width())
-                          .arg(victim.value().requestSize.height())
-                          .arg(static_cast<double>(m_cacheCostBytes) / (1024.0 * 1024.0), 0, 'f', 2));
+        UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailEvicted);
         m_cache.erase(victim);
     }
 }

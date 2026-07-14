@@ -23,8 +23,7 @@ class ProjectsPage : public QWidget {
 
 public:
     ProjectsPage(ProjectRepository* repository, RecentProjectsStore* recentProjects,
-                 AppSettings* settings,
-                 QWidget* parent = nullptr);
+                 AppSettings* settings, QWidget* parent = nullptr);
 
 public slots:
     void refresh();
@@ -34,6 +33,7 @@ public slots:
 
 signals:
     void openProjectRequested(const QString& filePath);
+    void projectDeleted(const QString& filePath);
 
 private:
     QString selectedPath() const;

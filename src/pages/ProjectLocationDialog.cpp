@@ -23,7 +23,8 @@ namespace tlm {
 namespace {
 QString documentsOrHome() {
     const QString documents = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    return documents.isEmpty() ? QDir::homePath() : documents;
+    const QString base = documents.isEmpty() ? QDir::homePath() : documents;
+    return QDir(base).filePath(QStringLiteral("TierListMaker"));
 }
 } // namespace
 

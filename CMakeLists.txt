@@ -41,6 +41,8 @@ set(TLM_CORE_SOURCES
     src/i18n/LanguageManager.h
     src/logging/Logger.cpp
     src/logging/Logger.h
+    src/logging/UiPerformanceMonitor.cpp
+    src/logging/UiPerformanceMonitor.h
     src/persistence/AtomicFileWriter.cpp
     src/persistence/AtomicFileWriter.h
     src/persistence/ProjectRepository.cpp

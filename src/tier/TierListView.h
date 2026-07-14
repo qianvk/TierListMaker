@@ -2,11 +2,11 @@
 
 #include "settings/AppSettings.h"
 
+#include <QHash>
 #include <QListView>
 #include <QPersistentModelIndex>
-#include <QHash>
-#include <QPointF>
 #include <QPixmap>
+#include <QPointF>
 #include <QRectF>
 #include <QStringList>
 #include <QVector>
@@ -51,12 +51,19 @@ public:
     bool isImageDragSource(const QString& imageId) const;
     QPointF visualOffsetForImage(const QString& imageId) const;
     QRect imageSourceRect(const QString& imageId) const;
-    bool isMissionControlActive() const { return m_missionControlActive; }
-    qreal missionTransitionProgress() const { return m_missionTransitionProgress; }
+    bool isMissionControlActive() const {
+        return m_missionControlActive;
+    }
+    qreal missionTransitionProgress() const {
+        return m_missionTransitionProgress;
+    }
     bool isGalleryMissionLayerVisible() const {
-        return m_missionFromGallery && (m_missionControlActive || m_missionTransitionProgress > 0.001);
+        return m_missionFromGallery &&
+               (m_missionControlActive || m_missionTransitionProgress > 0.001);
     }
     void setBlankAreaActions(BlankAreaAction doubleClickAction, BlankAreaAction longPressAction);
+    void updateImageVisual(const QString& imageId);
+    Q_INVOKABLE QString toolTipTextAt(QPoint viewportPoint) const;
 
 signals:
     void imageDropped(const QString& imageId, const QString& rowId, int index);
@@ -80,6 +87,9 @@ public slots:
     void toggleGalleryMissionControlActive(const QRect& sourceGlobalRect);
 
 protected:
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    bool viewportEvent(QEvent* event) override;
+#endif
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
     void mouseReleaseEvent(QMouseEvent* event) override;
@@ -95,18 +105,9 @@ protected:
     void dropEvent(QDropEvent* event) override;
 
 private:
-    enum class MissionControlSource {
-        TierRows,
-        TierRow,
-        Gallery
-    };
+    enum class MissionControlSource { TierRows, TierRow, Gallery };
 
-    enum class PressKind {
-        None,
-        RowLabel,
-        ImageTile,
-        BlankArea
-    };
+    enum class PressKind { None, RowLabel, ImageTile, BlankArea };
 
     TierListModel* tierModel() const;
     TierListDelegate* tierDelegate() const;
@@ -150,11 +151,14 @@ private:
     void animateMissionHover(qreal targetProgress);
     void stopMissionHoverAnimation();
     void scheduleMissionImageLift(const QString& imageId, const QPoint& viewportPoint);
-    void startMissionImageLiftDrag(const QString& imageId, const QPoint& viewportPoint, int pressSerial);
+    void startMissionImageLiftDrag(const QString& imageId, const QPoint& viewportPoint,
+                                   int pressSerial);
     void scheduleBlankMissionControl(const QPoint& viewportPoint);
-    bool runBlankAreaAction(BlankAreaAction action, const char* trigger, const QPoint& viewportPoint);
-    void updateBlankAreaToolTip(const QPoint& viewportPoint);
+    bool runBlankAreaAction(BlankAreaAction action, const char* trigger,
+                            const QPoint& viewportPoint);
+    QString blankAreaToolTipAt(const QPoint& viewportPoint) const;
     QString blankAreaHintText() const;
+    void updateInteractionMouseTracking();
     QRect tierRowImageRectForLift(const QString& imageId) const;
     void completeMissionExitForLift();
     void invalidateMissionControlLayout() const;

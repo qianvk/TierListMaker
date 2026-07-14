@@ -22,7 +22,9 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
+#if !defined(Q_OS_WIN)
 #include <QGraphicsDropShadowEffect>
+#endif
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
@@ -36,20 +38,21 @@
 #include <QPixmap>
 #include <QPointer>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QSignalBlocker>
 #include <QSizePolicy>
-#include <QScrollArea>
 #include <QSlider>
 #include <QStandardPaths>
 #include <QTimer>
 #include <QToolButton>
-#include <QVBoxLayout>
 #include <QUuid>
+#include <QVBoxLayout>
 
 #include <algorithm>
 #include <memory>
 #include <optional>
 #include <type_traits>
+#include <utility>
 
 #include <vkui/core/VkIcon.h>
 #include <vkui/widgets/overlays/VkPopover.h>
@@ -75,7 +78,8 @@ constexpr auto kCustomTemplatePrefix = "custom:";
 
 QString templateFileStem(const QString& value) {
     QString stem = value.trimmed();
-    stem.replace(QRegularExpression(QStringLiteral(R"([<>:"/\\|?*\x00-\x1f])")), QStringLiteral("_"));
+    stem.replace(QRegularExpression(QStringLiteral(R"([<>:"/\\|?*\x00-\x1f])")),
+                 QStringLiteral("_"));
     stem.replace(QRegularExpression(QStringLiteral(R"(\s+)")), QStringLiteral(" "));
     stem = stem.trimmed();
     while (stem.endsWith(u'.')) {
@@ -86,16 +90,15 @@ QString templateFileStem(const QString& value) {
 
 QVector<TierRow> rowsFromLabels(const QStringList& labels) {
     static const QVector<QColor> colors = {
-        QColor(QStringLiteral("#ff7b7b")),
-        QColor(QStringLiteral("#ffc36b")),
-        QColor(QStringLiteral("#ffe17d")),
-        QColor(QStringLiteral("#8bdc8b")),
+        QColor(QStringLiteral("#ff7b7b")), QColor(QStringLiteral("#ffc36b")),
+        QColor(QStringLiteral("#ffe17d")), QColor(QStringLiteral("#8bdc8b")),
         QColor(QStringLiteral("#82b7ff")),
     };
     QVector<TierRow> rows;
     rows.reserve(labels.size());
     for (int index = 0; index < labels.size(); ++index) {
-        rows.append(TierRow::makeDefault(labels.at(index), colors.at(index % colors.size()), index));
+        rows.append(
+            TierRow::makeDefault(labels.at(index), colors.at(index % colors.size()), index));
     }
     return rows;
 }
@@ -377,6 +380,7 @@ EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentPro
       m_exporter(new TierListExporter(assetManager, this)),
       m_project(TierProject::createUntitled()) {
     m_project = createProjectFromDefaultTemplate();
+    m_project.dirty = false;
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
     buildUi();
@@ -394,8 +398,7 @@ EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentPro
 }
 
 QString EditPage::displayTitle() const {
-    return QStringLiteral("%1%2").arg(m_project.name,
-                                      m_project.dirty ? QStringLiteral(" *") : QString());
+    return m_project.name;
 }
 
 bool EditPage::newProject() {
@@ -417,9 +420,8 @@ bool EditPage::openProjectFromDialog() {
         return false;
     }
     const QString directory = m_settings ? m_settings->defaultProjectDirectory() : QString();
-    const QString path =
-        QFileDialog::getOpenFileName(this, tr("Open Project"), directory,
-                                     tr("TierListMaker Projects (*.tlmproject)"));
+    const QString path = QFileDialog::getOpenFileName(this, tr("Open Project"), directory,
+                                                      tr("TierListMaker Projects (*.tlmproject)"));
     if (path.isEmpty()) {
         return false;
     }
@@ -532,10 +534,9 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
             return;
         }
         const bool active = isDefaultTemplateId(id);
-        button->setIcon(vkui::icon(active ? vkui::VkSymbol::Checkmark
-                                          : vkui::VkSymbol::DefaultTemplate,
-                                   active ? vkui::VkIconRole::Accent
-                                          : vkui::VkIconRole::Secondary));
+        button->setIcon(
+            vkui::icon(active ? vkui::VkSymbol::Checkmark : vkui::VkSymbol::DefaultTemplate,
+                       active ? vkui::VkIconRole::Accent : vkui::VkIconRole::Secondary));
         button->setToolTip(active ? tr("Default template") : tr("Set as default template"));
     };
     auto refreshDefaultButtons = [defaultButtons, updateDefaultButton]() {
@@ -544,8 +545,8 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
         }
     };
 
-    auto addTemplateRow = [&](const QString& id, const QString& name, const QIcon& icon, auto applyCallback,
-                              auto deleteCallback) {
+    auto addTemplateRow = [&](const QString& id, const QString& name, const QIcon& icon,
+                              auto applyCallback, auto deleteCallback) {
         auto* row = new QWidget(content);
         auto* rowLayout = new QHBoxLayout(row);
         rowLayout->setContentsMargins(0, 0, 0, 0);
@@ -604,20 +605,23 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
     };
 
     addSection(tr("Built-in"));
-    for (const BuiltInTemplate& entry : QVector<BuiltInTemplate>{localizedBuiltInTemplate(m_settings)}) {
-        addTemplateRow(entry.id, entry.name, vkui::icon(vkui::VkSymbol::Templates),
-                       [this, project = entry.project, name = entry.name]() {
-                           applyTemplateProject(project);
-                           Logger::info(QStringLiteral("tier.edit.template.apply builtin=\"%1\"")
-                                            .arg(name));
-                       },
-                       nullptr);
+    for (const BuiltInTemplate& entry :
+         QVector<BuiltInTemplate>{localizedBuiltInTemplate(m_settings)}) {
+        addTemplateRow(
+            entry.id, entry.name, vkui::icon(vkui::VkSymbol::Templates),
+            [this, project = entry.project, name = entry.name]() {
+                if (applyTemplateProject(project)) {
+                    Logger::info(
+                        QStringLiteral("tier.edit.template.apply builtin=\"%1\"").arg(name));
+                }
+            },
+            nullptr);
     }
 
     addSection(tr("Custom"));
     QDir directory(managedTemplateDirectory());
-    const QFileInfoList files = directory.entryInfoList({QStringLiteral("*.tlmtemplate")},
-                                                        QDir::Files, QDir::Name);
+    const QFileInfoList files =
+        directory.entryInfoList({QStringLiteral("*.tlmtemplate")}, QDir::Files, QDir::Name);
     if (files.isEmpty()) {
         auto* empty = new QLabel(tr("No custom templates saved."), content);
         empty->setObjectName(QStringLiteral("TemplatePopoverEmpty"));
@@ -629,35 +633,37 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
             if (auto result = m_repository->openProject(file.absoluteFilePath())) {
                 displayName = result.value().name;
             }
-            const QString templateId = QString::fromLatin1(kCustomTemplatePrefix) +
-                                       file.absoluteFilePath();
-            addTemplateRow(templateId, displayName, vkui::icon(vkui::VkSymbol::Document),
-                           [this, path = file.absoluteFilePath()]() {
-                               auto result = m_repository->openProject(path);
-                               if (!result) {
-                                   showError(tr("Apply Template"), result.error());
-                                   return;
-                               }
-                               applyTemplateProject(result.value());
-                               Logger::info(QStringLiteral("tier.edit.template.apply path=\"%1\"")
-                                                .arg(path));
-                           },
-                           [this, path = file.absoluteFilePath(), displayName, templateId]() {
-                               if (QMessageBox::question(
-                                       this, tr("Delete Template"),
-                                       tr("Delete the custom template \"%1\"?").arg(displayName)) !=
-                                   QMessageBox::Yes) {
-                                   return;
-                               }
-                               if (!QFile::remove(path)) {
-                                   QMessageBox::warning(this, tr("Delete Template"),
-                                                        tr("Could not delete the template file."));
-                                   return;
-                               }
-                               if (m_settings && m_settings->defaultTemplateId() == templateId) {
-                                   m_settings->setDefaultTemplateId({});
-                               }
-                           });
+            const QString templateId =
+                QString::fromLatin1(kCustomTemplatePrefix) + file.absoluteFilePath();
+            addTemplateRow(
+                templateId, displayName, vkui::icon(vkui::VkSymbol::Document),
+                [this, path = file.absoluteFilePath()]() {
+                    auto result = m_repository->openProject(path);
+                    if (!result) {
+                        showError(tr("Apply Template"), result.error());
+                        return;
+                    }
+                    if (applyTemplateProject(result.value())) {
+                        Logger::info(
+                            QStringLiteral("tier.edit.template.apply path=\"%1\"").arg(path));
+                    }
+                },
+                [this, path = file.absoluteFilePath(), displayName, templateId]() {
+                    if (QMessageBox::question(
+                            this, tr("Delete Template"),
+                            tr("Delete the custom template \"%1\"?").arg(displayName)) !=
+                        QMessageBox::Yes) {
+                        return;
+                    }
+                    if (!QFile::remove(path)) {
+                        QMessageBox::warning(this, tr("Delete Template"),
+                                             tr("Could not delete the template file."));
+                        return;
+                    }
+                    if (m_settings && m_settings->defaultTemplateId() == templateId) {
+                        m_settings->setDefaultTemplateId({});
+                    }
+                });
         }
     }
 
@@ -665,8 +671,8 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
     separator->setFrameShape(QFrame::HLine);
     layout->addWidget(separator);
 
-    auto* saveCurrent = new QPushButton(vkui::icon(vkui::VkSymbol::Save),
-                                        tr("Save Current Template..."), content);
+    auto* saveCurrent =
+        new QPushButton(vkui::icon(vkui::VkSymbol::Save), tr("Save Current Template..."), content);
     auto* importFile = new QPushButton(vkui::icon(vkui::VkSymbol::Download),
                                        tr("Import Template File..."), content);
     auto* exportFile =
@@ -1108,8 +1114,8 @@ void EditPage::toggleGallery(QWidget* anchor) {
             if (guard) {
                 guard->setOutsideDismissSuspended(true);
             }
-            QWidget* dialogParent = guard ? static_cast<QWidget*>(guard.data())
-                                          : static_cast<QWidget*>(this);
+            QWidget* dialogParent =
+                guard ? static_cast<QWidget*>(guard.data()) : static_cast<QWidget*>(this);
             const QStringList files = chooseImageImportFiles(dialogParent);
             if (guard) {
                 guard->setOutsideDismissSuspended(false);
@@ -1149,6 +1155,25 @@ void EditPage::toggleGallery(QWidget* anchor) {
     m_galleryPopoverAnchor = anchor;
     Logger::info(
         QStringLiteral("tier.gallery.popover.open images=%1").arg(m_project.images.size()));
+}
+
+void EditPage::clearProject() {
+    closeTransientPopovers();
+    if (m_previewOverlay && m_previewOverlay->isOpen()) {
+        m_previewOverlay->closePreview();
+    }
+    m_backgroundPreviewActive = false;
+
+    TierProject empty = TierProject::createUntitled();
+    empty.name = tr("Untitled Tier List");
+    empty.filePath.clear();
+    empty.images.clear();
+    for (TierRow& row : empty.rows) {
+        row.imageIds.clear();
+    }
+    empty.dirty = false;
+    setProject(std::move(empty));
+    Logger::info(QStringLiteral("tier.edit.project.clear"));
 }
 
 void EditPage::toggleGalleryMissionControlMode(const QRect& sourceGlobalRect) {
@@ -1192,12 +1217,14 @@ void EditPage::buildUi() {
     m_rootLayout->setSpacing(0);
 
     m_board = new TierBoardWidget(this);
+#if !defined(Q_OS_WIN)
     auto* boardShadow = new QGraphicsDropShadowEffect(m_board);
     // Match the reference TierListMaker section list elevation: concentrated, centered, and dark.
     boardShadow->setBlurRadius(20);
     boardShadow->setOffset(0, 0);
     boardShadow->setColor(QColor(0, 0, 0, 247));
     m_board->setGraphicsEffect(boardShadow);
+#endif
     m_rootLayout->addWidget(m_board, 1);
     if (m_settings) {
         const auto applyBlankAreaActions = [this]() {
@@ -1326,15 +1353,15 @@ QString EditPage::chooseTemplatePath(bool saveDialog) {
                    : QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     const QString suffix = QStringLiteral(".tlmtemplate");
     const QString suggested =
-        saveDialog ? QDir(directory.isEmpty() ? QDir::homePath() : directory)
-                         .filePath(QFileInfo(m_project.suggestedFileName()).completeBaseName() +
-                                   suffix)
-                   : directory;
+        saveDialog
+            ? QDir(directory.isEmpty() ? QDir::homePath() : directory)
+                  .filePath(QFileInfo(m_project.suggestedFileName()).completeBaseName() + suffix)
+            : directory;
     const QString filter = tr("TierListMaker Templates (*.tlmtemplate);;TierListMaker Projects "
                               "(*.tlmproject)");
-    QString path = saveDialog
-                       ? QFileDialog::getSaveFileName(this, tr("Save Template"), suggested, filter)
-                       : QFileDialog::getOpenFileName(this, tr("Apply Template"), suggested, filter);
+    QString path =
+        saveDialog ? QFileDialog::getSaveFileName(this, tr("Save Template"), suggested, filter)
+                   : QFileDialog::getOpenFileName(this, tr("Apply Template"), suggested, filter);
     if (saveDialog && !path.isEmpty() &&
         !path.endsWith(QStringLiteral(".tlmtemplate"), Qt::CaseInsensitive) &&
         !path.endsWith(QStringLiteral(".tlmproject"), Qt::CaseInsensitive)) {
@@ -1416,9 +1443,9 @@ QString EditPage::uniqueDefaultProjectPath(QString* projectName) const {
     const QString directory =
         m_settings ? m_settings->defaultProjectDirectory()
                    : QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
-    const QString baseName =
-        projectName && !projectName->trimmed().isEmpty() ? projectName->trimmed()
-                                                         : tr("Untitled Tier List");
+    const QString baseName = projectName && !projectName->trimmed().isEmpty()
+                                 ? projectName->trimmed()
+                                 : tr("Untitled Tier List");
     auto pathForName = [](const QString& parent, const QString& name) {
         TierProject candidate = TierProject::createUntitled();
         candidate.name = name;
@@ -1596,12 +1623,36 @@ bool EditPage::applyTemplateFromDialog() {
         return false;
     }
 
-    applyTemplateProject(result.value());
+    if (!applyTemplateProject(result.value())) {
+        return false;
+    }
     Logger::info(QStringLiteral("tier.edit.template.apply path=\"%1\"").arg(path));
     return true;
 }
 
-void EditPage::applyTemplateProject(const TierProject& templateProject) {
+bool EditPage::confirmTemplateApplication() {
+    int assignedImageCount = 0;
+    for (const TierRow& row : std::as_const(m_project.rows)) {
+        assignedImageCount += static_cast<int>(row.imageIds.size());
+    }
+
+    QMessageBox message(QMessageBox::Warning, tr("Apply Template"),
+                        tr("Applying a template replaces the current tiers and background. "
+                           "%1 image(s) placed in tiers will be moved back to the gallery. "
+                           "No images will be deleted from the project.")
+                            .arg(assignedImageCount),
+                        QMessageBox::NoButton, this);
+    QPushButton* applyButton = message.addButton(tr("Apply Template"), QMessageBox::AcceptRole);
+    message.addButton(QMessageBox::Cancel);
+    message.setDefaultButton(QMessageBox::Cancel);
+    message.exec();
+    return message.clickedButton() == applyButton;
+}
+
+bool EditPage::applyTemplateProject(const TierProject& templateProject) {
+    if (!confirmTemplateApplication()) {
+        return false;
+    }
     TierProject previous = m_project;
     QVector<TierRow> rows = templateProject.rows;
     for (TierRow& row : rows) {
@@ -1613,8 +1664,7 @@ void EditPage::applyTemplateProject(const TierProject& templateProject) {
 
     const QString templateBackground =
         templateProject.canvas.value(QStringLiteral("backgroundImagePath")).toString();
-    const QString resolvedBackground =
-        resolvedCanvasImagePath(templateProject, templateBackground);
+    const QString resolvedBackground = resolvedCanvasImagePath(templateProject, templateBackground);
     QJsonObject nextCanvas = templateProject.canvas;
     nextCanvas.remove(QStringLiteral("backgroundImagePath"));
 
@@ -1630,7 +1680,7 @@ void EditPage::applyTemplateProject(const TierProject& templateProject) {
             if (m_project.filePath.isEmpty() && !ensureProjectFile()) {
                 m_project = previous;
                 refreshUi();
-                return;
+                return false;
             }
             auto imported = m_assetManager->importCanvasImage(
                 m_project, resolvedBackground, QStringLiteral("backgroundImagePath"));
@@ -1638,13 +1688,14 @@ void EditPage::applyTemplateProject(const TierProject& templateProject) {
                 m_project = previous;
                 showError(tr("Apply Template"), imported.error());
                 refreshUi();
-                return;
+                return false;
             }
         }
     }
 
     markDirty();
     refreshUi();
+    return true;
 }
 
 void EditPage::moveImageToRow(const QString& imageId, const QString& rowId, int index) {
@@ -1846,10 +1897,9 @@ void EditPage::clearTierRowImages(const QString& rowId) {
     if (!row || row->imageIds.isEmpty()) {
         return;
     }
-    if (QMessageBox::question(this, tr("Clear Tier Images"),
-                              tr("Remove all images from \"%1\"?").arg(row->label),
-                              QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) !=
-        QMessageBox::Yes) {
+    if (QMessageBox::question(
+            this, tr("Clear Tier Images"), tr("Remove all images from \"%1\"?").arg(row->label),
+            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) {
         return;
     }
 
@@ -1861,9 +1911,8 @@ void EditPage::clearTierRowImages(const QString& rowId) {
         }
     }
     m_project.normalizeOrdering();
-    Logger::info(QStringLiteral("tier.edit.row.clear rowId=%1 count=%2")
-                     .arg(rowId)
-                     .arg(imageIds.size()));
+    Logger::info(
+        QStringLiteral("tier.edit.row.clear rowId=%1 count=%2").arg(rowId).arg(imageIds.size()));
     markDirty();
     refreshUi();
 }

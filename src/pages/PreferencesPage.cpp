@@ -7,6 +7,7 @@
 #include <QAbstractItemView>
 #include <QComboBox>
 #include <QCursor>
+#include <QDir>
 #include <QEasingCurve>
 #include <QEvent>
 #include <QFileDialog>
@@ -15,7 +16,6 @@
 #include <QGraphicsOpacityEffect>
 #include <QHBoxLayout>
 #include <QLabel>
-#include <QLineEdit>
 #include <QListWidget>
 #include <QPainter>
 #include <QPushButton>
@@ -457,32 +457,45 @@ QWidget* PreferencesPage::createGeneralPage() {
     });
 
     auto* projectFolderRow = new QWidget(page);
-    auto* projectFolderLayout = new QHBoxLayout(projectFolderRow);
+    auto* projectFolderLayout = new QVBoxLayout(projectFolderRow);
     projectFolderLayout->setContentsMargins(0, 0, 0, 0);
-    projectFolderLayout->setSpacing(18);
+    projectFolderLayout->setSpacing(6);
+    auto* projectFolderHeader = new QHBoxLayout;
+    projectFolderHeader->setContentsMargins(0, 0, 0, 0);
+    projectFolderHeader->setSpacing(18);
     auto* projectFolderLabel = new QLabel(tr("Default project folder"), projectFolderRow);
     projectFolderLabel->setMinimumWidth(120);
-    auto* projectFolderControl = new QWidget(projectFolderRow);
-    auto* projectFolderControlLayout = new QHBoxLayout(projectFolderControl);
-    projectFolderControlLayout->setContentsMargins(0, 0, 0, 0);
-    projectFolderControlLayout->setSpacing(8);
-    auto* projectFolderEdit = new QLineEdit(m_settings->defaultProjectDirectory(), projectFolderControl);
-    projectFolderEdit->setReadOnly(true);
-    projectFolderEdit->setMinimumWidth(260);
     auto* chooseProjectFolder =
-        new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Choose"), projectFolderControl);
-    projectFolderControlLayout->addWidget(projectFolderEdit, 1);
-    projectFolderControlLayout->addWidget(chooseProjectFolder);
-    projectFolderLayout->addWidget(projectFolderLabel);
-    projectFolderLayout->addStretch(1);
-    projectFolderLayout->addWidget(projectFolderControl);
-    connect(chooseProjectFolder, &QPushButton::clicked, this, [this, projectFolderEdit]() {
+        new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Choose"), projectFolderRow);
+    projectFolderHeader->addWidget(projectFolderLabel);
+    projectFolderHeader->addStretch(1);
+    projectFolderHeader->addWidget(chooseProjectFolder);
+    projectFolderLayout->addLayout(projectFolderHeader);
+
+    auto* projectFolderPath = new QLabel(projectFolderRow);
+    projectFolderPath->setObjectName(QStringLiteral("DefaultProjectFolderPath"));
+    projectFolderPath->setWordWrap(true);
+    projectFolderPath->setTextFormat(Qt::PlainText);
+    projectFolderPath->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    projectFolderPath->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    projectFolderPath->setStyleSheet(
+        QStringLiteral("QLabel#DefaultProjectFolderPath{color:palette(mid);}"));
+    const auto updateProjectFolderPath = [this, projectFolderPath]() {
+        const QString path = QDir::toNativeSeparators(m_settings->defaultProjectDirectory());
+        projectFolderPath->setText(path);
+        projectFolderPath->setToolTip(path);
+    };
+    updateProjectFolderPath();
+    connect(m_settings, &AppSettings::changed, projectFolderPath, updateProjectFolderPath);
+    projectFolderLayout->addWidget(projectFolderPath);
+
+    connect(chooseProjectFolder, &QPushButton::clicked, this, [this, updateProjectFolderPath]() {
         const QString directory = QFileDialog::getExistingDirectory(
             this, tr("Default Project Folder"), m_settings->defaultProjectDirectory(),
             QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
         if (!directory.isEmpty()) {
             m_settings->setDefaultProjectDirectory(directory);
-            projectFolderEdit->setText(m_settings->defaultProjectDirectory());
+            updateProjectFolderPath();
         }
     });
     settingsLayout->addWidget(projectFolderRow);

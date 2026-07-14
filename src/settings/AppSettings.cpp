@@ -61,7 +61,7 @@ QString fallbackProjectDirectory() {
     if (path.isEmpty()) {
         path = QDir::homePath();
     }
-    return QDir::cleanPath(path);
+    return QDir::cleanPath(QDir(path).filePath(QStringLiteral("TierListMaker")));
 }
 } // namespace
 

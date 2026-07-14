@@ -40,6 +40,9 @@ public:
         return m_project.dirty;
     }
     QString displayTitle() const;
+    QString currentProjectPath() const {
+        return m_project.filePath;
+    }
 
 public slots:
     bool newProject();
@@ -57,6 +60,7 @@ public slots:
     void deleteSelectedImage();
     void previewSelectedImage();
     bool confirmSaveIfDirty();
+    void clearProject();
     void setTierFocusMode(bool enabled);
     void toggleMissionControlMode();
     void toggleGallery(QWidget* anchor = nullptr);
@@ -94,7 +98,8 @@ private:
     bool saveManagedTemplateFromPrompt(QWidget* reopenAnchor);
     QString managedTemplateDirectory() const;
     TierProject templateSnapshot() const;
-    void applyTemplateProject(const TierProject& templateProject);
+    bool confirmTemplateApplication();
+    bool applyTemplateProject(const TierProject& templateProject);
     void moveImageToRow(const QString& imageId, const QString& rowId, int index);
     void moveRowToIndex(const QString& rowId, int destinationIndex);
     void editImage(const QString& imageId);

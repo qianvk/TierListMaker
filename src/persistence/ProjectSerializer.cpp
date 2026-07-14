@@ -55,6 +55,7 @@ Result<QByteArray> ProjectSerializer::serialize(const TierProject& project) cons
                             {QStringLiteral("createdAt"), dateToJson(project.createdAt)},
                             {QStringLiteral("updatedAt"), dateToJson(project.updatedAt)},
                             {QStringLiteral("thumbnailPath"), project.thumbnailPath},
+                            {QStringLiteral("cover"), project.cover},
                             {QStringLiteral("canvas"), project.canvas}});
 
     QJsonArray tiers;
@@ -130,6 +131,7 @@ Result<TierProject> ProjectSerializer::deserialize(const QByteArray& data, const
     project.createdAt = dateFromJson(projectObject.value(QStringLiteral("createdAt")).toString());
     project.updatedAt = dateFromJson(projectObject.value(QStringLiteral("updatedAt")).toString());
     project.thumbnailPath = projectObject.value(QStringLiteral("thumbnailPath")).toString();
+    project.cover = projectObject.value(QStringLiteral("cover")).toObject();
     project.canvas = projectObject.value(QStringLiteral("canvas")).toObject();
     project.filePath = filePath;
 

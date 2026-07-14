@@ -89,6 +89,9 @@ private:
     void setTierFocusMode(bool enabled);
     void showPreferencesDialog();
     int stackIndexForPage(AppPage page) const;
+    bool hasActiveProject() const;
+    void setActiveProjectAvailable(bool available);
+    void updateUnsavedIndicators();
 
     AppTitleBar* m_titleBar{nullptr};
     QWK::WidgetWindowAgent* m_windowAgent{nullptr};
@@ -112,7 +115,8 @@ private:
     AppSettings* m_settings{nullptr};
     LanguageManager* m_languageManager{nullptr};
     AppUpdater* m_updater{nullptr};
-    AppPage m_currentPage{AppPage::Edit};
+    AppPage m_currentPage{AppPage::Projects};
+    bool m_hasActiveProject{false};
     bool m_sidebarCollapsed{false};
     bool m_tierFocusMode{false};
     QWK::WindowAgentBase::SystemButtonVisibility m_savedSystemButtonVisibility{

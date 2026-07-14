@@ -9,6 +9,7 @@ class AppSettings;
 class AssetManager;
 class LanguageManager;
 class Logger;
+class UiPerformanceMonitor;
 class ProjectRepository;
 class RecentProjectsStore;
 class ThemeManager;
@@ -31,6 +32,7 @@ private:
     void scheduleAutoUpdateCheck();
 
     std::unique_ptr<Logger> m_logger;
+    std::unique_ptr<UiPerformanceMonitor> m_performanceMonitor;
     std::unique_ptr<AppSettings> m_settings;
     std::unique_ptr<LanguageManager> m_languageManager;
     std::unique_ptr<ThemeManager> m_themeManager;

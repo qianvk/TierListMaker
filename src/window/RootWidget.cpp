@@ -1,6 +1,7 @@
 #include "window/RootWidget.h"
 
 #include "logging/Logger.h"
+#include "logging/UiPerformanceMonitor.h"
 #include "navigation/SidebarView.h"
 #include "pages/EditPage.h"
 #include "pages/PreferencesPage.h"
@@ -13,7 +14,9 @@
 
 #include <QAbstractButton>
 #include <QDialog>
+#include <QDir>
 #include <QEasingCurve>
+#include <QFileInfo>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QIcon>
@@ -25,6 +28,9 @@
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QShowEvent>
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+#include <QSignalBlocker>
+#endif
 #include <QSizePolicy>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -70,6 +76,19 @@ Qt::KeyboardModifier physicalControlModifier() {
 #else
     return Qt::ControlModifier;
 #endif
+}
+
+bool sameProjectPath(const QString& left, const QString& right) {
+    if (left.isEmpty() || right.isEmpty()) {
+        return false;
+    }
+#if defined(Q_OS_WIN)
+    constexpr Qt::CaseSensitivity pathCase = Qt::CaseInsensitive;
+#else
+    constexpr Qt::CaseSensitivity pathCase = Qt::CaseSensitive;
+#endif
+    return QDir::cleanPath(QFileInfo(left).absoluteFilePath())
+               .compare(QDir::cleanPath(QFileInfo(right).absoluteFilePath()), pathCase) == 0;
 }
 
 QToolButton* makeTitleBarIconButton(const QString& tooltip, vkui::VkSymbol symbol,
@@ -135,16 +154,20 @@ void RootWidget::installWindowAgent(QWK::WidgetWindowAgent* agent) {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     m_windowAgent->setSystemButtonAreaGeometry(QRect(12, 11, 72, 32));
 #endif
-    setTitleEditorHitTestVisible(m_currentPage == AppPage::Edit);
+    setTitleEditorHitTestVisible(m_currentPage == AppPage::Edit && hasActiveProject());
 }
 
 bool RootWidget::confirmClose() {
-    return m_editPage->confirmSaveIfDirty();
+    return !hasActiveProject() || m_editPage->confirmSaveIfDirty();
 }
 
 void RootWidget::switchToPage(AppPage page) {
     if (page == AppPage::Preferences) {
         showPreferencesDialog();
+        updateSelection(m_currentPage);
+        return;
+    }
+    if (page == AppPage::Edit && !hasActiveProject()) {
         updateSelection(m_currentPage);
         return;
     }
@@ -156,6 +179,7 @@ void RootWidget::switchToPage(AppPage page) {
         updateSelection(page);
         updatePageMargins(page);
         updateTitleBarForPage(page);
+        updateUnsavedIndicators();
     }
 }
 
@@ -234,6 +258,10 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     m_splitter->setStretchFactor(1, 1);
 
     connect(m_sidebarView, &QListView::clicked, this, [this](const QModelIndex& index) {
+        if (!index.flags().testFlag(Qt::ItemIsEnabled)) {
+            updateSelection(m_currentPage);
+            return;
+        }
         switchToPage(m_sidebarModel->pageForIndex(index));
     });
     connect(m_splitter, &QSplitter::splitterMoved, this, [this](int pos, int index) {
@@ -242,10 +270,25 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             return;
         }
         m_currentSidebarWidth = m_sidebarShell ? m_sidebarShell->width() : 0;
+
+#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
+        const bool widthAnimationRunning =
+            m_sidebarAnimation && m_sidebarAnimation->state() == QAbstractAnimation::Running;
+        if (!widthAnimationRunning && m_currentSidebarWidth > 0 &&
+            m_currentSidebarWidth < kSidebarMinimumExpandedWidth) {
+            // Keep the manually resized navigation usable. Programmatic collapse still animates
+            // through intermediate widths, while drag resizing has a stable expanded minimum.
+            const QSignalBlocker blocker(m_splitter);
+            setSidebarWidth(kSidebarMinimumExpandedWidth);
+            m_currentSidebarWidth = m_sidebarShell ? m_sidebarShell->width() : 0;
+        }
+#endif
+
         if (m_currentSidebarWidth > 0) {
             m_sidebarCollapsed = false;
-            m_lastExpandedSidebarWidth =
-                std::max(kSidebarMinimumExpandedWidth, m_currentSidebarWidth);
+            if (m_currentSidebarWidth >= kSidebarMinimumExpandedWidth) {
+                m_lastExpandedSidebarWidth = m_currentSidebarWidth;
+            }
             if (m_sidebarToggleButton) {
                 m_sidebarToggleButton->setToolTip(tr("Collapse sidebar"));
             }
@@ -269,6 +312,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     m_newProjectButton->setObjectName(QStringLiteral("NewProjectButton"));
     connect(m_newProjectButton, &QToolButton::clicked, this, [this]() {
         if (m_editPage && m_editPage->newProject()) {
+            setActiveProjectAvailable(true);
             switchToPage(AppPage::Edit);
         }
     });
@@ -293,18 +337,28 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
 
     connect(m_projectsPage, &ProjectsPage::openProjectRequested, this, [this](const QString& path) {
         if (m_editPage->confirmSaveIfDirty() && m_editPage->openProject(path)) {
+            setActiveProjectAvailable(true);
             switchToPage(AppPage::Edit);
         }
     });
+    connect(m_projectsPage, &ProjectsPage::projectDeleted, this, [this](const QString& path) {
+        if (!m_editPage || !sameProjectPath(m_editPage->currentProjectPath(), path)) {
+            return;
+        }
+        m_editPage->clearProject();
+        setActiveProjectAvailable(false);
+    });
 
     connect(m_editPage, &EditPage::titleChanged, this, [this](const QString& title) {
-        if (m_pages && m_pages->currentWidget() == m_editPage && !m_tierFocusMode) {
+        if (m_pages && m_pages->currentWidget() == m_editPage && !m_tierFocusMode &&
+            hasActiveProject()) {
             m_titleBar->setTitleEditable(true);
             m_titleBar->setDocumentTitle(title);
         }
     });
-    connect(m_titleBar, &AppTitleBar::templatesRequested, m_editPage,
-            &EditPage::showTemplateMenu);
+    connect(m_editPage, &EditPage::dirtyChanged, this, &RootWidget::updateUnsavedIndicators);
+    connect(m_editPage, &EditPage::projectSaved, this, &RootWidget::updateUnsavedIndicators);
+    connect(m_titleBar, &AppTitleBar::templatesRequested, m_editPage, &EditPage::showTemplateMenu);
     connect(m_titleBar, &AppTitleBar::backgroundRequested, m_editPage,
             &EditPage::configureBackground);
     connect(m_titleBar, &AppTitleBar::galleryRequested, m_editPage, &EditPage::toggleGallery);
@@ -323,6 +377,14 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     connect(languageManager, &LanguageManager::languageChanged, m_sidebarModel,
             &SidebarModel::retranslate);
     connect(languageManager, &LanguageManager::languageChanged, this, [this]() {
+        if (m_sidebarView) {
+            const int preferred = std::clamp(m_sidebarView->preferredWidth() + 22,
+                                             kSidebarMinimumExpandedWidth, kSidebarMaximumWidth);
+            m_lastExpandedSidebarWidth = std::max(m_lastExpandedSidebarWidth, preferred);
+            if (!m_sidebarCollapsed && m_currentSidebarWidth > 0) {
+                setSidebarWidth(std::max(m_currentSidebarWidth, preferred));
+            }
+        }
         if (m_titleBar) {
             m_titleBar->retranslateUi();
         }
@@ -344,8 +406,14 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
         }
     });
 
-    setSidebarWidth(kSidebarInitialWidth);
-    switchToPage(AppPage::Edit);
+    m_sidebarModel->setPageEnabled(AppPage::Edit, false);
+    m_sidebarModel->setPageDirty(AppPage::Edit, false);
+    const int preferredSidebarWidth =
+        std::clamp(m_sidebarView ? m_sidebarView->preferredWidth() + 22 : kSidebarInitialWidth,
+                   kSidebarMinimumExpandedWidth, kSidebarMaximumWidth);
+    m_lastExpandedSidebarWidth = preferredSidebarWidth;
+    setSidebarWidth(preferredSidebarWidth);
+    switchToPage(AppPage::Projects);
     layoutTitleBars();
     layoutSidebarToggleButton();
     updateTitleBarLeadingReservation();
@@ -512,6 +580,7 @@ void RootWidget::setTierFocusMode(bool enabled) {
     }
 
     m_tierFocusMode = enabled;
+    UiPerformanceMonitor::setTierFocusMode(enabled);
     Logger::info(QStringLiteral("ui.tier.focus.mode enabled=%1").arg(enabled));
 
     if (enabled) {
@@ -581,7 +650,8 @@ void RootWidget::syncSidebarPresentation(int sidebarWidth) {
     if (!m_sidebarView) {
         return;
     }
-    m_sidebarView->setVisible(sidebarWidth > 48);
+    m_sidebarView->setAvailableWidth(qMax(0, sidebarWidth - 22));
+    m_sidebarView->setVisible(sidebarWidth >= 72);
 }
 
 void RootWidget::layoutSidebarSurface() {
@@ -631,8 +701,8 @@ void RootWidget::layoutSidebarToggleButton() {
     }
 
     constexpr int kChromeButtonGap = 6;
-    const int groupWidth = m_newProjectButton->width() + kChromeButtonGap +
-                           m_sidebarToggleButton->width();
+    const int groupWidth =
+        m_newProjectButton->width() + kChromeButtonGap + m_sidebarToggleButton->width();
     const int minimumX = minimumSidebarToggleX();
     const int titleBarWidth = m_sidebarTitleBar ? m_sidebarTitleBar->width() : width();
     const int maximumX = std::max(minimumX, titleBarWidth - groupWidth - kSidebarToggleInset);
@@ -743,11 +813,18 @@ void RootWidget::setupShortcuts() {
         auto* shortcut = new QShortcut(sequence, this);
         connect(shortcut, SIGNAL(activated()), receiver, slot);
     };
-    addShortcut(QKeySequence::New, m_editPage, SLOT(newProject()));
+    auto* newShortcut = new QShortcut(QKeySequence::New, this);
+    connect(newShortcut, &QShortcut::activated, this, [this]() {
+        if (m_editPage && m_editPage->newProject()) {
+            setActiveProjectAvailable(true);
+            switchToPage(AppPage::Edit);
+        }
+    });
     addShortcut(QKeySequence::Open, m_projectsPage, SLOT(openProjectFromDialog()));
     auto* saveShortcut = new QShortcut(QKeySequence::Save, this);
+    saveShortcut->setContext(Qt::ApplicationShortcut);
     connect(saveShortcut, &QShortcut::activated, this, [this]() {
-        if (m_editPage) {
+        if (m_editPage && hasActiveProject() && m_editPage->isDirty()) {
             m_editPage->saveProject();
         }
     });
@@ -798,8 +875,8 @@ void RootWidget::updateTitleBarForPage(AppPage page) {
     switch (page) {
     case AppPage::Edit:
         m_titleBar->setEditorActionsVisible(true);
-        m_titleBar->setTitleEditable(true);
-        setTitleEditorHitTestVisible(true);
+        m_titleBar->setTitleEditable(hasActiveProject());
+        setTitleEditorHitTestVisible(hasActiveProject());
         m_titleBar->setDocumentTitle(m_editPage ? m_editPage->displayTitle() : QString());
         break;
     case AppPage::Projects:
@@ -815,6 +892,7 @@ void RootWidget::updateTitleBarForPage(AppPage page) {
         m_titleBar->setDocumentTitle(tr("Preferences"));
         break;
     }
+    updateUnsavedIndicators();
 }
 
 void RootWidget::setTitleEditorHitTestVisible(bool visible) {
@@ -835,6 +913,37 @@ void RootWidget::updatePageMargins(AppPage page) {
         return;
     }
     m_pages->setContentsMargins(0, kTitleBarHeight, 0, 0);
+}
+
+bool RootWidget::hasActiveProject() const {
+    return m_hasActiveProject;
+}
+
+void RootWidget::setActiveProjectAvailable(bool available) {
+    if (m_hasActiveProject == available) {
+        updateUnsavedIndicators();
+        return;
+    }
+
+    m_hasActiveProject = available;
+    if (m_sidebarModel) {
+        m_sidebarModel->setPageEnabled(AppPage::Edit, available);
+    }
+    if (!available && m_currentPage == AppPage::Edit) {
+        switchToPage(AppPage::Projects);
+    }
+    updateTitleBarForPage(m_currentPage);
+    updateUnsavedIndicators();
+}
+
+void RootWidget::updateUnsavedIndicators() {
+    const bool dirty = hasActiveProject() && m_editPage && m_editPage->isDirty();
+    if (m_sidebarModel) {
+        m_sidebarModel->setPageDirty(AppPage::Edit, dirty);
+    }
+    if (m_titleBar) {
+        m_titleBar->setUnsavedIndicatorVisible(dirty && m_currentPage == AppPage::Edit);
+    }
 }
 
 } // namespace tlm

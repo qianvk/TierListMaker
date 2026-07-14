@@ -58,7 +58,11 @@ void TierBoardWidget::setData(const TierProject* project, const AssetManager* as
     }
     if (m_thumbnailCache) {
         m_thumbnailConnection = connect(m_thumbnailCache, &ThumbnailCache::thumbnailReady, m_view->viewport(),
-                                        [this](const QString&) { m_view->viewport()->update(); });
+                                        [this](const QString& imageId) {
+                                            if (m_view) {
+                                                m_view->updateImageVisual(imageId);
+                                            }
+                                        });
     }
 
     m_delegate->setContext(m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);

@@ -10,7 +10,15 @@ class SidebarView : public QListView {
 
 public:
     explicit SidebarView(QWidget* parent = nullptr);
+
+    int preferredWidth() const;
+    int availableWidth() const {
+        return m_availableWidth;
+    }
+    void setAvailableWidth(int width);
+
+private:
+    int m_availableWidth{208};
 };
 
 } // namespace tlm
-
