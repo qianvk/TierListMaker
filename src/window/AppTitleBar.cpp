@@ -10,9 +10,6 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
-#include <QPalette>
-#include <QPaintEvent>
-#include <QPainter>
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QSizePolicy>
@@ -67,9 +64,6 @@ QToolButton* makeButton(const QString& text, vkui::VkSymbol symbol, QWidget* par
 AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     setFixedHeight(54);
     setAttribute(Qt::WA_StyledBackground, false);
-    // The chrome fully covers this band, so hover updates must not repaint the page below it.
-    setAttribute(Qt::WA_OpaquePaintEvent);
-    setBackgroundRole(QPalette::Base);
     m_contentLayout = new QHBoxLayout(this);
     auto* layout = m_contentLayout;
     updateLayoutMargins();
@@ -331,6 +325,11 @@ void AppTitleBar::updateTitleWidth() {
     updateTitleGeometry();
 }
 
+QSize AppTitleBar::focusRevealSizeHint() const {
+    const int toolbarWidth = m_buttonGroup ? m_buttonGroup->sizeHint().width() : 260;
+    return QSize(toolbarWidth + 36, 54);
+}
+
 QRect AppTitleBar::galleryButtonGlobalRect() const {
     return globalRectFor(m_galleryButton);
 }
@@ -400,8 +399,7 @@ void AppTitleBar::mousePressEvent(QMouseEvent* event) {
 }
 
 void AppTitleBar::paintEvent(QPaintEvent* event) {
-    QPainter painter(this);
-    painter.fillRect(event->rect(), palette().brush(backgroundRole()));
+    QWidget::paintEvent(event);
 }
 
 void AppTitleBar::resizeEvent(QResizeEvent* event) {

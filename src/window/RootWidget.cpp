@@ -177,6 +177,7 @@ void RootWidget::switchToPage(AppPage page) {
         m_pages->setCurrentIndex(index);
         m_currentPage = page;
         updateSelection(page);
+        updatePageMargins(page);
         updateTitleBarForPage(page);
         updateUnsavedIndicators();
     }
@@ -475,9 +476,6 @@ QFrame* RootWidget::createContent(ProjectRepository* repository,
     contentLayout->setContentsMargins(0, 0, 0, 0);
     contentLayout->setSpacing(0);
 
-    m_titleBar = new AppTitleBar(content);
-    contentLayout->addWidget(m_titleBar, 0);
-
     m_pages = new QStackedWidget(content);
     m_pages->setObjectName(QStringLiteral("Pages"));
     m_pages->setContentsMargins(0, 0, 0, 0);
@@ -487,6 +485,10 @@ QFrame* RootWidget::createContent(ProjectRepository* repository,
     m_pages->addWidget(m_editPage);
     m_pages->addWidget(m_projectsPage);
     contentLayout->addWidget(m_pages, 1);
+
+    m_titleBar = new AppTitleBar(content);
+    m_titleBar->setGeometry(0, 0, content->width(), kTitleBarHeight);
+    m_titleBar->raise();
     return content;
 }
 
@@ -559,6 +561,7 @@ void RootWidget::synchronizeInitialLayout() {
         m_sidebarCollapsed ? 0 : std::max(kSidebarMinimumExpandedWidth, m_lastExpandedSidebarWidth);
     setSidebarWidth(targetWidth);
     if (m_pages) {
+        updatePageMargins(m_currentPage);
         updateTitleBarForPage(m_currentPage);
     }
     syncSidebarPresentation(m_currentSidebarWidth);
@@ -590,6 +593,9 @@ void RootWidget::setTierFocusMode(bool enabled) {
             m_focusSavedSidebarCollapsed
                 ? std::max(kSidebarMinimumExpandedWidth, m_lastExpandedSidebarWidth)
                 : std::max(kSidebarMinimumExpandedWidth, m_currentSidebarWidth);
+        if (m_pages) {
+            m_pages->setContentsMargins(0, 0, 0, 0);
+        }
         if (m_sidebarToggleButton) {
             m_sidebarToggleButton->hide();
         }
@@ -607,6 +613,9 @@ void RootWidget::setTierFocusMode(bool enabled) {
     } else {
         if (m_windowAgent) {
             m_windowAgent->setSystemButtonVisibility(m_savedSystemButtonVisibility);
+        }
+        if (m_pages) {
+            updatePageMargins(m_currentPage);
         }
         if (m_titleBar) {
             m_titleBar->show();
@@ -662,9 +671,20 @@ void RootWidget::layoutTitleBars() {
         m_sidebarTitleBar->raise();
     }
     if (m_titleBar) {
-        // The content layout owns this title bar. Keeping it out of the page's stacking area
-        // prevents small hover updates from invalidating the expensive tier view underneath.
-        m_titleBar->setVisible(!m_tierFocusMode);
+        const int contentWidth = m_content ? std::max(0, m_content->width()) : width();
+        if (m_tierFocusMode) {
+            const int revealWidth =
+                std::min(contentWidth, m_titleBar->focusRevealSizeHint().width());
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+            m_titleBar->setGeometry(std::max(0, contentWidth - revealWidth), 0, revealWidth,
+                                    kTitleBarHeight);
+#else
+            m_titleBar->setGeometry(0, 0, revealWidth, kTitleBarHeight);
+#endif
+        } else {
+            m_titleBar->setGeometry(0, 0, contentWidth, kTitleBarHeight);
+        }
+        m_titleBar->raise();
     }
     if (m_newProjectButton) {
         m_newProjectButton->raise();
@@ -880,6 +900,18 @@ void RootWidget::setTitleEditorHitTestVisible(bool visible) {
         return;
     }
     m_windowAgent->setHitTestVisible(m_titleBar, m_titleBar->titleEditor(), visible);
+}
+
+void RootWidget::updatePageMargins(AppPage page) {
+    if (!m_pages) {
+        return;
+    }
+    if (m_tierFocusMode || page == AppPage::Edit) {
+        // The transparent chrome overlays the page while the tier board starts at its lower edge.
+        m_pages->setContentsMargins(0, 0, 0, 0);
+        return;
+    }
+    m_pages->setContentsMargins(0, kTitleBarHeight, 0, 0);
 }
 
 bool RootWidget::hasActiveProject() const {

@@ -62,6 +62,7 @@
 namespace tlm {
 
 namespace {
+constexpr int kContentTitleBarHeight = 54;
 constexpr int kTierBoardOuterMargin = 16;
 constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
 constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
@@ -1074,7 +1075,7 @@ void EditPage::setTierFocusMode(bool enabled) {
         }
     } else {
         if (m_rootLayout) {
-            m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kTierBoardOuterMargin,
+            m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kContentTitleBarHeight,
                                              kTierBoardOuterMargin, kTierBoardOuterMargin);
             m_rootLayout->setSpacing(0);
         }
@@ -1209,7 +1210,7 @@ void EditPage::resizeEvent(QResizeEvent* event) {
 
 void EditPage::buildUi() {
     m_rootLayout = new QVBoxLayout(this);
-    m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kTierBoardOuterMargin,
+    m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kContentTitleBarHeight,
                                      kTierBoardOuterMargin, kTierBoardOuterMargin);
     m_rootLayout->setSpacing(0);
 
