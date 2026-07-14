@@ -69,7 +69,6 @@ private:
     void setupShortcuts();
     void updateSelection(AppPage page);
     void updateTitleBarForPage(AppPage page);
-    void updatePageMargins(AppPage page);
     void setTitleEditorHitTestVisible(bool visible);
     QFrame* createSidebar(QWidget* parent);
     QFrame* createContent(ProjectRepository* repository, RecentProjectsStore* recentProjects,

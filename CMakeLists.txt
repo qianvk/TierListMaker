@@ -111,6 +111,8 @@ set(TLM_APP_SOURCES
     src/tier/TierListView.h
     src/update/AppUpdater.cpp
     src/update/AppUpdater.h
+    src/widgets/DestructiveActionDialog.cpp
+    src/widgets/DestructiveActionDialog.h
     src/widgets/EmptyStateWidget.cpp
     src/widgets/EmptyStateWidget.h
     src/widgets/FlowLayout.cpp

@@ -1,5 +1,7 @@
 #include "pages/ProjectsPage.h"
 
+#include "widgets/DestructiveActionDialog.h"
+
 #include "logging/Logger.h"
 #include "pages/ProjectLocationDialog.h"
 #include "persistence/ProjectRepository.h"
@@ -1135,11 +1137,9 @@ void ProjectsPage::deleteSelectedProject() {
         return;
     }
 
-    const int choice = QMessageBox::warning(
-        this, tr("Delete Project"),
-        tr("Delete \"%1\" and its project files? This cannot be undone.").arg(entry.name),
-        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
-    if (choice != QMessageBox::Yes) {
+    if (!confirmDestructiveAction(
+            this, tr("Delete Project"),
+            tr("Delete \"%1\" and its project files? This cannot be undone.").arg(entry.name))) {
         return;
     }
 

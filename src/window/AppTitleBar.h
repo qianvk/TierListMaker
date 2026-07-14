@@ -33,7 +33,6 @@ public:
     void setUnsavedIndicatorVisible(bool visible);
     void setLeadingReservedWidth(int width);
     void retranslateUi();
-    QSize focusRevealSizeHint() const;
     QRect galleryButtonGlobalRect() const;
     QLineEdit* titleEditor() const;
 

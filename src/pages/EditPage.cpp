@@ -1,5 +1,7 @@
 #include "pages/EditPage.h"
 
+#include "widgets/DestructiveActionDialog.h"
+
 #include "logging/Logger.h"
 #include "pages/ProjectLocationDialog.h"
 #include "preview/PreviewOverlay.h"
@@ -60,7 +62,6 @@
 namespace tlm {
 
 namespace {
-constexpr int kContentTitleBarHeight = 54;
 constexpr int kTierBoardOuterMargin = 16;
 constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
 constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
@@ -649,10 +650,9 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
                     }
                 },
                 [this, path = file.absoluteFilePath(), displayName, templateId]() {
-                    if (QMessageBox::question(
+                    if (!confirmDestructiveAction(
                             this, tr("Delete Template"),
-                            tr("Delete the custom template \"%1\"?").arg(displayName)) !=
-                        QMessageBox::Yes) {
+                            tr("Delete the custom template \"%1\"?").arg(displayName))) {
                         return;
                     }
                     if (!QFile::remove(path)) {
@@ -715,10 +715,9 @@ void EditPage::renameProject(const QString& name) {
 }
 
 void EditPage::resetRows() {
-    if (QMessageBox::question(
+    if (!confirmDestructiveAction(
             this, tr("Reset Rows"),
-            tr("Reset rows to S/A/B/C/D and remove row assignments from images?")) !=
-        QMessageBox::Yes) {
+            tr("Reset rows to S/A/B/C/D and remove row assignments from images?"))) {
         return;
     }
     m_project.resetDefaultRows();
@@ -1002,10 +1001,8 @@ void EditPage::deleteSelectedImage() {
     if (m_selectedImageId.isEmpty()) {
         return;
     }
-    const int choice = QMessageBox::question(
-        this, tr("Remove Image"), tr("Remove the selected image from this project?"),
-        QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
-    if (choice != QMessageBox::Yes) {
+    if (!confirmDestructiveAction(this, tr("Remove Image"),
+                                  tr("Remove the selected image from this project?"))) {
         return;
     }
     removeImageFromRows(m_selectedImageId);
@@ -1077,7 +1074,7 @@ void EditPage::setTierFocusMode(bool enabled) {
         }
     } else {
         if (m_rootLayout) {
-            m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kContentTitleBarHeight,
+            m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kTierBoardOuterMargin,
                                              kTierBoardOuterMargin, kTierBoardOuterMargin);
             m_rootLayout->setSpacing(0);
         }
@@ -1212,7 +1209,7 @@ void EditPage::resizeEvent(QResizeEvent* event) {
 
 void EditPage::buildUi() {
     m_rootLayout = new QVBoxLayout(this);
-    m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kContentTitleBarHeight,
+    m_rootLayout->setContentsMargins(kTierBoardOuterMargin, kTierBoardOuterMargin,
                                      kTierBoardOuterMargin, kTierBoardOuterMargin);
     m_rootLayout->setSpacing(0);
 
@@ -1581,9 +1578,9 @@ bool EditPage::saveManagedTemplateFromPrompt(QWidget* reopenAnchor) {
     const QString path =
         directory.filePath(templateFileStem(templateName) + QStringLiteral(".tlmtemplate"));
     if (QFileInfo::exists(path) &&
-        QMessageBox::question(this, tr("Replace Template"),
-                              tr("Replace the existing template \"%1\"?").arg(templateName)) !=
-            QMessageBox::Yes) {
+        !confirmDestructiveAction(
+            this, tr("Replace Template"),
+            tr("Replace the existing template \"%1\"?").arg(templateName))) {
         return false;
     }
 
@@ -1636,17 +1633,13 @@ bool EditPage::confirmTemplateApplication() {
         assignedImageCount += static_cast<int>(row.imageIds.size());
     }
 
-    QMessageBox message(QMessageBox::Warning, tr("Apply Template"),
-                        tr("Applying a template replaces the current tiers and background. "
-                           "%1 image(s) placed in tiers will be moved back to the gallery. "
-                           "No images will be deleted from the project.")
-                            .arg(assignedImageCount),
-                        QMessageBox::NoButton, this);
-    QPushButton* applyButton = message.addButton(tr("Apply Template"), QMessageBox::AcceptRole);
-    message.addButton(QMessageBox::Cancel);
-    message.setDefaultButton(QMessageBox::Cancel);
-    message.exec();
-    return message.clickedButton() == applyButton;
+    return confirmDestructiveAction(
+        this, tr("Apply Template"),
+        tr("Applying a template replaces the current tiers and background. "
+           "%1 image(s) placed in tiers will be moved back to the gallery. "
+           "No images will be deleted from the project.")
+            .arg(assignedImageCount),
+        tr("Apply Template"));
 }
 
 bool EditPage::applyTemplateProject(const TierProject& templateProject) {
@@ -1897,9 +1890,8 @@ void EditPage::clearTierRowImages(const QString& rowId) {
     if (!row || row->imageIds.isEmpty()) {
         return;
     }
-    if (QMessageBox::question(
-            this, tr("Clear Tier Images"), tr("Remove all images from \"%1\"?").arg(row->label),
-            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel) != QMessageBox::Yes) {
+    if (!confirmDestructiveAction(this, tr("Clear Tier Images"),
+                                  tr("Remove all images from \"%1\"?").arg(row->label))) {
         return;
     }
 
@@ -1926,10 +1918,9 @@ void EditPage::deleteTierRow(const QString& rowId) {
     if (!row) {
         return;
     }
-    if (QMessageBox::question(
+    if (!confirmDestructiveAction(
             this, tr("Delete Row"),
-            tr("Delete \"%1\" and remove its image assignments?").arg(row->label)) !=
-        QMessageBox::Yes) {
+            tr("Delete \"%1\" and remove its image assignments?").arg(row->label))) {
         return;
     }
 
