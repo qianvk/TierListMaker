@@ -40,20 +40,29 @@ if(APPLE)
 elseif(WIN32)
     # NSIS provides a familiar per-user wizard, Start Menu entry, repair-safe upgrades,
     # Apps & Features metadata, and an optional launch action without modifying PATH.
+    file(TO_NATIVE_PATH
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app-icon.ico"
+        _tlm_nsis_icon)
+    file(TO_NATIVE_PATH
+        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/installer-welcome.bmp"
+        _tlm_nsis_welcome_bitmap)
+    file(TO_NATIVE_PATH
+        "${CMAKE_INSTALL_BINDIR}/TierListMaker.exe"
+        _tlm_nsis_installed_executable)
+
     set(CPACK_GENERATOR "NSIS")
+    set(CPACK_VERBATIM_VARIABLES ON)
     set(CPACK_NSIS_INSTALL_ROOT "$LOCALAPPDATA")
     set(CPACK_NSIS_DISPLAY_NAME "TierListMaker")
     set(CPACK_NSIS_PACKAGE_NAME "TierListMaker")
-    set(CPACK_NSIS_MUI_ICON "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app-icon.ico")
-    set(CPACK_NSIS_MUI_UNIICON "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app-icon.ico")
-    set(CPACK_NSIS_MUI_WELCOMEFINISHPAGE_BITMAP
-        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/installer-welcome.bmp")
-    set(CPACK_NSIS_MUI_UNWELCOMEFINISHPAGE_BITMAP
-        "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/installer-welcome.bmp")
-    set(CPACK_NSIS_INSTALLED_ICON_NAME "${CMAKE_INSTALL_BINDIR}\\\\TierListMaker.exe")
+    set(CPACK_NSIS_MUI_ICON "${_tlm_nsis_icon}")
+    set(CPACK_NSIS_MUI_UNIICON "${_tlm_nsis_icon}")
+    set(CPACK_NSIS_MUI_WELCOMEFINISHPAGE_BITMAP "${_tlm_nsis_welcome_bitmap}")
+    set(CPACK_NSIS_MUI_UNWELCOMEFINISHPAGE_BITMAP "${_tlm_nsis_welcome_bitmap}")
+    set(CPACK_NSIS_INSTALLED_ICON_NAME "${_tlm_nsis_installed_executable}")
     set(CPACK_NSIS_EXECUTABLES_DIRECTORY "${CMAKE_INSTALL_BINDIR}")
-    set(CPACK_NSIS_MENU_LINKS "TierListMaker.exe" "TierListMaker")
-    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "${CMAKE_INSTALL_BINDIR}\\TierListMaker.exe")
+    set(CPACK_PACKAGE_EXECUTABLES "TierListMaker" "TierListMaker")
+    set(CPACK_NSIS_MUI_FINISHPAGE_RUN "TierListMaker.exe")
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH OFF)
     set(CPACK_NSIS_MANIFEST_DPI_AWARE ON)
