@@ -30,7 +30,20 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTLM_BUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        shell: bash
+        run: |
+          set +e
+          cmake --build build --config Release --parallel 2>&1 | tee build-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [[ ${status} -ne 0 ]]; then
+            summary="$(tail -n 80 build-output.log)"
+            summary="${summary//'%'/'%25'}"
+            summary="${summary//$'\r'/'%0D'}"
+            summary="${summary//$'\n'/'%0A'}"
+            echo "::error title=Native build failed::${summary}"
+            exit "${status}"
+          fi
 
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
