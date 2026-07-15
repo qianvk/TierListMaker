@@ -402,6 +402,20 @@ QWidget* PreferencesPage::createGeneralPage() {
             [this](int index) { m_settings->setAppearance(static_cast<AppearanceMode>(index)); });
     settingsLayout->addWidget(createSettingRow(tr("Appearance"), appearance, page));
 
+    auto* previewBackground = new QComboBox(page);
+    previewBackground->addItem(tr("None"), static_cast<int>(PreviewBackgroundMode::None));
+    previewBackground->addItem(tr("Image"),
+                               static_cast<int>(PreviewBackgroundMode::SelfImage));
+    previewBackground->setCurrentIndex(qMax(
+        0, previewBackground->findData(static_cast<int>(m_settings->previewBackgroundMode()))));
+    connect(previewBackground, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this, previewBackground](int index) {
+                m_settings->setPreviewBackgroundMode(static_cast<PreviewBackgroundMode>(
+                    previewBackground->itemData(index).toInt()));
+            });
+    settingsLayout->addWidget(
+        createSettingRow(tr("Preview background"), previewBackground, page));
+
     const auto addBlankAreaActionItems = [](QComboBox* combo) {
         combo->addItem(tr("Open Gallery Overview"),
                        static_cast<int>(BlankAreaAction::GalleryMissionControl));

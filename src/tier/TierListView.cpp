@@ -1019,8 +1019,8 @@ void TierListView::setMissionControlActive(bool active) {
     setMissionControlActiveForSource(active, MissionControlSource::TierRows);
 }
 
-void TierListView::setGalleryMissionControlActive(bool active, const QRect& sourceGlobalRect) {
-    setMissionControlActiveForSource(active, MissionControlSource::Gallery, sourceGlobalRect);
+void TierListView::setGalleryMissionControlActive(bool active) {
+    setMissionControlActiveForSource(active, MissionControlSource::Gallery);
 }
 
 void TierListView::updateImageVisual(const QString& imageId) {
@@ -1040,7 +1040,6 @@ void TierListView::updateImageVisual(const QString& imageId) {
 }
 
 void TierListView::setMissionControlActiveForSource(bool active, MissionControlSource source,
-                                                    const QRect& sourceGlobalRect,
                                                     const QString& tierRowId) {
     const bool gallerySource = source == MissionControlSource::Gallery;
     const bool tierRowSource = source == MissionControlSource::TierRow;
@@ -1054,18 +1053,8 @@ void TierListView::setMissionControlActiveForSource(bool active, MissionControlS
 
     const bool entering = active;
     if (gallerySource) {
-        if (sourceGlobalRect.isValid()) {
-            m_missionGallerySourceRect = QRectF(
-                viewport()->mapFromGlobal(sourceGlobalRect.topLeft()), sourceGlobalRect.size());
-        }
-        if (!m_missionGallerySourceRect.isValid()) {
-            const QSizeF fallbackSize(36.0, 36.0);
-            const QPointF fallbackCenter(viewport()->rect().right() - 42.0, 28.0);
-            m_missionGallerySourceRect = missionRectAroundCenter(fallbackCenter, fallbackSize);
-        }
         m_missionNormalRects.clear();
     } else {
-        m_missionGallerySourceRect = {};
         m_missionNormalRects = normalImageRects();
     }
     m_missionFromGallery = gallerySource;
@@ -1099,9 +1088,9 @@ void TierListView::toggleMissionControlActive() {
     setMissionControlActive(!m_missionControlActive);
 }
 
-void TierListView::toggleGalleryMissionControlActive(const QRect& sourceGlobalRect) {
+void TierListView::toggleGalleryMissionControlActive() {
     const bool shouldExitGallery = m_missionControlActive && m_missionFromGallery;
-    setGalleryMissionControlActive(!shouldExitGallery, sourceGlobalRect);
+    setGalleryMissionControlActive(!shouldExitGallery);
 }
 
 void TierListView::refreshLayoutMetrics() {
@@ -1287,7 +1276,7 @@ QRect TierListView::imageViewportRect(const QString& imageId) const {
 
 void TierListView::clearImageSelection() {
     m_activeImageId.clear();
-    m_activeImageIndex = {};
+    m_activeImageIndex = QPersistentModelIndex{};
     emit imageSelected({});
 }
 
@@ -1321,7 +1310,7 @@ void TierListView::mousePressEvent(QMouseEvent* event) {
                              .arg(event->pos().x())
                              .arg(event->pos().y()));
             if (m_missionFromGallery) {
-                setGalleryMissionControlActive(false, {});
+                setGalleryMissionControlActive(false);
             } else {
                 setMissionControlActive(false);
             }
@@ -1489,7 +1478,7 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
                          .arg(event->pos().x())
                          .arg(event->pos().y()));
         if (m_missionFromGallery) {
-            setGalleryMissionControlActive(false, {});
+            setGalleryMissionControlActive(false);
         } else {
             setMissionControlActive(false);
         }
@@ -1510,7 +1499,7 @@ void TierListView::mouseDoubleClickEvent(QMouseEvent* event) {
                         "tier.list.mission.request source=label-double-click rowId=%1 row=%2")
                         .arg(rowId)
                         .arg(index.row()));
-                setMissionControlActiveForSource(true, MissionControlSource::TierRow, {}, rowId);
+                setMissionControlActiveForSource(true, MissionControlSource::TierRow, rowId);
                 event->accept();
                 return;
             }
@@ -2786,7 +2775,6 @@ void TierListView::animateMissionTransition(qreal targetProgress) {
         if (targetProgress <= 0.001) {
             m_missionNormalRects.clear();
             m_missionFromGallery = false;
-            m_missionGallerySourceRect = {};
             m_missionHoverImageId.clear();
             m_missionHoverProgress = 0.0;
         }
@@ -3109,7 +3097,7 @@ void TierListView::startMissionImageLiftDrag(const QString& imageId, const QPoin
     ++m_missionPressSerial;
     resetPressState();
     if (m_missionFromGallery) {
-        setGalleryMissionControlActive(false, {});
+        setGalleryMissionControlActive(false);
     } else {
         setMissionControlActive(false);
     }
@@ -3277,7 +3265,6 @@ void TierListView::completeMissionExitForLift() {
     m_missionTierRowId.clear();
     m_missionTransitionProgress = 0.0;
     m_missionNormalRects.clear();
-    m_missionGallerySourceRect = {};
     m_missionHoverImageId.clear();
     m_missionHoverProgress = 0.0;
     Logger::debug(QStringLiteral("tier.list.mission.lift.exit.complete"));
@@ -3417,19 +3404,20 @@ QHash<QString, QRectF> TierListView::normalImageRects() const {
 QRectF TierListView::interpolatedMissionRect(const QString& imageId,
                                              const QRectF& targetRect) const {
     if (m_missionFromGallery) {
-        const QRectF sourceRect = galleryMissionSourceRect();
-        const QRectF centerRect = galleryMissionCenterRect(targetRect);
-        const qreal p = missionMacHoverEase(qBound<qreal>(0.0, m_missionTransitionProgress, 1.0));
-        constexpr qreal kStackPhase = 0.38;
-        const auto interpolate = [](const QRectF& from, const QRectF& to, qreal t) {
-            return QRectF(from.x() + (to.x() - from.x()) * t, from.y() + (to.y() - from.y()) * t,
-                          from.width() + (to.width() - from.width()) * t,
-                          from.height() + (to.height() - from.height()) * t);
-        };
-        if (p < kStackPhase) {
-            return interpolate(sourceRect, centerRect, p / kStackPhase);
-        }
-        return interpolate(centerRect, targetRect, (p - kStackPhase) / (1.0 - kStackPhase));
+        // Gallery images now begin at the board center. The former gallery-icon leg is omitted,
+        // while the same center-to-mosaic transition is used in both directions.
+        const qreal boardSide = qMax<qreal>(1.0, qMin(viewport()->width(), viewport()->height()));
+        const qreal startLongSide = qBound<qreal>(28.0, boardSide * 0.055, 48.0);
+        const qreal targetLongSide = qMax<qreal>(1.0, qMax(targetRect.width(), targetRect.height()));
+        const qreal startScale = qBound<qreal>(0.16, startLongSide / targetLongSide, 0.55);
+        QRectF sourceRect(QPointF(), targetRect.size() * startScale);
+        sourceRect.moveCenter(QRectF(viewport()->rect()).center());
+
+        const qreal p = qBound<qreal>(0.0, m_missionTransitionProgress, 1.0);
+        return QRectF(sourceRect.x() + (targetRect.x() - sourceRect.x()) * p,
+                      sourceRect.y() + (targetRect.y() - sourceRect.y()) * p,
+                      sourceRect.width() + (targetRect.width() - sourceRect.width()) * p,
+                      sourceRect.height() + (targetRect.height() - sourceRect.height()) * p);
     }
 
     QRectF sourceRect = m_missionNormalRects.value(imageId);
@@ -3442,23 +3430,6 @@ QRectF TierListView::interpolatedMissionRect(const QString& imageId,
                   sourceRect.y() + (targetRect.y() - sourceRect.y()) * p,
                   sourceRect.width() + (targetRect.width() - sourceRect.width()) * p,
                   sourceRect.height() + (targetRect.height() - sourceRect.height()) * p);
-}
-
-QRectF TierListView::galleryMissionSourceRect() const {
-    if (m_missionGallerySourceRect.isValid()) {
-        return m_missionGallerySourceRect;
-    }
-    return missionRectAroundCenter(QRectF(viewport()->rect()).center(), QSizeF(36.0, 36.0));
-}
-
-QRectF TierListView::galleryMissionCenterRect(const QRectF& targetRect) const {
-    const QRectF viewportRect(viewport()->rect());
-    const qreal longSide = qBound<qreal>(
-        34.0, qMax(targetRect.width(), targetRect.height()) * 0.46,
-        qBound<qreal>(48.0, qMin(viewportRect.width(), viewportRect.height()) / 8.5, 92.0));
-    const qreal aspect =
-        qMax<qreal>(0.05, targetRect.width() / qMax<qreal>(1.0, targetRect.height()));
-    return missionRectAroundCenter(viewportRect.center(), missionSizeForLongSide(aspect, longSide));
 }
 
 QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
@@ -3552,6 +3523,10 @@ void TierListView::paintMissionControl(QPainter* painter) {
     }
 
     painter->save();
+    if (m_missionFromGallery) {
+        const qreal transition = qBound<qreal>(0.0, m_missionTransitionProgress, 1.0);
+        painter->setOpacity(painter->opacity() * (0.35 + transition * 0.65));
+    }
     QPainterPath boardClip;
     boardClip.addRoundedRect(QRectF(viewport()->rect()).adjusted(0.5, 0.5, -0.5, -0.5),
                              TierListDelegate::outerRadius(), TierListDelegate::outerRadius());

@@ -5,10 +5,10 @@
 #include <QWidget>
 
 class QEvent;
-class QHBoxLayout;
 class QKeyEvent;
 class QLabel;
 class QLineEdit;
+class QMoveEvent;
 class QMouseEvent;
 class QPaintEvent;
 class QResizeEvent;
@@ -34,8 +34,9 @@ public:
     void setLeadingReservedWidth(int width);
     void retranslateUi();
     QSize focusRevealSizeHint() const;
-    QRect galleryButtonGlobalRect() const;
     QLineEdit* titleEditor() const;
+    QList<QWidget*> interactiveWidgets() const;
+    void raiseChrome();
 
 signals:
     void templatesRequested(QWidget* anchor);
@@ -49,6 +50,7 @@ protected:
     bool eventFilter(QObject* watched, QEvent* event) override;
     void changeEvent(QEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
+    void moveEvent(QMoveEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
@@ -56,22 +58,20 @@ private:
     void submitTitleEdit(bool clearFocus);
     void cancelTitleEdit();
     void rememberTitleEditBaseline();
-    QRect globalRectFor(QWidget* widget) const;
-    void updateLayoutMargins();
     void updateTitleWidth();
     void updateTitleGeometry();
+    void setActionButtonsVisible(bool visible);
+    int actionButtonsWidth() const;
     void installTitleEditOutsideClickFilter();
     void removeTitleEditOutsideClickFilter();
 
     QLineEdit* m_titleEdit{nullptr};
     QLabel* m_unsavedIndicator{nullptr};
-    QHBoxLayout* m_contentLayout{nullptr};
     QToolButton* m_templatesButton{nullptr};
     QToolButton* m_backgroundButton{nullptr};
     QToolButton* m_galleryButton{nullptr};
     QToolButton* m_resetButton{nullptr};
     QToolButton* m_focusButton{nullptr};
-    QWidget* m_buttonGroup{nullptr};
     bool m_tierFocusMode{false};
     bool m_editorActionsVisible{true};
     bool m_titleEditable{true};

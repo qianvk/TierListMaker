@@ -7,7 +7,7 @@ class QEvent;
 
 namespace tlm {
 
-/** Low-overhead Windows UI counters used while diagnosing visible-window CPU usage. */
+/** Opt-in UI counters used while diagnosing visible-window CPU usage. */
 class UiPerformanceMonitor final : public QObject {
 public:
     enum class Counter {

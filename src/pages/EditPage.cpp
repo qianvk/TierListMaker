@@ -4,13 +4,14 @@
 
 #include "logging/Logger.h"
 #include "pages/ProjectLocationDialog.h"
-#include "preview/PreviewOverlay.h"
 #include "theme/Theme.h"
 #include "tier/ImageEditDialog.h"
 #include "tier/ImageGalleryPopover.h"
 #include "tier/TierBoardWidget.h"
+#include "tier/TierListDelegate.h"
 #include "tier/TierRowEditDialog.h"
 #include "window/AppDialog.h"
+#include "window/AppMessageDialog.h"
 
 #include <QApplication>
 #include <QColorDialog>
@@ -24,16 +25,12 @@
 #include <QFileInfo>
 #include <QFormLayout>
 #include <QFrame>
-#if !defined(Q_OS_WIN)
-#include <QGraphicsDropShadowEffect>
-#endif
 #include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
 #include <QLocale>
 #include <QMenu>
-#include <QMessageBox>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPainterPath>
@@ -51,6 +48,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <type_traits>
@@ -64,8 +62,58 @@ namespace tlm {
 namespace {
 constexpr int kContentTitleBarHeight = 54;
 constexpr int kTierBoardOuterMargin = 16;
+constexpr int kTierBoardShadowExtent = 18;
 constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
 constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
+
+class TierBoardShadowLayer final : public QWidget {
+public:
+    explicit TierBoardShadowLayer(QWidget* parent) : QWidget(parent) {
+        setAttribute(Qt::WA_TransparentForMouseEvents);
+        setAttribute(Qt::WA_NoSystemBackground);
+        setFocusPolicy(Qt::NoFocus);
+    }
+
+protected:
+    void paintEvent(QPaintEvent* event) override {
+        QPainter painter(this);
+        painter.setClipRegion(event->region());
+        painter.setRenderHint(QPainter::Antialiasing);
+        painter.setPen(Qt::NoPen);
+
+        const qreal extent = kTierBoardShadowExtent;
+        const qreal radius = TierListDelegate::outerRadius();
+        const QRectF boardRect = QRectF(rect()).adjusted(extent, extent, -extent, -extent);
+        if (boardRect.isEmpty()) {
+            return;
+        }
+
+        QColor shadowColor = activeThemeTokens().shadow;
+        const qreal peakOpacity = std::clamp(qMax<qreal>(0.46, shadowColor.alphaF()), 0.0, 0.64);
+        constexpr qreal sigma = 5.6;
+        qreal accumulatedOpacity = 0.0;
+
+        // Nested rounded silhouettes are the discrete equivalent of blurring one rounded mask.
+        // A single geometry produces both edges and corners, avoiding seams or radial corner blobs.
+        for (int distance = kTierBoardShadowExtent; distance >= 0; --distance) {
+            const qreal d = static_cast<qreal>(distance);
+            const qreal targetOpacity =
+                peakOpacity * std::exp(-(d * d) / (2.0 * sigma * sigma));
+            const qreal layerOpacity =
+                1.0 - (1.0 - targetOpacity) / qMax<qreal>(0.0001, 1.0 - accumulatedOpacity);
+            accumulatedOpacity = targetOpacity;
+            if (layerOpacity <= 0.001) {
+                continue;
+            }
+
+            const QRectF layerRect = boardRect.adjusted(-d, -d, d, d);
+            QPainterPath layer;
+            layer.addRoundedRect(layerRect, radius + d, radius + d);
+            shadowColor.setAlphaF(static_cast<float>(std::clamp(layerOpacity, 0.0, 1.0)));
+            painter.fillPath(layer, shadowColor);
+        }
+    }
+};
 
 struct BuiltInTemplate {
     QString id;
@@ -235,6 +283,11 @@ public:
         m_popover->closeAnimated();
     }
 
+    void rejectImmediately() {
+        m_result = Rejected;
+        m_popover->closeImmediately();
+    }
+
 protected:
     bool eventFilter(QObject* watched, QEvent* event) override {
         if (watched == m_anchor.data() && event && event->type() == QEvent::MouseButtonPress) {
@@ -385,6 +438,9 @@ EditPage::EditPage(ProjectRepository* repository, RecentProjectsStore* recentPro
     m_project.dirty = false;
     setFocusPolicy(Qt::StrongFocus);
     setMouseTracking(true);
+    // The page is the opaque backing surface revealed through the transparent title bar.
+    setBackgroundRole(QPalette::Base);
+    setAutoFillBackground(true);
     buildUi();
     refreshUi();
 
@@ -467,17 +523,22 @@ bool EditPage::saveProjectAs() {
 }
 
 void EditPage::showTemplateMenu(QWidget* anchor) {
-    if (m_templatePopover && m_templatePopover->isOpen()) {
-        if (anchor && m_templatePopoverAnchor == anchor) {
-            m_templatePopover->closeAnimated();
-            return;
-        }
-        m_templatePopover->closeAnimated();
-    }
     if (!anchor) {
         return;
     }
-    closeTransientPopovers();
+    if (m_activePopover == TransientPopover::Templates && m_templatePopoverAnchor == anchor) {
+        m_activePopover = TransientPopover::None;
+        m_templatePopoverAnchor = nullptr;
+        if (m_templatePopover) {
+            m_templatePopover->closeAnimated();
+        }
+        Logger::debug(QStringLiteral("tier.edit.popover.toggle kind=templates open=0"));
+        return;
+    }
+    closeTransientPopovers(TransientPopover::Templates);
+    if (m_templatePopover) {
+        m_templatePopover->closeImmediately();
+    }
 
     auto* content = new QWidget;
     content->setObjectName(QStringLiteral("TemplatePopoverContent"));
@@ -502,10 +563,14 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
         if (m_templatePopover == popover) {
             m_templatePopover = nullptr;
             m_templatePopoverAnchor = nullptr;
+            if (m_activePopover == TransientPopover::Templates) {
+                m_activePopover = TransientPopover::None;
+            }
         }
         popover->deleteLater();
     });
     m_templatePopoverAnchor = anchor;
+    m_activePopover = TransientPopover::Templates;
 
     auto addSection = [&](const QString& text) {
         auto* label = new QLabel(text, content);
@@ -657,8 +722,8 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
                         return;
                     }
                     if (!QFile::remove(path)) {
-                        QMessageBox::warning(this, tr("Delete Template"),
-                                             tr("Could not delete the template file."));
+                        AppMessageDialog::warning(this, tr("Delete Template"),
+                                                  tr("Could not delete the template file."));
                         return;
                     }
                     if (m_settings && m_settings->defaultTemplateId() == templateId) {
@@ -702,6 +767,7 @@ void EditPage::showTemplateMenu(QWidget* anchor) {
     });
 
     popover->openFor(anchor);
+    Logger::debug(QStringLiteral("tier.edit.popover.toggle kind=templates open=1"));
 }
 
 void EditPage::renameProject(const QString& name) {
@@ -770,11 +836,20 @@ void EditPage::exportProjectFromDialog() {
 }
 
 void EditPage::configureBackground(QWidget* anchor) {
+    if (m_activePopover == TransientPopover::Background) {
+        const auto close = m_closeBackgroundPopover;
+        m_activePopover = TransientPopover::None;
+        if (close) {
+            close(false);
+        }
+        Logger::debug(QStringLiteral("tier.edit.popover.toggle kind=background open=0"));
+        return;
+    }
     if (m_backgroundPreviewActive) {
         Logger::debug(QStringLiteral("tier.edit.background.popover.ignore active=1"));
         return;
     }
-    closeTransientPopovers();
+    closeTransientPopovers(TransientPopover::Background);
 
     const QJsonObject originalCanvas = m_project.canvas;
     const bool originalDirty = m_project.dirty;
@@ -786,6 +861,18 @@ void EditPage::configureBackground(QWidget* anchor) {
     m_backgroundPreviewActive = true;
 
     BackgroundPopover dialog(this);
+    m_activePopover = TransientPopover::Background;
+    QPointer<BackgroundPopover> dialogGuard(&dialog);
+    m_closeBackgroundPopover = [dialogGuard](bool immediately) {
+        if (!dialogGuard) {
+            return;
+        }
+        if (immediately) {
+            dialogGuard->rejectImmediately();
+        } else {
+            dialogGuard->reject();
+        }
+    };
     dialog.setFixedWidth(380);
     QWidget* popoverContent = dialog.contentWidget();
     auto* layout = new QVBoxLayout(popoverContent);
@@ -902,7 +989,12 @@ void EditPage::configureBackground(QWidget* anchor) {
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &BackgroundPopover::reject);
 
     updatePreview();
-    if (dialog.execFor(anchor ? anchor : this) != BackgroundPopover::Accepted) {
+    const int backgroundResult = dialog.execFor(anchor ? anchor : this);
+    m_closeBackgroundPopover = {};
+    if (m_activePopover == TransientPopover::Background) {
+        m_activePopover = TransientPopover::None;
+    }
+    if (backgroundResult != BackgroundPopover::Accepted) {
         m_project.canvas = originalCanvas;
         m_project.dirty = originalDirty;
         m_project.updatedAt = originalUpdatedAt;
@@ -1017,10 +1109,6 @@ void EditPage::deleteSelectedImage() {
 }
 
 void EditPage::previewSelectedImage() {
-    if (m_previewOverlay->isOpen()) {
-        m_previewOverlay->closePreview();
-        return;
-    }
     const QPixmap pixmap = pixmapForImage(m_selectedImageId);
     if (!pixmap.isNull()) {
         QRect source = m_board ? m_board->imageSourceRect(m_selectedImageId) : QRect();
@@ -1038,7 +1126,7 @@ void EditPage::previewSelectedImage() {
                 .arg(source.y())
                 .arg(source.width())
                 .arg(source.height()));
-        m_previewOverlay->openPreview(source, pixmap);
+        emit imagePreviewRequested(source, pixmap);
     }
 }
 
@@ -1046,13 +1134,14 @@ bool EditPage::confirmSaveIfDirty() {
     if (!m_project.dirty) {
         return true;
     }
-    const int choice = QMessageBox::warning(
+    const auto choice = AppMessageDialog::warning(
         this, tr("Unsaved Changes"), tr("Save changes to \"%1\"?").arg(m_project.name),
-        QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel, QMessageBox::Save);
-    if (choice == QMessageBox::Cancel) {
+        QDialogButtonBox::Save | QDialogButtonBox::Discard | QDialogButtonBox::Cancel,
+        QDialogButtonBox::Save);
+    if (choice == QDialogButtonBox::Cancel || choice == QDialogButtonBox::NoButton) {
         return false;
     }
-    if (choice == QMessageBox::Save) {
+    if (choice == QDialogButtonBox::Save) {
         return saveProject();
     }
     return true;
@@ -1084,6 +1173,9 @@ void EditPage::setTierFocusMode(bool enabled) {
         }
     }
 
+    if (m_rootLayout) {
+        m_rootLayout->activate();
+    }
     layoutOverlays();
     updateGeometry();
     update();
@@ -1096,16 +1188,19 @@ void EditPage::toggleMissionControlMode() {
 }
 
 void EditPage::toggleGallery(QWidget* anchor) {
-    if (m_galleryPopover && m_galleryPopover->isOpen()) {
-        if (anchor && m_galleryPopoverAnchor == anchor) {
-            Logger::debug(QStringLiteral("tier.gallery.popover.close reason=toggle"));
-            m_galleryPopover->closeAnimated();
-            return;
-        }
-        Logger::debug(QStringLiteral("tier.gallery.popover.close reason=switch-anchor"));
-        m_galleryPopover->closeAnimated();
+    if (!anchor) {
+        return;
     }
-    closeTransientPopovers();
+    if (m_activePopover == TransientPopover::Gallery && m_galleryPopoverAnchor == anchor) {
+        m_activePopover = TransientPopover::None;
+        m_galleryPopoverAnchor = nullptr;
+        if (m_galleryPopover) {
+            m_galleryPopover->closeAnimated();
+        }
+        Logger::debug(QStringLiteral("tier.edit.popover.toggle kind=gallery open=0"));
+        return;
+    }
+    closeTransientPopovers(TransientPopover::Gallery);
 
     if (!m_galleryPopover) {
         auto* popover = new ImageGalleryPopover(this);
@@ -1141,28 +1236,35 @@ void EditPage::toggleGallery(QWidget* anchor) {
                     m_selectedImageId = imageId;
                     const QPixmap pixmap = pixmapForImage(imageId);
                     if (!pixmap.isNull()) {
-                        m_previewOverlay->openPreview(source, pixmap);
+                        emit imagePreviewRequested(source, pixmap);
                     }
                     refreshUi();
                 });
         connect(popover, &ImageGalleryPopover::imageEditRequested, this, &EditPage::editImage);
         connect(popover, &ImageGalleryPopover::imageRemoveRequested, this,
                 &EditPage::removeImageFromGallery);
+        connect(popover, &ImageGalleryPopover::closed, this, [this, popover]() {
+            if (m_galleryPopover == popover) {
+                m_galleryPopoverAnchor = nullptr;
+                if (m_activePopover == TransientPopover::Gallery) {
+                    m_activePopover = TransientPopover::None;
+                }
+            }
+        });
     }
 
     auto* popover = m_galleryPopover.data();
     popover->setData(&m_project, m_assetManager, m_thumbnailCache, m_selectedImageId);
     popover->openFor(anchor);
     m_galleryPopoverAnchor = anchor;
+    m_activePopover = TransientPopover::Gallery;
     Logger::info(
         QStringLiteral("tier.gallery.popover.open images=%1").arg(m_project.images.size()));
 }
 
 void EditPage::clearProject() {
     closeTransientPopovers();
-    if (m_previewOverlay && m_previewOverlay->isOpen()) {
-        m_previewOverlay->closePreview();
-    }
+    emit imagePreviewCloseRequested();
     m_backgroundPreviewActive = false;
 
     TierProject empty = TierProject::createUntitled();
@@ -1177,15 +1279,19 @@ void EditPage::clearProject() {
     Logger::info(QStringLiteral("tier.edit.project.clear"));
 }
 
-void EditPage::toggleGalleryMissionControlMode(const QRect& sourceGlobalRect) {
+void EditPage::toggleGalleryMissionControlMode() {
     if (m_board) {
-        m_board->toggleGalleryMissionControlMode(sourceGlobalRect);
+        m_board->toggleGalleryMissionControlMode();
     }
 }
 
 void EditPage::layoutOverlays() {
-    if (m_previewOverlay) {
-        m_previewOverlay->raise();
+    if (m_boardShadow && m_board) {
+        m_boardShadow->setGeometry(m_board->geometry().adjusted(
+            -kTierBoardShadowExtent, -kTierBoardShadowExtent, kTierBoardShadowExtent,
+            kTierBoardShadowExtent));
+        m_boardShadow->setVisible(!m_tierFocusMode);
+        m_boardShadow->stackUnder(m_board);
     }
 }
 
@@ -1205,9 +1311,6 @@ void EditPage::keyPressEvent(QKeyEvent* event) {
 
 void EditPage::resizeEvent(QResizeEvent* event) {
     QWidget::resizeEvent(event);
-    if (m_previewOverlay) {
-        m_previewOverlay->setGeometry(rect());
-    }
     layoutOverlays();
 }
 
@@ -1217,15 +1320,8 @@ void EditPage::buildUi() {
                                      kTierBoardOuterMargin, kTierBoardOuterMargin);
     m_rootLayout->setSpacing(0);
 
+    m_boardShadow = new TierBoardShadowLayer(this);
     m_board = new TierBoardWidget(this);
-#if !defined(Q_OS_WIN)
-    auto* boardShadow = new QGraphicsDropShadowEffect(m_board);
-    // Match the reference TierListMaker section list elevation: concentrated, centered, and dark.
-    boardShadow->setBlurRadius(20);
-    boardShadow->setOffset(0, 0);
-    boardShadow->setColor(QColor(0, 0, 0, 247));
-    m_board->setGraphicsEffect(boardShadow);
-#endif
     m_rootLayout->addWidget(m_board, 1);
     if (m_settings) {
         const auto applyBlankAreaActions = [this]() {
@@ -1244,9 +1340,6 @@ void EditPage::buildUi() {
         connect(m_settings, &AppSettings::tierListToolTipsEnabledChanged, m_board,
                 &TierBoardWidget::setToolTipsEnabled);
     }
-
-    m_previewOverlay = new PreviewOverlay(this);
-    m_previewOverlay->setGeometry(rect());
 
     connect(m_board, &TierBoardWidget::imageDropped, this, &EditPage::moveImageToRow);
     connect(m_board, &TierBoardWidget::rowMovedToIndex, this, &EditPage::moveRowToIndex);
@@ -1281,7 +1374,7 @@ void EditPage::buildUi() {
                 m_selectedImageId = imageId;
                 const QPixmap pixmap = pixmapForImage(imageId);
                 if (!pixmap.isNull()) {
-                    m_previewOverlay->openPreview(source, pixmap);
+                    emit imagePreviewRequested(source, pixmap);
                 }
             });
 
@@ -1313,10 +1406,10 @@ void EditPage::setProject(TierProject project) {
 }
 
 void EditPage::showError(const QString& title, const Error& error) {
-    QMessageBox::critical(this, title,
-                          error.details.isEmpty()
-                              ? error.message
-                              : QStringLiteral("%1\n\n%2").arg(error.message, error.details));
+    AppMessageDialog::critical(
+        this, title,
+        error.details.isEmpty() ? error.message
+                                : QStringLiteral("%1\n\n%2").arg(error.message, error.details));
 }
 
 QString EditPage::chooseSavePath() {
@@ -1389,12 +1482,26 @@ QStringList EditPage::chooseImageImportFiles(QWidget* dialogParent) {
     return files;
 }
 
-void EditPage::closeTransientPopovers() {
-    if (m_templatePopover && m_templatePopover->isOpen()) {
-        m_templatePopover->closeAnimated();
+void EditPage::closeTransientPopovers(TransientPopover keep, bool immediately) {
+    if (keep != TransientPopover::Background && m_closeBackgroundPopover) {
+        const auto close = m_closeBackgroundPopover;
+        if (m_activePopover == TransientPopover::Background) {
+            m_activePopover = TransientPopover::None;
+        }
+        close(immediately);
     }
-    if (m_galleryPopover && m_galleryPopover->isOpen()) {
-        m_galleryPopover->closeAnimated();
+    if (keep != TransientPopover::Templates && m_templatePopover) {
+        immediately ? m_templatePopover->closeImmediately() : m_templatePopover->closeAnimated();
+        if (m_activePopover == TransientPopover::Templates) {
+            m_activePopover = TransientPopover::None;
+        }
+        m_templatePopoverAnchor = nullptr;
+    }
+    if (keep != TransientPopover::Gallery && m_galleryPopover) {
+        immediately ? m_galleryPopover->closeImmediately() : m_galleryPopover->closeAnimated();
+        if (m_activePopover == TransientPopover::Gallery) {
+            m_activePopover = TransientPopover::None;
+        }
         m_galleryPopoverAnchor = nullptr;
     }
 }
@@ -1562,7 +1669,8 @@ bool EditPage::saveManagedTemplateFromPrompt(QWidget* reopenAnchor) {
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
         if (nameEdit->text().trimmed().isEmpty()) {
-            QMessageBox::warning(&dialog, tr("Save Template"), tr("Enter a template name."));
+            AppMessageDialog::warning(&dialog, tr("Save Template"),
+                                      tr("Enter a template name."));
             return;
         }
         dialog.accept();
@@ -1578,16 +1686,15 @@ bool EditPage::saveManagedTemplateFromPrompt(QWidget* reopenAnchor) {
     const QString templateName = nameEdit->text().trimmed();
     QDir directory(managedTemplateDirectory());
     if (!directory.exists() && !QDir().mkpath(directory.absolutePath())) {
-        QMessageBox::warning(this, tr("Save Template"),
-                             tr("Could not create the template folder."));
+        AppMessageDialog::warning(this, tr("Save Template"),
+                                  tr("Could not create the template folder."));
         return false;
     }
     const QString path =
         directory.filePath(templateFileStem(templateName) + QStringLiteral(".tlmtemplate"));
     if (QFileInfo::exists(path) &&
-        !confirmDestructiveAction(
-            this, tr("Replace Template"),
-            tr("Replace the existing template \"%1\"?").arg(templateName))) {
+        !confirmDestructiveAction(this, tr("Replace Template"),
+                                  tr("Replace the existing template \"%1\"?").arg(templateName))) {
         return false;
     }
 
@@ -1918,7 +2025,8 @@ void EditPage::clearTierRowImages(const QString& rowId) {
 
 void EditPage::deleteTierRow(const QString& rowId) {
     if (m_project.rows.size() <= 1) {
-        QMessageBox::information(this, tr("Delete Row"), tr("At least one row is required."));
+        AppMessageDialog::information(this, tr("Delete Row"),
+                                      tr("At least one row is required."));
         return;
     }
     const TierRow* row = m_project.rowById(rowId);
@@ -1992,8 +2100,8 @@ bool EditPage::saveProjectToPath(const QString& filePath) {
     const bool pathChanged =
         previousPath.isEmpty() || QFileInfo(previousPath).absoluteFilePath() != absolutePath;
     if (pathChanged && QFileInfo::exists(absolutePath)) {
-        QMessageBox::warning(this, tr("Save Project"),
-                             tr("A project with this name already exists."));
+        AppMessageDialog::warning(this, tr("Save Project"),
+                                  tr("A project with this name already exists."));
         return false;
     }
     if (!m_project.dirty && !pathChanged) {
@@ -2024,7 +2132,7 @@ bool EditPage::saveProjectToPath(const QString& filePath) {
 
     auto recentResult = m_recentProjects->addOrUpdate(m_project);
     if (!recentResult) {
-        QMessageBox::warning(
+        AppMessageDialog::warning(
             this, tr("Recent Projects"),
             recentResult.error().details.isEmpty()
                 ? recentResult.error().message

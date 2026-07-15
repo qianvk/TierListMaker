@@ -2,6 +2,7 @@
 
 #include "navigation/SidebarModel.h"
 
+#include <QPoint>
 #include <QPointer>
 #include <QWidget>
 
@@ -112,6 +113,7 @@ private:
     QStackedWidget* m_pages{nullptr};
     EditPage* m_editPage{nullptr};
     ProjectsPage* m_projectsPage{nullptr};
+    PreviewOverlay* m_previewOverlay{nullptr};
     QPointer<QDialog> m_preferencesDialog;
     AppSettings* m_settings{nullptr};
     LanguageManager* m_languageManager{nullptr};
@@ -122,11 +124,16 @@ private:
     bool m_tierFocusMode{false};
     QWK::WindowAgentBase::SystemButtonVisibility m_savedSystemButtonVisibility{
         QWK::WindowAgentBase::AlwaysVisible};
+    QWK::WindowAgentBase::SystemButtonVisibility m_previewSavedSystemButtonVisibility{
+        QWK::WindowAgentBase::AlwaysVisible};
+    bool m_previewSystemButtonStateCaptured{false};
     int m_currentSidebarWidth{0};
     int m_lastExpandedSidebarWidth{240};
     int m_focusSavedSidebarWidth{240};
     bool m_focusSavedSidebarCollapsed{false};
     bool m_initialLayoutSynced{false};
+    QPointer<QWidget> m_focusMoveWindow;
+    QPoint m_focusMoveOffset;
 };
 
 } // namespace tlm

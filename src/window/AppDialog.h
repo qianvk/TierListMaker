@@ -14,12 +14,15 @@ class WidgetWindowAgent;
 
 namespace tlm {
 
-/** Modal frameless shell used by app-owned dialogs. */
+/** Modal app shell that preserves native platform window controls. */
 class AppDialog : public QDialog {
     Q_OBJECT
 
 public:
     explicit AppDialog(const QString& title, QWidget* parent = nullptr);
+
+    bool isResizable() const;
+    void setResizable(bool resizable);
 
     QWidget* titleBar() const {
         return m_titleBar;
@@ -48,6 +51,7 @@ private:
     QWidget* m_content{nullptr};
     QVBoxLayout* m_contentLayout{nullptr};
     QWK::WidgetWindowAgent* m_windowAgent{nullptr};
+    bool m_resizable{false};
 };
 
 } // namespace tlm

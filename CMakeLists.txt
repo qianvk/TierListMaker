@@ -121,6 +121,8 @@ set(TLM_APP_SOURCES
     src/widgets/SectionHeader.h
     src/window/AppDialog.cpp
     src/window/AppDialog.h
+    src/window/AppMessageDialog.cpp
+    src/window/AppMessageDialog.h
     src/window/AppTitleBar.cpp
     src/window/AppTitleBar.h
     src/window/MainWindow.cpp

@@ -17,6 +17,8 @@
 
 #if defined(Q_OS_WIN)
 #include <qt_windows.h>
+#elif defined(Q_OS_UNIX)
+#include <sys/resource.h>
 #endif
 
 namespace tlm {
@@ -85,6 +87,19 @@ quint64 processCpuTime() {
     }
     return fileTimeValue(kernel) + fileTimeValue(user);
 }
+#elif defined(Q_OS_UNIX)
+quint64 processCpuTime() {
+    rusage usage{};
+    if (getrusage(RUSAGE_SELF, &usage) != 0) {
+        return 0;
+    }
+    const auto microseconds = [](const timeval& value) {
+        return static_cast<quint64>(value.tv_sec) * 1'000'000ULL +
+               static_cast<quint64>(value.tv_usec);
+    };
+    // Match Windows FILETIME's 100 ns unit so the sampling formula stays platform neutral.
+    return (microseconds(usage.ru_utime) + microseconds(usage.ru_stime)) * 10ULL;
+}
 #endif
 
 } // namespace
@@ -105,6 +120,10 @@ public:
     struct TargetStats {
         QString label;
         quint64 paints{0};
+        quint64 paintedPixels{0};
+        quint64 paintRegionRects{0};
+        quint64 largestPaintPixels{0};
+        quint64 widgetPixels{0};
         quint64 updateRequests{0};
     };
 
@@ -129,6 +148,10 @@ public:
                     ? QString::fromLatin1(object->metaObject()->className())
                     : QStringLiteral("%1#%2").arg(
                           QString::fromLatin1(object->metaObject()->className()), objectName);
+            if (const auto* widget = qobject_cast<const QWidget*>(object)) {
+                it->widgetPixels = static_cast<quint64>(qMax(0, widget->width())) *
+                                   static_cast<quint64>(qMax(0, widget->height()));
+            }
         }
         return it.value();
     }
@@ -169,7 +192,7 @@ public:
                 break;
             }
             if (current->inherits("tlm::MainWindow") ||
-                current->isWidgetType() && !current->parent()) {
+                (current->isWidgetType() && !current->parent())) {
                 result = Surface::Window;
             }
         }
@@ -191,7 +214,7 @@ public:
 
         const qint64 elapsedMs = qMax<qint64>(1, elapsed.restart());
         qreal corePercent = 0.0;
-#if defined(Q_OS_WIN)
+#if defined(Q_OS_WIN) || defined(Q_OS_UNIX)
         const quint64 currentCpuTime = processCpuTime();
         if (currentCpuTime >= previousProcessCpuTime && previousProcessCpuTime != 0) {
             const quint64 delta100ns = currentCpuTime - previousProcessCpuTime;
@@ -256,9 +279,13 @@ public:
         targetParts.reserve(targetLimit);
         for (qsizetype i = 0; i < targetLimit; ++i) {
             const TargetStats& stats = busiestTargets.at(i);
-            targetParts.append(QStringLiteral("%1:p%2/u%3")
+            targetParts.append(QStringLiteral("%1:p%2/px%3/max%4/of%5/r%6/u%7")
                                    .arg(stats.label)
                                    .arg(stats.paints)
+                                   .arg(stats.paintedPixels)
+                                   .arg(stats.largestPaintPixels)
+                                   .arg(stats.widgetPixels)
+                                   .arg(stats.paintRegionRects)
                                    .arg(stats.updateRequests));
         }
 
@@ -306,21 +333,23 @@ UiPerformanceMonitor* g_monitor = nullptr;
 
 UiPerformanceMonitor::UiPerformanceMonitor(QApplication* application, QObject* parent)
     : QObject(parent), d(new Private) {
-#if defined(Q_OS_WIN)
     const QByteArray requested = qgetenv("TLM_PERF_DIAGNOSTICS").trimmed();
-#if defined(NDEBUG)
     const bool explicitlyEnabled =
         requested == QByteArrayLiteral("1") ||
         requested.compare(QByteArrayLiteral("true"), Qt::CaseInsensitive) == 0;
+#if defined(NDEBUG)
     d->enabled = explicitlyEnabled;
 #else
     const bool explicitlyDisabled =
         requested == QByteArrayLiteral("0") ||
         requested.compare(QByteArrayLiteral("false"), Qt::CaseInsensitive) == 0;
+#if defined(Q_OS_WIN)
     d->enabled = !explicitlyDisabled;
-#endif
 #else
-    Q_UNUSED(application)
+    // Keep the observer out of normal macOS/Linux debug sessions. It remains available on demand
+    // for identical cross-platform paint/update/CPU diagnostics.
+    d->enabled = explicitlyEnabled && !explicitlyDisabled;
+#endif
 #endif
     if (!d->enabled || !application) {
         return;
@@ -328,7 +357,7 @@ UiPerformanceMonitor::UiPerformanceMonitor(QApplication* application, QObject* p
 
     g_monitor = this;
     d->application = application;
-#if defined(Q_OS_WIN)
+#if defined(Q_OS_WIN) || defined(Q_OS_UNIX)
     d->previousProcessCpuTime = processCpuTime();
 #endif
     d->elapsed.start();
@@ -404,10 +433,18 @@ bool UiPerformanceMonitor::eventFilter(QObject* watched, QEvent* event) {
     switch (event->type()) {
     case QEvent::Paint: {
         ++stats.paints;
-        ++d->targetFor(watched).paints;
-        const QRect rect = static_cast<QPaintEvent*>(event)->rect();
-        stats.paintedPixels += static_cast<quint64>(qMax(0, rect.width())) *
-                               static_cast<quint64>(qMax(0, rect.height()));
+        Private::TargetStats& target = d->targetFor(watched);
+        ++target.paints;
+        const QRegion region = static_cast<QPaintEvent*>(event)->region();
+        quint64 paintPixels = 0;
+        for (const QRect& rect : region) {
+            paintPixels += static_cast<quint64>(qMax(0, rect.width())) *
+                           static_cast<quint64>(qMax(0, rect.height()));
+        }
+        stats.paintedPixels += paintPixels;
+        target.paintedPixels += paintPixels;
+        target.paintRegionRects += static_cast<quint64>(region.rectCount());
+        target.largestPaintPixels = qMax(target.largestPaintPixels, paintPixels);
         break;
     }
     case QEvent::UpdateRequest:

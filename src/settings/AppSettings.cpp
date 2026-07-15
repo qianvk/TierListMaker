@@ -56,6 +56,16 @@ BlankAreaAction blankAreaActionFromString(const QString& value, BlankAreaAction 
     return fallback;
 }
 
+QString previewBackgroundModeToString(PreviewBackgroundMode mode) {
+    return mode == PreviewBackgroundMode::SelfImage ? QStringLiteral("selfImage")
+                                                    : QStringLiteral("none");
+}
+
+PreviewBackgroundMode previewBackgroundModeFromString(const QString& value) {
+    return value == QStringLiteral("selfImage") ? PreviewBackgroundMode::SelfImage
+                                                : PreviewBackgroundMode::None;
+}
+
 QString fallbackProjectDirectory() {
     QString path = QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation);
     if (path.isEmpty()) {
@@ -228,6 +238,22 @@ void AppSettings::setTierListToolTipsEnabled(bool enabled) {
     }
     m_settings.setValue(settings_keys::tierListToolTipsEnabled.toString(), enabled);
     emit tierListToolTipsEnabledChanged(enabled);
+    emit changed();
+}
+
+PreviewBackgroundMode AppSettings::previewBackgroundMode() const {
+    return previewBackgroundModeFromString(
+        m_settings.value(settings_keys::previewBackgroundMode.toString(), QStringLiteral("none"))
+            .toString());
+}
+
+void AppSettings::setPreviewBackgroundMode(PreviewBackgroundMode mode) {
+    if (previewBackgroundMode() == mode) {
+        return;
+    }
+    m_settings.setValue(settings_keys::previewBackgroundMode.toString(),
+                        previewBackgroundModeToString(mode));
+    emit previewBackgroundModeChanged(mode);
     emit changed();
 }
 

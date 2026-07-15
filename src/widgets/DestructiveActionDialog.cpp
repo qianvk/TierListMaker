@@ -1,20 +1,22 @@
 #include "widgets/DestructiveActionDialog.h"
 
-#include <QAbstractButton>
-#include <QMessageBox>
+#include "window/AppMessageDialog.h"
+
+#include <QCoreApplication>
+#include <QDialogButtonBox>
 #include <QPushButton>
 
 namespace tlm {
 
 bool confirmDestructiveAction(QWidget* parent, const QString& title, const QString& text,
                               const QString& confirmText) {
-    QMessageBox message(QMessageBox::Warning, title, text, QMessageBox::NoButton, parent);
-    QAbstractButton* confirmButton =
-        confirmText.isEmpty()
-            ? static_cast<QAbstractButton*>(message.addButton(QMessageBox::Yes))
-            : static_cast<QAbstractButton*>(
-                  message.addButton(confirmText, QMessageBox::DestructiveRole));
-    QPushButton* cancelButton = message.addButton(QMessageBox::Cancel);
+    AppMessageDialog message(AppMessageDialog::Icon::Warning, title, text,
+                             QDialogButtonBox::Cancel, parent);
+    QAbstractButton* confirmButton = message.addButton(
+        confirmText.isEmpty() ? QCoreApplication::translate("DestructiveActionDialog", "Confirm")
+                              : confirmText,
+        QDialogButtonBox::DestructiveRole);
+    QPushButton* cancelButton = message.button(QDialogButtonBox::Cancel);
 
     // Destructive prompts intentionally require an explicit choice: Enter and Escape stay safe.
     message.setDefaultButton(cancelButton);

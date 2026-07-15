@@ -3,31 +3,51 @@
 #include <QPixmap>
 #include <QWidget>
 
+class QParallelAnimationGroup;
+class QPropertyAnimation;
+
 namespace tlm {
 
-/** Animated dimming overlay that previews an image from its source tile rectangle. */
+enum class PreviewBackgroundMode;
+
+/** Window-level animated image preview that owns input while it is visible. */
 class PreviewOverlay : public QWidget {
     Q_OBJECT
     Q_PROPERTY(QRect previewGeometry READ previewGeometry WRITE setPreviewGeometry)
-    Q_PROPERTY(qreal dimOpacity READ dimOpacity WRITE setDimOpacity)
+    Q_PROPERTY(qreal backdropProgress READ backdropProgress WRITE setBackdropProgress)
 
 public:
     explicit PreviewOverlay(QWidget* parent = nullptr);
+    ~PreviewOverlay() override;
 
-    QRect previewGeometry() const { return m_previewGeometry; }
+    QRect previewGeometry() const {
+        return m_previewGeometry;
+    }
     void setPreviewGeometry(const QRect& rect);
 
-    qreal dimOpacity() const { return m_dimOpacity; }
-    void setDimOpacity(qreal opacity);
+    qreal backdropProgress() const {
+        return m_backdropProgress;
+    }
+    void setBackdropProgress(qreal progress);
 
-    bool isOpen() const { return m_open; }
+    PreviewBackgroundMode backgroundMode() const {
+        return m_backgroundMode;
+    }
+    void setBackgroundMode(PreviewBackgroundMode mode);
+
+    bool isOpen() const {
+        return m_open;
+    }
+    Q_INVOKABLE QString toolTipTextAt(QPoint position) const;
     void openPreview(const QRect& sourceRectInWindow, const QPixmap& pixmap);
     void closePreview();
 
 signals:
+    void opened();
     void closed();
 
 protected:
+    bool eventFilter(QObject* watched, QEvent* event) override;
     void paintEvent(QPaintEvent* event) override;
     void mousePressEvent(QMouseEvent* event) override;
     void mouseMoveEvent(QMouseEvent* event) override;
@@ -37,14 +57,24 @@ protected:
 
 private:
     QRect targetRectForPixmap(const QPixmap& pixmap) const;
-    void animateTo(const QRect& from, const QRect& to, qreal fromDim, qreal toDim, bool closing);
+    void animateTo(const QRect& from, const QRect& to, qreal fromProgress, qreal toProgress,
+                   bool closing);
+    void rebuildProjectionCache();
+    void setInputBarrierActive(bool active);
+    bool isOverlayObject(const QObject* object) const;
 
     QPixmap m_pixmap;
+    QPixmap m_projectionCache;
     QRect m_sourceGeometry;
     QRect m_previewGeometry;
-    qreal m_dimOpacity{0.0};
+    qreal m_backdropProgress{0.0};
+    PreviewBackgroundMode m_backgroundMode;
+    QParallelAnimationGroup* m_animationGroup{nullptr};
+    QPropertyAnimation* m_geometryAnimation{nullptr};
+    QPropertyAnimation* m_backdropAnimation{nullptr};
     bool m_open{false};
+    bool m_closing{false};
+    bool m_inputBarrierActive{false};
 };
 
 } // namespace tlm
-

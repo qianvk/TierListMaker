@@ -96,7 +96,7 @@ public:
         setAcceptDrops(true);
         setFocusPolicy(Qt::StrongFocus);
         setMouseTracking(true);
-        setCursor(Qt::PointingHandCursor);
+        setCursor(Qt::ArrowCursor);
         setAttribute(Qt::WA_OpaquePaintEvent, false);
     }
 
@@ -368,6 +368,7 @@ ImageGalleryPopover::ImageGalleryPopover(QWidget* parent)
     setObjectName(QStringLiteral("ImageGalleryPopover"));
     m_popover->setPreferredPlacement(vkui::VkPopoverPlacement::Below);
     m_popover->setContentWidget(this);
+    connect(m_popover, &vkui::VkPopover::closed, this, &ImageGalleryPopover::closed);
 }
 
 void ImageGalleryPopover::setData(const TierProject* project, const AssetManager* assetManager,

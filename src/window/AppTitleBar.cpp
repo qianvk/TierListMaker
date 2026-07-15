@@ -5,10 +5,10 @@
 #include <QEvent>
 #include <QFont>
 #include <QFontMetrics>
-#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMoveEvent>
 #include <QMouseEvent>
 #include <QResizeEvent>
 #include <QShortcut>
@@ -32,7 +32,8 @@ QToolButton* makeButton(const QString& text, vkui::VkSymbol symbol, QWidget* par
     button->setToolTip(text);
     button->setIcon(vkui::icon(symbol));
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    button->setCursor(Qt::PointingHandCursor);
+    button->setCursor(Qt::ArrowCursor);
+    button->setAttribute(Qt::WA_NoMousePropagation, true);
     button->setAutoRaise(true);
     button->setFixedSize(32, 32);
     button->setIconSize(QSize(19, 19));
@@ -64,15 +65,14 @@ QToolButton* makeButton(const QString& text, vkui::VkSymbol symbol, QWidget* par
 AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     setFixedHeight(54);
     setAttribute(Qt::WA_StyledBackground, false);
-    m_contentLayout = new QHBoxLayout(this);
-    auto* layout = m_contentLayout;
-    updateLayoutMargins();
-    layout->setSpacing(kTitleBarSpacing);
-    while (QLayoutItem* item = layout->takeAt(0)) {
-        delete item;
-    }
+    setAttribute(Qt::WA_NoSystemBackground, true);
+    setAttribute(Qt::WA_NoMousePropagation, true);
 
-    m_titleEdit = new QLineEdit(this);
+    // Interactive chrome is parented beside the transparent drag region. This preserves normal
+    // Qt style painting for every independent control without propagating hover updates through
+    // the transparent title-bar widget and the dynamic page beneath it.
+    QWidget* controlsParent = parent ? parent : this;
+    m_titleEdit = new QLineEdit(controlsParent);
     m_titleEdit->setObjectName(QStringLiteral("ProjectTitleEdit"));
     m_titleEdit->setAlignment(Qt::AlignCenter);
     m_titleEdit->setPlaceholderText(tr("Untitled Tier List"));
@@ -89,7 +89,7 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
         QStringLiteral("QLineEdit#ProjectTitleEdit{background:transparent;border:none;"
                        "border-radius:0px;padding:4px "
                        "10px;}"));
-    m_unsavedIndicator = new QLabel(this);
+    m_unsavedIndicator = new QLabel(controlsParent);
     m_unsavedIndicator->setObjectName(QStringLiteral("UnsavedIndicator"));
     m_unsavedIndicator->setFixedSize(16, 16);
     m_unsavedIndicator->setPixmap(
@@ -97,31 +97,12 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
     m_unsavedIndicator->setToolTip(tr("Unsaved changes"));
     m_unsavedIndicator->setAttribute(Qt::WA_TransparentForMouseEvents);
     m_unsavedIndicator->hide();
-    m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Templates, this);
-    m_backgroundButton = makeButton(tr("Background"), vkui::VkSymbol::CanvasBackground, this);
-    m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::PhotoLibrary, this);
-    m_resetButton = makeButton(tr("Reset Rows"), vkui::VkSymbol::Reset, this);
-    m_focusButton = makeButton(tr("Enter Tier Focus"), vkui::VkSymbol::FocusTarget, this);
-    m_buttonGroup = new QWidget(this);
-    m_buttonGroup->setObjectName(QStringLiteral("ToolbarButtonGroup"));
-    m_buttonGroup->setStyleSheet(
-        QStringLiteral("QWidget#ToolbarButtonGroup{background:transparent;border:none;}"));
-    auto* buttonsLayout = new QHBoxLayout(m_buttonGroup);
-    buttonsLayout->setContentsMargins(0, 0, 0, 0);
-    buttonsLayout->setSpacing(2);
-    for (QToolButton* button :
-         {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton, m_focusButton}) {
-        button->installEventFilter(this);
-        buttonsLayout->addWidget(button);
-    }
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    layout->addStretch(1);
-    layout->addWidget(m_buttonGroup);
-#else
-    layout->addWidget(m_buttonGroup);
-    layout->addStretch(1);
-#endif
-
+    m_templatesButton = makeButton(tr("Templates"), vkui::VkSymbol::Templates, controlsParent);
+    m_backgroundButton =
+        makeButton(tr("Background"), vkui::VkSymbol::CanvasBackground, controlsParent);
+    m_galleryButton = makeButton(tr("Gallery"), vkui::VkSymbol::PhotoLibrary, controlsParent);
+    m_resetButton = makeButton(tr("Reset Rows"), vkui::VkSymbol::Reset, controlsParent);
+    m_focusButton = makeButton(tr("Enter Tier Focus"), vkui::VkSymbol::FocusTarget, controlsParent);
     connect(m_templatesButton, &QToolButton::clicked, this,
             [this]() { emit templatesRequested(m_templatesButton); });
     connect(m_backgroundButton, &QToolButton::clicked, this,
@@ -148,6 +129,15 @@ AppTitleBar::AppTitleBar(QWidget* parent) : QWidget(parent) {
 
 AppTitleBar::~AppTitleBar() {
     removeTitleEditOutsideClickFilter();
+    // Overlay controls are visual siblings so that their dirty regions never traverse the
+    // transparent drag region. AppTitleBar remains their logical owner.
+    delete m_titleEdit;
+    delete m_unsavedIndicator;
+    delete m_templatesButton;
+    delete m_backgroundButton;
+    delete m_galleryButton;
+    delete m_resetButton;
+    delete m_focusButton;
 }
 
 void AppTitleBar::retranslateUi() {
@@ -211,9 +201,7 @@ void AppTitleBar::setTitleEditable(bool editable) {
 
 void AppTitleBar::setEditorActionsVisible(bool visible) {
     m_editorActionsVisible = visible;
-    if (m_buttonGroup) {
-        m_buttonGroup->setVisible(visible && !m_tierFocusMode);
-    }
+    setActionButtonsVisible(visible && !m_tierFocusMode);
 }
 
 void AppTitleBar::setResetRowsActionEnabled(bool enabled) {
@@ -230,9 +218,7 @@ void AppTitleBar::setTierFocusMode(bool enabled) {
     if (m_titleEdit) {
         m_titleEdit->setVisible(!enabled);
     }
-    if (m_buttonGroup) {
-        m_buttonGroup->setVisible(!enabled && m_editorActionsVisible);
-    }
+    setActionButtonsVisible(!enabled && m_editorActionsVisible);
     if (m_focusButton) {
         m_focusButton->setToolTip(enabled ? tr("Exit Tier Focus") : tr("Enter Tier Focus"));
         m_focusButton->setIconSize(enabled ? QSize(15, 15) : QSize(19, 19));
@@ -253,7 +239,6 @@ void AppTitleBar::setLeadingReservedWidth(int width) {
         return;
     }
     m_leadingReservedWidth = next;
-    updateLayoutMargins();
     updateTitleWidth();
 }
 
@@ -291,13 +276,6 @@ void AppTitleBar::rememberTitleEditBaseline() {
     }
 }
 
-QRect AppTitleBar::globalRectFor(QWidget* widget) const {
-    if (!widget) {
-        return {};
-    }
-    return QRect(widget->mapToGlobal(QPoint(0, 0)), widget->size());
-}
-
 void AppTitleBar::updateTitleWidth() {
     if (!m_titleEdit) {
         return;
@@ -305,8 +283,7 @@ void AppTitleBar::updateTitleWidth() {
     const QString measuredText =
         m_titleEdit->text().isEmpty() ? m_titleEdit->placeholderText() : m_titleEdit->text();
     const int textWidth = QFontMetrics(m_titleEdit->font()).horizontalAdvance(measuredText);
-    const int actionWidth =
-        (m_buttonGroup && m_buttonGroup->isVisible()) ? m_buttonGroup->width() + 28 : 18;
+    const int actionWidth = actionButtonsWidth() + (actionButtonsWidth() > 0 ? 28 : 18);
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     const int reservedLeft = 18;
     const int reservedRight = actionWidth;
@@ -324,16 +301,32 @@ void AppTitleBar::updateTitleWidth() {
 }
 
 QSize AppTitleBar::focusRevealSizeHint() const {
-    const int toolbarWidth = m_buttonGroup ? m_buttonGroup->sizeHint().width() : 260;
-    return QSize(toolbarWidth + 36, 54);
-}
-
-QRect AppTitleBar::galleryButtonGlobalRect() const {
-    return globalRectFor(m_galleryButton);
+    return QSize(qMax(260, actionButtonsWidth()) + 36, 54);
 }
 
 QLineEdit* AppTitleBar::titleEditor() const {
     return m_titleEdit;
+}
+
+QList<QWidget*> AppTitleBar::interactiveWidgets() const {
+    return {m_titleEdit, m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton,
+            m_focusButton};
+}
+
+void AppTitleBar::raiseChrome() {
+    raise();
+    if (m_titleEdit) {
+        m_titleEdit->raise();
+    }
+    if (m_unsavedIndicator) {
+        m_unsavedIndicator->raise();
+    }
+    for (QToolButton* button :
+         {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton, m_focusButton}) {
+        if (button) {
+            button->raise();
+        }
+    }
 }
 
 bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
@@ -383,15 +376,25 @@ bool AppTitleBar::eventFilter(QObject* watched, QEvent* event) {
 }
 
 void AppTitleBar::mousePressEvent(QMouseEvent* event) {
+    const QRect titleRect = m_titleEdit
+                                ? QRect(mapFromParent(m_titleEdit->pos()), m_titleEdit->size())
+                                : QRect{};
     if (m_titleEdit && m_titleEdit->hasFocus() &&
-        !m_titleEdit->geometry().contains(event->position().toPoint())) {
+        !titleRect.contains(event->position().toPoint())) {
         submitTitleEdit(true);
     }
     QWidget::mousePressEvent(event);
 }
 
+void AppTitleBar::moveEvent(QMoveEvent* event) {
+    QWidget::moveEvent(event);
+    updateTitleGeometry();
+}
+
 void AppTitleBar::paintEvent(QPaintEvent* event) {
-    QWidget::paintEvent(event);
+    // The registered QWindowKit drag region is intentionally paint-free. Dynamic page content is
+    // visible below it, while sibling controls keep independent interaction and dirty regions.
+    event->accept();
 }
 
 void AppTitleBar::resizeEvent(QResizeEvent* event) {
@@ -414,33 +417,58 @@ void AppTitleBar::updateTitleGeometry() {
     const QSize titleSize = m_titleEdit->sizeHint();
     const int titleWidth = m_titleEdit->width() > 0 ? m_titleEdit->width() : titleSize.width();
     const int titleHeight = titleSize.height();
-    const int x = qMax(0, (width() - titleWidth) / 2);
-    const int y = qMax(0, (height() - titleHeight) / 2);
+    const int x = pos().x() + qMax(0, (width() - titleWidth) / 2);
+    const int y = pos().y() + qMax(0, (height() - titleHeight) / 2);
     m_titleEdit->setGeometry(x, y, titleWidth, titleHeight);
     m_titleEdit->raise();
     if (m_unsavedIndicator) {
-        const int indicatorX =
-            qMin(width() - m_unsavedIndicator->width() - 4, m_titleEdit->geometry().right() + 4);
-        const int indicatorY = qMax(0, (height() - m_unsavedIndicator->height()) / 2);
-        m_unsavedIndicator->move(qMax(0, indicatorX), indicatorY);
+        const int indicatorX = qMin(pos().x() + width() - m_unsavedIndicator->width() - 4,
+                                    m_titleEdit->geometry().right() + 4);
+        const int indicatorY =
+            pos().y() + qMax(0, (height() - m_unsavedIndicator->height()) / 2);
+        m_unsavedIndicator->move(qMax(pos().x(), indicatorX), indicatorY);
         m_unsavedIndicator->raise();
     }
-    if (m_buttonGroup) {
-        m_buttonGroup->raise();
+
+    const int totalActionWidth = actionButtonsWidth();
+#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
+    int actionX = pos().x() + width() - kTitleBarHorizontalMargin - totalActionWidth;
+#else
+    int actionX = pos().x() + kTitleBarHorizontalMargin + m_leadingReservedWidth;
+#endif
+    for (QToolButton* button :
+         {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton, m_focusButton}) {
+        if (!button || !button->isVisible()) {
+            continue;
+        }
+        button->move(actionX, pos().y() + qMax(0, (height() - button->height()) / 2));
+        button->raise();
+        actionX += button->width() + kTitleBarSpacing;
     }
 }
 
-void AppTitleBar::updateLayoutMargins() {
-    auto* layout = m_contentLayout;
-    if (!layout) {
-        return;
+void AppTitleBar::setActionButtonsVisible(bool visible) {
+    for (QToolButton* button :
+         {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton, m_focusButton}) {
+        if (button) {
+            button->setVisible(visible);
+        }
     }
-#if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-    layout->setContentsMargins(kTitleBarHorizontalMargin, 0, kTitleBarHorizontalMargin, 0);
-#else
-    layout->setContentsMargins(kTitleBarHorizontalMargin + m_leadingReservedWidth, 0,
-                               kTitleBarHorizontalMargin, 0);
-#endif
+    updateTitleWidth();
+}
+
+int AppTitleBar::actionButtonsWidth() const {
+    int width = 0;
+    int visibleButtons = 0;
+    for (const QToolButton* button :
+         {m_templatesButton, m_backgroundButton, m_galleryButton, m_resetButton, m_focusButton}) {
+        if (!button || !button->isVisible()) {
+            continue;
+        }
+        width += button->width();
+        ++visibleButtons;
+    }
+    return width + qMax(0, visibleButtons - 1) * kTitleBarSpacing;
 }
 
 void AppTitleBar::installTitleEditOutsideClickFilter() {

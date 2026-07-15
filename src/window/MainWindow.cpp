@@ -17,6 +17,9 @@ MainWindow::MainWindow(ProjectRepository* repository, RecentProjectsStore* recen
                        QWidget* parent)
     : QMainWindow(parent), m_windowAgent(new QWK::WidgetWindowAgent(this)) {
     setAttribute(Qt::WA_DontCreateNativeAncestors);
+    // QWindowKit keeps transient windows fixed by default. The application shell is the explicit
+    // resizable host and opts in before the native context is created.
+    m_windowAgent->setResizable(true);
     if (!m_windowAgent->setup(this)) {
         Logger::error(QStringLiteral("ui.window.agent.setup failed backend=qwindowkit"));
     } else if (!m_windowAgent->installSystemButtons()) {

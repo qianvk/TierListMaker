@@ -98,9 +98,9 @@ void TierBoardWidget::toggleMissionControlMode() {
     }
 }
 
-void TierBoardWidget::toggleGalleryMissionControlMode(const QRect& sourceGlobalRect) {
+void TierBoardWidget::toggleGalleryMissionControlMode() {
     if (m_view) {
-        m_view->toggleGalleryMissionControlActive(sourceGlobalRect);
+        m_view->toggleGalleryMissionControlActive();
     }
 }
 

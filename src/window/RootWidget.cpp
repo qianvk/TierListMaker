@@ -6,6 +6,7 @@
 #include "pages/EditPage.h"
 #include "pages/PreferencesPage.h"
 #include "pages/ProjectsPage.h"
+#include "preview/PreviewOverlay.h"
 #include "theme/Theme.h"
 #include "update/AppUpdater.h"
 #include "window/AppDialog.h"
@@ -30,9 +31,7 @@
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QShowEvent>
-#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
 #include <QSignalBlocker>
-#endif
 #include <QSizePolicy>
 #include <QSplitter>
 #include <QStackedWidget>
@@ -100,7 +99,7 @@ QToolButton* makeTitleBarIconButton(const QString& tooltip, vkui::VkSymbol symbo
     button->setToolTip(tooltip);
     button->setIcon(vkui::icon(symbol));
     button->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    button->setCursor(Qt::PointingHandCursor);
+    button->setCursor(Qt::ArrowCursor);
     button->setFocusPolicy(Qt::NoFocus);
     button->setFixedSize(34, 34);
     button->setIconSize(QSize(20, 20));
@@ -140,7 +139,11 @@ void RootWidget::installWindowAgent(QWK::WidgetWindowAgent* agent) {
         }
     };
     registerInteractiveChildren(m_sidebarTitleBar);
-    registerInteractiveChildren(m_titleBar);
+    for (QWidget* control : m_titleBar->interactiveWidgets()) {
+        if (control) {
+            m_windowAgent->setHitTestVisible(m_titleBar, control, true);
+        }
+    }
 
     if (m_sidebarToggleButton) {
         m_windowAgent->setHitTestVisible(m_sidebarTitleBar, m_sidebarToggleButton, true);
@@ -196,6 +199,12 @@ void RootWidget::resizeEvent(QResizeEvent* event) {
     layoutTitleBars();
     layoutSidebarToggleButton();
     layoutPreferenceBadge();
+    if (m_previewOverlay) {
+        m_previewOverlay->setGeometry(rect());
+        if (m_previewOverlay->isOpen()) {
+            m_previewOverlay->raise();
+        }
+    }
 }
 
 void RootWidget::showEvent(QShowEvent* event) {
@@ -253,6 +262,34 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     m_sidebar = createSidebar(m_sidebarShell);
     m_content = createContent(repository, recentProjects, assetManager, thumbnailCache, settings);
 
+    m_previewOverlay = new PreviewOverlay(this);
+    m_previewOverlay->setGeometry(rect());
+    m_previewOverlay->setBackgroundMode(settings ? settings->previewBackgroundMode()
+                                                 : PreviewBackgroundMode::None);
+    connect(m_editPage, &EditPage::imagePreviewRequested, m_previewOverlay,
+            &PreviewOverlay::openPreview);
+    connect(m_editPage, &EditPage::imagePreviewCloseRequested, m_previewOverlay,
+            &PreviewOverlay::closePreview);
+    if (settings) {
+        connect(settings, &AppSettings::previewBackgroundModeChanged, m_previewOverlay,
+                &PreviewOverlay::setBackgroundMode);
+    }
+    connect(m_previewOverlay, &PreviewOverlay::opened, this, [this]() {
+        if (m_windowAgent && !m_previewSystemButtonStateCaptured) {
+            m_previewSavedSystemButtonVisibility = m_windowAgent->systemButtonVisibility();
+            m_previewSystemButtonStateCaptured = true;
+            m_windowAgent->setSystemButtonVisibility(QWK::WindowAgentBase::AlwaysHidden);
+        }
+        Logger::info(QStringLiteral("ui.preview.input.barrier enabled=1 scope=window"));
+    });
+    connect(m_previewOverlay, &PreviewOverlay::closed, this, [this]() {
+        if (m_windowAgent && m_previewSystemButtonStateCaptured) {
+            m_windowAgent->setSystemButtonVisibility(m_previewSavedSystemButtonVisibility);
+        }
+        m_previewSystemButtonStateCaptured = false;
+        Logger::info(QStringLiteral("ui.preview.input.barrier enabled=0 scope=window"));
+    });
+
     m_splitter->addWidget(m_sidebarShell);
     m_splitter->addWidget(m_content);
     m_splitter->setCollapsible(0, true);
@@ -274,7 +311,6 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
         }
         m_currentSidebarWidth = m_sidebarShell ? m_sidebarShell->width() : 0;
 
-#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
         const bool widthAnimationRunning =
             m_sidebarAnimation && m_sidebarAnimation->state() == QAbstractAnimation::Running;
         if (!widthAnimationRunning && m_currentSidebarWidth > 0 &&
@@ -285,7 +321,6 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             setSidebarWidth(kSidebarMinimumExpandedWidth);
             m_currentSidebarWidth = m_sidebarShell ? m_sidebarShell->width() : 0;
         }
-#endif
 
         if (m_currentSidebarWidth > 0) {
             m_sidebarCollapsed = false;
@@ -375,8 +410,8 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     connect(m_titleBar, &AppTitleBar::tierFocusModeRequested, this,
             [this]() { setTierFocusMode(!m_tierFocusMode); });
     connect(m_editPage, &EditPage::galleryMissionControlRequested, this, [this]() {
-        if (m_editPage && m_titleBar) {
-            m_editPage->toggleGalleryMissionControlMode(m_titleBar->galleryButtonGlobalRect());
+        if (m_editPage) {
+            m_editPage->toggleGalleryMissionControlMode();
         }
     });
     connect(m_editPage, &EditPage::resetRowsAvailableChanged, m_titleBar,
@@ -454,7 +489,7 @@ QFrame* RootWidget::createSidebar(QWidget* parent) {
     m_preferencesButton->setObjectName(QStringLiteral("PreferencesButton"));
     m_preferencesButton->setIcon(vkui::icon(vkui::VkSymbol::Settings));
     m_preferencesButton->setToolTip(tr("Preferences"));
-    m_preferencesButton->setCursor(Qt::PointingHandCursor);
+    m_preferencesButton->setCursor(Qt::ArrowCursor);
     m_preferencesButton->setFixedSize(34, 34);
     m_preferencesButton->setIconSize(QSize(18, 18));
     m_preferencesButton->setAutoRaise(true);
@@ -494,9 +529,11 @@ QFrame* RootWidget::createContent(ProjectRepository* repository,
     m_pages->addWidget(m_projectsPage);
     contentLayout->addWidget(m_pages, 1);
 
+    // The chrome is intentionally a transparent overlay. EditPage reserves exactly one title-bar
+    // height for the board, while its lightweight shadow can remain visible below this widget.
     m_titleBar = new AppTitleBar(content);
     m_titleBar->setGeometry(0, 0, content->width(), kTitleBarHeight);
-    m_titleBar->raise();
+    m_titleBar->raiseChrome();
     return content;
 }
 
@@ -592,6 +629,7 @@ void RootWidget::setTierFocusMode(bool enabled) {
         qApp->installEventFilter(this);
     } else {
         qApp->removeEventFilter(this);
+        m_focusMoveWindow = nullptr;
     }
     UiPerformanceMonitor::setTierFocusMode(enabled);
     Logger::info(QStringLiteral("ui.tier.focus.mode enabled=%1").arg(enabled));
@@ -660,15 +698,49 @@ void RootWidget::setTierFocusMode(bool enabled) {
 }
 
 bool RootWidget::eventFilter(QObject* watched, QEvent* event) {
-    if (m_tierFocusMode && event && event->type() == QEvent::MouseButtonPress) {
+    if (!m_tierFocusMode || !event) {
+        return QWidget::eventFilter(watched, event);
+    }
+
+    if (m_focusMoveWindow && event->type() == QEvent::MouseMove) {
+        auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->buttons().testFlag(Qt::LeftButton)) {
+            m_focusMoveWindow->move(mouseEvent->globalPosition().toPoint() - m_focusMoveOffset);
+            mouseEvent->accept();
+            return true;
+        }
+        m_focusMoveWindow = nullptr;
+    } else if (m_focusMoveWindow && event->type() == QEvent::MouseButtonRelease) {
+        auto* mouseEvent = static_cast<QMouseEvent*>(event);
+        if (mouseEvent->button() == Qt::LeftButton) {
+            m_focusMoveWindow = nullptr;
+            mouseEvent->accept();
+            return true;
+        }
+    }
+
+    if (event->type() == QEvent::MouseButtonPress) {
         auto* mouseEvent = static_cast<QMouseEvent*>(event);
         auto* target = qobject_cast<QWidget*>(watched);
         if (mouseEvent->button() == Qt::LeftButton &&
             mouseEvent->modifiers().testFlag(Qt::AltModifier) && target &&
             target->window() == window()) {
-            QWindow* nativeWindow = windowHandle();
+            // RootWidget is the central widget, so its own windowHandle() is normally null.
+            // QWindow::startSystemMove() must be invoked on the top-level native window.
+            QWidget* topLevel = target->window();
+            QWindow* nativeWindow = topLevel ? topLevel->windowHandle() : nullptr;
             if (nativeWindow && nativeWindow->startSystemMove()) {
                 Logger::debug(QStringLiteral("ui.tier.focus.window.move"));
+                mouseEvent->accept();
+                return true;
+            }
+            // Some compositors reject native system move for custom full-content windows. Keep a
+            // small cross-platform fallback so Option/Alt-drag remains available everywhere.
+            if (topLevel) {
+                m_focusMoveWindow = topLevel;
+                m_focusMoveOffset =
+                    mouseEvent->globalPosition().toPoint() - topLevel->frameGeometry().topLeft();
+                Logger::warn(QStringLiteral("ui.tier.focus.window.move fallback=manual"));
                 mouseEvent->accept();
                 return true;
             }
@@ -715,7 +787,7 @@ void RootWidget::layoutTitleBars() {
         } else {
             m_titleBar->setGeometry(0, 0, contentWidth, kTitleBarHeight);
         }
-        m_titleBar->raise();
+        m_titleBar->raiseChrome();
     }
     if (m_newProjectButton) {
         m_newProjectButton->raise();
@@ -724,6 +796,9 @@ void RootWidget::layoutTitleBars() {
         m_sidebarToggleButton->raise();
     }
     updateTitleBarLeadingReservation();
+    if (m_previewOverlay && m_previewOverlay->isOpen()) {
+        m_previewOverlay->raise();
+    }
 }
 
 void RootWidget::layoutSidebarToggleButton() {
@@ -866,8 +941,8 @@ void RootWidget::setupShortcuts() {
     auto* galleryMissionShortcut =
         new QShortcut(QKeySequence(QKeyCombination(physicalControlModifier(), Qt::Key_P)), this);
     connect(galleryMissionShortcut, &QShortcut::activated, this, [this]() {
-        if (m_editPage && m_titleBar) {
-            m_editPage->toggleGalleryMissionControlMode(m_titleBar->galleryButtonGlobalRect());
+        if (m_editPage) {
+            m_editPage->toggleGalleryMissionControlMode();
         }
     });
     addShortcut(QKeySequence(Qt::CTRL | Qt::Key_E), m_editPage, SLOT(exportProjectFromDialog()));
@@ -938,7 +1013,6 @@ void RootWidget::updatePageMargins(AppPage page) {
         return;
     }
     if (m_tierFocusMode || page == AppPage::Edit) {
-        // The transparent chrome overlays the page while the tier board starts at its lower edge.
         m_pages->setContentsMargins(0, 0, 0, 0);
         return;
     }

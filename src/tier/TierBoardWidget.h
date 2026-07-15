@@ -27,7 +27,7 @@ public:
     void refreshVisuals();
     QRect imageSourceRect(const QString& imageId) const;
     void toggleMissionControlMode();
-    void toggleGalleryMissionControlMode(const QRect& sourceGlobalRect);
+    void toggleGalleryMissionControlMode();
     void setMissionControlMode(bool active);
     bool isMissionControlModeActive() const;
     void setBlankAreaActions(BlankAreaAction doubleClickAction, BlankAreaAction longPressAction);

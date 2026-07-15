@@ -33,7 +33,7 @@
 #include <QLineEdit>
 #include <QListView>
 #include <QMenu>
-#include <QMessageBox>
+#include "window/AppMessageDialog.h"
 #include <QPainter>
 #include <QPainterPath>
 #include <QPixmap>
@@ -536,7 +536,7 @@ public:
                 return;
             }
             if (m_image.isNull() || !m_cropEditor) {
-                QMessageBox::warning(this, tr("Project Cover"), tr("Choose a cover image."));
+                AppMessageDialog::warning(this, tr("Project Cover"), tr("Choose a cover image."));
                 return;
             }
             accept();
@@ -578,7 +578,7 @@ private:
         QImage image(path);
         if (image.isNull()) {
             if (warnOnFailure) {
-                QMessageBox::warning(this, tr("Project Cover"),
+                AppMessageDialog::warning(this, tr("Project Cover"),
                                      tr("Could not read the selected image."));
             }
             return;
@@ -642,7 +642,7 @@ ProjectsPage::ProjectsPage(ProjectRepository* repository, RecentProjectsStore* r
     m_openProjectButton->setToolTip(tr("Open Project"));
     m_openProjectButton->setIcon(vkui::icon(vkui::VkSymbol::Folder));
     m_openProjectButton->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    m_openProjectButton->setCursor(Qt::PointingHandCursor);
+    m_openProjectButton->setCursor(Qt::ArrowCursor);
     m_openProjectButton->setFocusPolicy(Qt::NoFocus);
     m_openProjectButton->setFixedSize(34, 34);
     m_openProjectButton->setIconSize(QSize(19, 19));
@@ -806,7 +806,7 @@ void ProjectsPage::renameSelectedProject() {
 
     auto projectResult = m_repository->openProject(sourcePath);
     if (!projectResult) {
-        QMessageBox::warning(this, tr("Rename Project"), projectResult.error().message);
+        AppMessageDialog::warning(this, tr("Rename Project"), projectResult.error().message);
         return;
     }
 
@@ -825,7 +825,7 @@ void ProjectsPage::renameSelectedProject() {
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
         if (nameEdit->text().trimmed().isEmpty()) {
-            QMessageBox::warning(&dialog, tr("Rename Project"), tr("Enter a project name."));
+            AppMessageDialog::warning(&dialog, tr("Rename Project"), tr("Enter a project name."));
             return;
         }
         dialog.accept();
@@ -850,7 +850,7 @@ void ProjectsPage::renameSelectedProject() {
     const QString targetDir = QFileInfo(targetPath).absolutePath();
     const bool sameProjectFile = sameFilePath(sourceAbsolute, targetPath);
     if (!sameProjectFile && QFileInfo::exists(targetPath)) {
-        QMessageBox::warning(this, tr("Rename Project"),
+        AppMessageDialog::warning(this, tr("Rename Project"),
                              tr("A project with this name already exists."));
         return;
     }
@@ -861,13 +861,13 @@ void ProjectsPage::renameSelectedProject() {
         const bool sameProjectFolder = sameFilePath(sourceRoot, targetDir);
         if (!sameProjectFolder) {
             if (QFileInfo::exists(targetDir)) {
-                QMessageBox::warning(this, tr("Rename Project"),
+                AppMessageDialog::warning(this, tr("Rename Project"),
                                      tr("A project folder with this name already exists."));
                 return;
             }
             const QString targetParent = QFileInfo(targetDir).absolutePath();
             if (!QDir().mkpath(targetParent) || !QDir().rename(sourceRoot, targetDir)) {
-                QMessageBox::warning(this, tr("Rename Project"),
+                AppMessageDialog::warning(this, tr("Rename Project"),
                                      tr("Could not rename the project folder."));
                 return;
             }
@@ -875,7 +875,7 @@ void ProjectsPage::renameSelectedProject() {
         }
     } else if (!sameProjectFile) {
         if (!QDir().mkpath(targetDir)) {
-            QMessageBox::warning(this, tr("Rename Project"),
+            AppMessageDialog::warning(this, tr("Rename Project"),
                                  tr("Could not create the project folder."));
             return;
         }
@@ -883,7 +883,7 @@ void ProjectsPage::renameSelectedProject() {
             QDir(QFileInfo(sourcePath).absolutePath()).filePath(QStringLiteral("assets"));
         const QString targetAssets = QDir(targetDir).filePath(QStringLiteral("assets"));
         if (!copyDirectoryRecursively(sourceAssets, targetAssets)) {
-            QMessageBox::warning(this, tr("Rename Project"),
+            AppMessageDialog::warning(this, tr("Rename Project"),
                                  tr("Could not copy the project assets."));
             return;
         }
@@ -894,14 +894,14 @@ void ProjectsPage::renameSelectedProject() {
     project.touch();
     auto result = m_repository->saveProject(project, targetPath);
     if (!result) {
-        QMessageBox::warning(this, tr("Rename Project"), result.error().message);
+        AppMessageDialog::warning(this, tr("Rename Project"), result.error().message);
         return;
     }
 
     const bool removeOldProjectFile = !sameFilePath(activeSourceProjectFile, targetPath) &&
                                       QFileInfo::exists(activeSourceProjectFile);
     if (removeOldProjectFile && !QFile::remove(activeSourceProjectFile)) {
-        QMessageBox::warning(this, tr("Rename Project"),
+        AppMessageDialog::warning(this, tr("Rename Project"),
                              tr("The project was renamed, but the old project file could not be "
                                 "removed."));
     }
@@ -919,7 +919,7 @@ void ProjectsPage::chooseCoverForSelectedProject() {
 
     auto projectResult = m_repository->openProject(projectPath);
     if (!projectResult) {
-        QMessageBox::warning(
+        AppMessageDialog::warning(
             this, tr("Cover Image"),
             projectResult.error().details.isEmpty()
                 ? projectResult.error().message
@@ -945,7 +945,7 @@ void ProjectsPage::chooseCoverForSelectedProject() {
     const QString assetDirectory =
         QDir(QFileInfo(projectPath).absolutePath()).filePath(QStringLiteral("assets"));
     if (!QDir().mkpath(assetDirectory)) {
-        QMessageBox::warning(this, tr("Cover Image"),
+        AppMessageDialog::warning(this, tr("Cover Image"),
                              tr("Could not create the project assets folder."));
         return;
     }
@@ -957,7 +957,7 @@ void ProjectsPage::chooseCoverForSelectedProject() {
         project.dirty = true;
         auto saveResult = m_repository->saveProject(project, projectPath);
         if (!saveResult) {
-            QMessageBox::warning(this, tr("Cover Image"), saveResult.error().message);
+            AppMessageDialog::warning(this, tr("Cover Image"), saveResult.error().message);
             return;
         }
         removeManagedCoverAsset(projectPath, storedSource);
@@ -983,7 +983,7 @@ void ProjectsPage::chooseCoverForSelectedProject() {
     if (!sourceAlreadyInProject) {
         projectSourcePath = copyCoverSourceToAssets(projectPath, selectedSource);
         if (projectSourcePath.isEmpty()) {
-            QMessageBox::warning(this, tr("Cover Image"),
+            AppMessageDialog::warning(this, tr("Cover Image"),
                                  tr("Could not save the cover source image."));
             return;
         }
@@ -998,7 +998,7 @@ void ProjectsPage::chooseCoverForSelectedProject() {
         if (copiedSource) {
             removeManagedCoverAsset(projectPath, projectSourcePath);
         }
-        QMessageBox::warning(this, tr("Cover Image"), tr("Could not save the cover image."));
+        AppMessageDialog::warning(this, tr("Cover Image"), tr("Could not save the cover image."));
         return;
     }
 
@@ -1016,7 +1016,7 @@ void ProjectsPage::chooseCoverForSelectedProject() {
             removeManagedCoverAsset(projectPath, projectSourcePath);
         }
         removeManagedCoverAsset(projectPath, coverPath);
-        QMessageBox::warning(
+        AppMessageDialog::warning(
             this, tr("Cover Image"),
             saveResult.error().details.isEmpty()
                 ? saveResult.error().message
@@ -1061,7 +1061,7 @@ void ProjectsPage::saveSelectedProjectAs() {
 
     auto projectResult = m_repository->openProject(sourcePath);
     if (!projectResult) {
-        QMessageBox::warning(this, tr("Save As Project"), projectResult.error().message);
+        AppMessageDialog::warning(this, tr("Save As Project"), projectResult.error().message);
         return;
     }
     TierProject project = projectResult.takeValue();
@@ -1080,7 +1080,7 @@ void ProjectsPage::saveSelectedProjectAs() {
         return;
     }
     if (QFileInfo::exists(targetPath)) {
-        QMessageBox::warning(this, tr("Save As Project"),
+        AppMessageDialog::warning(this, tr("Save As Project"),
                              tr("A project with this name already exists."));
         return;
     }
@@ -1088,14 +1088,14 @@ void ProjectsPage::saveSelectedProjectAs() {
     if (!sourceRoot.isEmpty() &&
         QDir::cleanPath(targetPath)
             .startsWith(QDir::cleanPath(sourceRoot) + QLatin1Char('/'), Qt::CaseInsensitive)) {
-        QMessageBox::warning(this, tr("Save As Project"),
+        AppMessageDialog::warning(this, tr("Save As Project"),
                              tr("Choose a location outside the current project folder."));
         return;
     }
 
     const QString targetDir = QFileInfo(targetPath).absolutePath();
     if (!QDir().mkpath(targetDir)) {
-        QMessageBox::warning(this, tr("Save As Project"),
+        AppMessageDialog::warning(this, tr("Save As Project"),
                              tr("Could not create the project folder."));
         return;
     }
@@ -1104,7 +1104,7 @@ void ProjectsPage::saveSelectedProjectAs() {
         QDir(QFileInfo(sourcePath).absolutePath()).filePath(QStringLiteral("assets"));
     const QString targetAssets = QDir(targetDir).filePath(QStringLiteral("assets"));
     if (!copyDirectoryRecursively(sourceAssets, targetAssets)) {
-        QMessageBox::warning(this, tr("Save As Project"), tr("Could not copy the project assets."));
+        AppMessageDialog::warning(this, tr("Save As Project"), tr("Could not copy the project assets."));
         return;
     }
 
@@ -1113,12 +1113,12 @@ void ProjectsPage::saveSelectedProjectAs() {
     project.touch();
     auto saveResult = m_repository->saveProject(project, targetPath);
     if (!saveResult) {
-        QMessageBox::warning(this, tr("Save As Project"), saveResult.error().message);
+        AppMessageDialog::warning(this, tr("Save As Project"), saveResult.error().message);
         return;
     }
 
     if (!deleteProjectFromDisk(sourcePath)) {
-        QMessageBox::warning(
+        AppMessageDialog::warning(
             this, tr("Save As Project"),
             tr("The project was saved, but the old project could not be removed."));
     }
@@ -1144,7 +1144,7 @@ void ProjectsPage::deleteSelectedProject() {
     }
 
     if (!deleteProjectFromDisk(entry.filePath)) {
-        QMessageBox::warning(this, tr("Delete Project"),
+        AppMessageDialog::warning(this, tr("Delete Project"),
                              tr("Could not delete the project from disk."));
         return;
     }

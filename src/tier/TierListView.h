@@ -84,9 +84,9 @@ signals:
 
 public slots:
     void setMissionControlActive(bool active);
-    void setGalleryMissionControlActive(bool active, const QRect& sourceGlobalRect);
+    void setGalleryMissionControlActive(bool active);
     void toggleMissionControlActive();
-    void toggleGalleryMissionControlActive(const QRect& sourceGlobalRect);
+    void toggleGalleryMissionControlActive();
 
 protected:
     void mousePressEvent(QMouseEvent* event) override;
@@ -144,7 +144,6 @@ private:
     void clearDropState();
     void clearImageDropState();
     void setMissionControlActiveForSource(bool active, MissionControlSource source,
-                                          const QRect& sourceGlobalRect = {},
                                           const QString& tierRowId = {});
     void animateMissionTransition(qreal targetProgress);
     void stopMissionTransitionAnimation();
@@ -171,8 +170,6 @@ private:
     void paintMissionControl(QPainter* painter);
     QHash<QString, QRectF> normalImageRects() const;
     QRectF interpolatedMissionRect(const QString& imageId, const QRectF& targetRect) const;
-    QRectF galleryMissionSourceRect() const;
-    QRectF galleryMissionCenterRect(const QRectF& targetRect) const;
     QVector<MissionTile> missionDisplayTiles() const;
     QPixmap missionPixmapForImage(const QString& imageId, QSize targetPixelSize, bool fullQuality);
     int rowDropIndexForPosition(const QPoint& point, const QString& rowId) const;
@@ -225,7 +222,6 @@ private:
     qreal m_missionTransitionProgress{0.0};
     QVariantAnimation* m_missionTransitionAnimation{nullptr};
     QHash<QString, QRectF> m_missionNormalRects;
-    QRectF m_missionGallerySourceRect;
     QString m_missionHoverImageId;
     QString m_missionLiftImageId;
     QPointF m_missionHoverPosition;

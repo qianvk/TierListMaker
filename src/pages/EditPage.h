@@ -11,6 +11,8 @@
 #include <QPointer>
 #include <QWidget>
 
+#include <functional>
+
 class QTimer;
 class QVBoxLayout;
 
@@ -21,7 +23,6 @@ class VkPopover;
 namespace tlm {
 
 class ImageGalleryPopover;
-class PreviewOverlay;
 class TierBoardWidget;
 
 /** Main editing workspace for the active tier-list project. */
@@ -64,7 +65,7 @@ public slots:
     void setTierFocusMode(bool enabled);
     void toggleMissionControlMode();
     void toggleGallery(QWidget* anchor = nullptr);
-    void toggleGalleryMissionControlMode(const QRect& sourceGlobalRect = QRect());
+    void toggleGalleryMissionControlMode();
 
 signals:
     void titleChanged(const QString& title);
@@ -73,12 +74,16 @@ signals:
     void projectSaved();
     void projectOpened(const QString& filePath);
     void galleryMissionControlRequested();
+    void imagePreviewRequested(const QRect& sourceRectInWindow, const QPixmap& pixmap);
+    void imagePreviewCloseRequested();
 
 protected:
     void keyPressEvent(QKeyEvent* event) override;
     void resizeEvent(QResizeEvent* event) override;
 
 private:
+    enum class TransientPopover { None, Templates, Background, Gallery };
+
     void buildUi();
     void refreshUi();
     void markDirty();
@@ -87,7 +92,8 @@ private:
     QString chooseSavePath();
     QString chooseTemplatePath(bool saveDialog);
     QStringList chooseImageImportFiles(QWidget* dialogParent);
-    void closeTransientPopovers();
+    void closeTransientPopovers(TransientPopover keep = TransientPopover::None,
+                                bool immediately = true);
     bool ensureProjectFile();
     TierProject createProjectFromDefaultTemplate() const;
     QString uniqueDefaultProjectPath(QString* projectName = nullptr) const;
@@ -125,12 +131,14 @@ private:
     QString m_selectedImageId;
 
     QVBoxLayout* m_rootLayout{nullptr};
+    QWidget* m_boardShadow{nullptr};
     TierBoardWidget* m_board{nullptr};
     QPointer<ImageGalleryPopover> m_galleryPopover;
     QPointer<QWidget> m_galleryPopoverAnchor;
     QPointer<vkui::VkPopover> m_templatePopover;
     QPointer<QWidget> m_templatePopoverAnchor;
-    PreviewOverlay* m_previewOverlay{nullptr};
+    std::function<void(bool)> m_closeBackgroundPopover;
+    TransientPopover m_activePopover{TransientPopover::None};
     QTimer* m_autosaveTimer{nullptr};
     bool m_tierFocusMode{false};
     bool m_backgroundPreviewActive{false};

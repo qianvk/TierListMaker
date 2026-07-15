@@ -15,21 +15,37 @@ namespace tlm {
 
 namespace {
 constexpr int kTitleBarHeight = 44;
+constexpr int kMacCloseButtonReserve = 24;
+constexpr QPoint kMacCloseButtonPosition{18, 15};
 constexpr int kSystemButtonReserve = 56;
 } // namespace
 
 AppDialog::AppDialog(const QString& title, QWidget* parent)
-    : QDialog(parent, Qt::Dialog | Qt::FramelessWindowHint | Qt::WindowCloseButtonHint),
+    : QDialog(parent, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
+                          Qt::WindowCloseButtonHint),
       m_windowAgent(new QWK::WidgetWindowAgent(this)) {
     setObjectName(QStringLiteral("AppDialog"));
     setWindowTitle(title);
     setModal(true);
     setWindowModality(Qt::ApplicationModal);
-    setAttribute(Qt::WA_TranslucentBackground, true);
     setAttribute(Qt::WA_DontCreateNativeAncestors);
 
     buildUi(title);
     installWindowChrome();
+}
+
+bool AppDialog::isResizable() const {
+    return m_resizable;
+}
+
+void AppDialog::setResizable(bool resizable) {
+    if (m_resizable == resizable) {
+        return;
+    }
+    m_resizable = resizable;
+    if (m_windowAgent) {
+        m_windowAgent->setResizable(resizable);
+    }
 }
 
 void AppDialog::changeEvent(QEvent* event) {
@@ -46,9 +62,11 @@ void AppDialog::buildUi(const QString& title) {
 
     m_surface = new QFrame(this);
     m_surface->setObjectName(QStringLiteral("AppDialogSurface"));
-    m_surface->setStyleSheet(QStringLiteral(
-        "QFrame#AppDialogSurface{background:palette(window);border:1px solid palette(mid);"
-        "border-radius:12px;}"));
+    // Native window chrome owns the outer edge and corner clipping. Drawing another rounded
+    // frame here produces a visible double border, especially on macOS.
+    m_surface->setFrameShape(QFrame::NoFrame);
+    m_surface->setStyleSheet(
+        QStringLiteral("QFrame#AppDialogSurface{background:palette(window);border:none;}"));
     root->addWidget(m_surface, 1);
 
     auto* surfaceLayout = new QVBoxLayout(m_surface);
@@ -64,7 +82,7 @@ void AppDialog::buildUi(const QString& title) {
 
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
     m_nativeButtonArea = new QWidget(m_titleBar);
-    m_nativeButtonArea->setFixedWidth(kSystemButtonReserve);
+    m_nativeButtonArea->setFixedWidth(kMacCloseButtonReserve);
     titleLayout->addWidget(m_nativeButtonArea);
 #endif
     m_titleLabel = new QLabel(title, m_titleBar);
@@ -101,13 +119,15 @@ void AppDialog::installWindowChrome() {
     const bool setup = m_windowAgent->setup(this);
     bool platformCloseAvailable = false;
     if (setup) {
+        m_windowAgent->setResizable(m_resizable);
         platformCloseAvailable = m_windowAgent->installSystemButtons();
         m_windowAgent->addTitleBar(m_titleBar);
         m_windowAgent->setSystemButtonVisibility(QWK::WindowAgentBase::AlwaysVisible);
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-        if (m_nativeButtonArea) {
-            m_windowAgent->setSystemButtonArea(m_nativeButtonArea);
-        }
+        // A close-only dialog keeps the native AppKit control at its normal top-left position;
+        // it must not be centered inside a three-button traffic-light reservation.
+        m_windowAgent->setSystemButtonPosition(QWK::WindowAgentBase::Close,
+                                                kMacCloseButtonPosition);
 #elif defined(Q_OS_WIN)
         if (auto* closeButton = m_windowAgent->systemButton(QWK::WindowAgentBase::Close)) {
             closeButton->setProperty("_qwk_top_right_corner_radius", 12.0);

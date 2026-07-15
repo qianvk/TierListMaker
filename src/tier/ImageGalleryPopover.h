@@ -36,6 +36,7 @@ public:
     QSize sizeHint() const override;
 
 signals:
+    void closed();
     void importRequested();
     void imageFilesDropped(const QStringList& filePaths);
     void imageSelected(const QString& imageId);

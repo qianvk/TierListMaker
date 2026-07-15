@@ -9,6 +9,7 @@ namespace tlm {
 
 enum class AppearanceMode { System, Light, Dark };
 enum class BlankAreaAction { None, TierMissionControl, GalleryMissionControl };
+enum class PreviewBackgroundMode { None, SelfImage };
 
 /** Persistent application preferences backed by QSettings. */
 class AppSettings : public QObject {
@@ -44,6 +45,8 @@ public:
     void setBlankLongPressAction(BlankAreaAction action);
     bool tierListToolTipsEnabled() const;
     void setTierListToolTipsEnabled(bool enabled);
+    PreviewBackgroundMode previewBackgroundMode() const;
+    void setPreviewBackgroundMode(PreviewBackgroundMode mode);
 
     QString defaultExportFormat() const;
     void setDefaultExportFormat(const QString& format);
@@ -66,6 +69,7 @@ signals:
     void blankDoubleClickActionChanged(BlankAreaAction action);
     void blankLongPressActionChanged(BlankAreaAction action);
     void tierListToolTipsEnabledChanged(bool enabled);
+    void previewBackgroundModeChanged(PreviewBackgroundMode mode);
 
 private:
     QSettings m_settings;

@@ -1,5 +1,7 @@
 #include "pages/ProjectLocationDialog.h"
 
+#include "window/AppMessageDialog.h"
+
 #include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QDir>
@@ -9,7 +11,6 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
-#include <QMessageBox>
 #include <QPushButton>
 #include <QRegularExpression>
 #include <QStandardPaths>
@@ -78,11 +79,11 @@ ProjectLocationDialog::ProjectLocationDialog(const QString& projectName,
     connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
     connect(buttons, &QDialogButtonBox::accepted, this, [this]() {
         if (this->projectName().isEmpty()) {
-            QMessageBox::warning(this, tr("Save Project"), tr("Enter a project name."));
+            AppMessageDialog::warning(this, tr("Save Project"), tr("Enter a project name."));
             return;
         }
         if (this->parentDirectory().isEmpty()) {
-            QMessageBox::warning(this, tr("Save Project"), tr("Choose a parent folder."));
+            AppMessageDialog::warning(this, tr("Save Project"), tr("Choose a parent folder."));
             return;
         }
         accept();
