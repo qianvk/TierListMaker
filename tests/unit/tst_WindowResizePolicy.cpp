@@ -117,6 +117,7 @@ void WindowResizePolicyTest::transientAgentNeverClaimsOwnerWindow() {
         QVERIFY(dialogAgent->setup(dialog));
         QVERIFY(!dialog->internalWinId());
         QVERIFY(dialogAgent->installSystemButtons());
+        QVERIFY(!dialog->internalWinId());
         QVERIFY(dialogAgent->addTitleBar(dialogTitleBar));
 
         // Agent setup must never hook the already-native owner while the dialog is still alien.

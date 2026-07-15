@@ -10,6 +10,21 @@ add_tlm_unit_test(tst_RecentProjectsStore tst_RecentProjectsStore.cpp)
 add_tlm_unit_test(tst_AssetManager tst_AssetManager.cpp)
 add_tlm_unit_test(tst_ThemeManager tst_ThemeManager.cpp)
 
+qt_add_executable(tst_WindowLifecycle
+    tst_WindowLifecycle.cpp
+    "${PROJECT_SOURCE_DIR}/src/preview/PreviewOverlay.cpp"
+    "${PROJECT_SOURCE_DIR}/src/preview/PreviewOverlay.h"
+    "${PROJECT_SOURCE_DIR}/src/window/AppDialog.cpp"
+    "${PROJECT_SOURCE_DIR}/src/window/AppDialog.h"
+)
+target_link_libraries(tst_WindowLifecycle PRIVATE
+    tierlistmaker_core
+    QWindowKit::Widgets
+    Qt6::Test
+)
+target_include_directories(tst_WindowLifecycle PRIVATE "${PROJECT_SOURCE_DIR}/src")
+add_test(NAME tst_WindowLifecycle COMMAND tst_WindowLifecycle)
+
 qt_add_executable(tst_PreviewOverlay
     tst_PreviewOverlay.cpp
     "${PROJECT_SOURCE_DIR}/src/preview/PreviewOverlay.cpp"
