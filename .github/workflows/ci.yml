@@ -29,6 +29,28 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTLM_BUILD_TESTS=ON
 
+      - name: Build native window policy test
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          set +e
+          cmake --build build --config Release --target tst_WindowResizePolicy --parallel \
+            2>&1 | tee native-build-output.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [[ ${status} -ne 0 ]]; then
+            summary="$(grep -Ei 'error [A-Z]+[0-9]+:|fatal error|FAILED:' \
+              native-build-output.log | tail -n 80)"
+            if [[ -z "${summary}" ]]; then
+              summary="$(tail -n 80 native-build-output.log)"
+            fi
+            summary="${summary//'%'/'%25'}"
+            summary="${summary//$'\r'/'%0D'}"
+            summary="${summary//$'\n'/'%0A'}"
+            echo "::error title=Windows native build failed::${summary}"
+            exit "${status}"
+          fi
+
       - name: Build
         shell: bash
         run: |
@@ -37,7 +59,11 @@ jobs:
           status=${PIPESTATUS[0]}
           set -e
           if [[ ${status} -ne 0 ]]; then
-            summary="$(tail -n 80 build-output.log)"
+            summary="$(grep -Ei 'error [A-Z]+[0-9]+:|fatal error|FAILED:' \
+              build-output.log | tail -n 80)"
+            if [[ -z "${summary}" ]]; then
+              summary="$(tail -n 80 build-output.log)"
+            fi
             summary="${summary//'%'/'%25'}"
             summary="${summary//$'\r'/'%0D'}"
             summary="${summary//$'\n'/'%0A'}"
