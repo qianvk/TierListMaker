@@ -1,7 +1,7 @@
 # QWindowKit deliberately uses Qt private platform integration APIs. Installers deploy the exact
 # Qt build used here, so suppress the generic warning after making that version lock explicit.
 set(QT_NO_PRIVATE_MODULE_WARNING ON)
-find_package(Qt6 6.6 REQUIRED COMPONENTS
+find_package(Qt6 6.10.1 REQUIRED COMPONENTS
     Core CorePrivate
     Gui GuiPrivate
     Widgets WidgetsPrivate
