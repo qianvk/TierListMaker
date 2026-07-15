@@ -61,7 +61,7 @@ private:
                    bool closing);
     void rebuildProjectionCache();
     void setInputBarrierActive(bool active);
-    bool isOverlayObject(const QObject* object) const;
+    bool isOverlayDispatchObject(const QObject* object) const;
 
     QPixmap m_pixmap;
     QPixmap m_projectionCache;

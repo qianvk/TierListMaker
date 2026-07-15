@@ -1,3 +1,4 @@
+#include <QDialog>
 #include <QOperatingSystemVersion>
 #include <QPushButton>
 #include <QWidget>
@@ -16,7 +17,19 @@ class WindowResizePolicyTest final : public QObject {
 
 private slots:
     void nativeResizeIsOptIn();
+    void transientAgentNeverClaimsOwnerWindow();
 };
+
+#if defined(Q_OS_WIN)
+namespace {
+LRESULT hitTestAt(QWidget& host, const QPoint& clientPosition) {
+    const auto hwnd = reinterpret_cast<HWND>(host.winId());
+    POINT nativePosition{clientPosition.x(), clientPosition.y()};
+    ::ClientToScreen(hwnd, &nativePosition);
+    return ::SendMessageW(hwnd, WM_NCHITTEST, 0, MAKELPARAM(nativePosition.x, nativePosition.y));
+}
+} // namespace
+#endif
 
 void WindowResizePolicyTest::nativeResizeIsOptIn() {
     QWidget host;
@@ -66,6 +79,50 @@ void WindowResizePolicyTest::nativeResizeIsOptIn() {
     QVERIFY(agent.isResizable());
     agent.setResizable(false);
     QVERIFY(!agent.isResizable());
+#endif
+}
+
+void WindowResizePolicyTest::transientAgentNeverClaimsOwnerWindow() {
+#if defined(Q_OS_WIN)
+    QWidget host;
+    host.resize(640, 420);
+    QWidget hostTitleBar(&host);
+    hostTitleBar.setGeometry(0, 0, host.width(), 44);
+
+    QWK::WidgetWindowAgent hostAgent;
+    hostAgent.setResizable(true);
+    QVERIFY(hostAgent.setup(&host));
+    QVERIFY(hostAgent.addTitleBar(&hostTitleBar));
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+    QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
+
+    QDialog dialog(&host, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
+                              Qt::WindowCloseButtonHint);
+    dialog.setWindowModality(Qt::WindowModal);
+    dialog.resize(360, 220);
+    QWidget dialogTitleBar(&dialog);
+    dialogTitleBar.setGeometry(0, 0, dialog.width(), 44);
+
+    QWK::WidgetWindowAgent dialogAgent;
+    QVERIFY(!dialog.internalWinId());
+    QVERIFY(dialogAgent.setup(&dialog));
+    QVERIFY(dialogAgent.addTitleBar(&dialogTitleBar));
+
+    // Agent setup must not hook the already-native owner while the dialog is still alien.
+    QVERIFY(!dialog.internalWinId());
+    QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
+
+    dialog.open();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+    QVERIFY(dialog.internalWinId());
+    dialog.reject();
+    QTRY_VERIFY(!dialog.isVisible());
+
+    // Destroying or hiding the transient context must leave the owner's native hit testing intact.
+    QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
+#else
+    QSKIP("The native owner-window regression is specific to the Windows HWND backend.");
 #endif
 }
 

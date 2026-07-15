@@ -4,6 +4,7 @@
 
 #include <QPushButton>
 #include <QSignalSpy>
+#include <QWindow>
 #include <QtTest>
 
 using namespace tlm;
@@ -73,7 +74,9 @@ void PreviewOverlayTest::doubleClickingPreviewImageCloses() {
     const QPoint imageCenter = overlay.previewGeometry().center();
     QCOMPARE(overlay.toolTipTextAt(imageCenter),
              QStringLiteral("Double-click image to close"));
-    QTest::mouseDClick(&overlay, Qt::LeftButton, Qt::NoModifier, imageCenter);
+    // Use the native window dispatch path. Application event filters see the QWindow event before
+    // Qt translates it to the child overlay, which is where the original regression occurred.
+    QTest::mouseDClick(host.windowHandle(), Qt::LeftButton, Qt::NoModifier, imageCenter);
 
     QTRY_COMPARE_WITH_TIMEOUT(closedSpy.count(), 1, 1000);
     QVERIFY(!overlay.isOpen());
@@ -94,7 +97,7 @@ void PreviewOverlayTest::clickingOutsidePreviewImageCloses() {
 
     const QPoint outsidePoint(8, 8);
     QCOMPARE(overlay.toolTipTextAt(outsidePoint), QStringLiteral("Click to close preview"));
-    QTest::mouseClick(&overlay, Qt::LeftButton, Qt::NoModifier, outsidePoint);
+    QTest::mouseClick(host.windowHandle(), Qt::LeftButton, Qt::NoModifier, outsidePoint);
 
     QTRY_COMPARE_WITH_TIMEOUT(closedSpy.count(), 1, 1000);
     QVERIFY(!overlay.isOpen());

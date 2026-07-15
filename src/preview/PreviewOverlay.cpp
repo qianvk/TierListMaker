@@ -13,6 +13,7 @@
 #include <QPropertyAnimation>
 #include <QResizeEvent>
 #include <QShortcutEvent>
+#include <QWindow>
 
 #include <algorithm>
 
@@ -181,7 +182,7 @@ void PreviewOverlay::closePreview() {
 
 bool PreviewOverlay::eventFilter(QObject* watched, QEvent* event) {
     if (!m_open || !event || !isBlockingInputEvent(event->type()) ||
-        isOverlayObject(watched)) {
+        isOverlayDispatchObject(watched)) {
         return QWidget::eventFilter(watched, event);
     }
 
@@ -380,7 +381,14 @@ void PreviewOverlay::setInputBarrierActive(bool active) {
     }
 }
 
-bool PreviewOverlay::isOverlayObject(const QObject* object) const {
+bool PreviewOverlay::isOverlayDispatchObject(const QObject* object) const {
+    // Native pointer input reaches the top-level QWindow before Qt dispatches the translated
+    // QWidget event. Blocking that first stage prevents this overlay from ever receiving real
+    // mouse input, even though direct QTest delivery still appears to work.
+    const QWidget* topLevel = window();
+    if (topLevel && object == topLevel->windowHandle()) {
+        return true;
+    }
     for (const QObject* current = object; current; current = current->parent()) {
         if (current == this) {
             return true;
