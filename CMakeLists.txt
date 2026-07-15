@@ -13,6 +13,16 @@ endif()
 
 option(TLM_BUILD_TESTS "Build TierListMaker tests" ON)
 option(TLM_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
+set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}" CACHE STRING
+    "Version embedded in the application and platform installers")
+if(NOT TLM_PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$")
+    message(FATAL_ERROR "TLM_PACKAGE_VERSION must start with a semantic x.y.z version")
+endif()
+set(TLM_VERSION_MAJOR "${CMAKE_MATCH_1}")
+set(TLM_VERSION_MINOR "${CMAKE_MATCH_2}")
+set(TLM_VERSION_PATCH "${CMAKE_MATCH_3}")
+set(TLM_NUMERIC_VERSION
+    "${TLM_VERSION_MAJOR}.${TLM_VERSION_MINOR}.${TLM_VERSION_PATCH}")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -186,7 +196,7 @@ if(WIN32)
     target_link_libraries(TierListMaker PRIVATE dwmapi)
 endif()
 target_compile_definitions(TierListMaker PRIVATE
-    TLM_APP_VERSION="${PROJECT_VERSION}"
+    TLM_APP_VERSION="${TLM_PACKAGE_VERSION}"
     TLM_GIT_COMMIT="${TLM_GIT_COMMIT}"
 )
 qt_add_translations(TierListMaker
@@ -204,6 +214,8 @@ set_target_properties(TierListMaker PROPERTIES
     MACOSX_BUNDLE_BUNDLE_NAME "TierListMaker"
     MACOSX_BUNDLE_GUI_IDENTIFIER "org.tierlistmaker.app"
     MACOSX_BUNDLE_ICON_FILE "app-icon.icns"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${TLM_NUMERIC_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${TLM_NUMERIC_VERSION}"
 )
 
 include(InstallRules)

@@ -1,12 +1,14 @@
+#include <QPushButton>
 #include <QWidget>
 #include <QtTest>
 
 #include <QWKWidgets/widgetwindowagent.h>
 
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
-#  import <AppKit/AppKit.h>
+#import <AppKit/AppKit.h>
 #elif defined(Q_OS_WIN)
-#  include <qt_windows.h>
+#include <QWKCore/qwindowkit_windows.h>
+#include <qt_windows.h>
 #endif
 
 class WindowResizePolicyTest final : public QObject {
@@ -43,6 +45,13 @@ void WindowResizePolicyTest::nativeResizeIsOptIn() {
     const auto hwnd = reinterpret_cast<HWND>(host.winId());
     const auto style = [hwnd]() { return ::GetWindowLongPtrW(hwnd, GWL_STYLE); };
     QVERIFY(!(style() & (WS_THICKFRAME | WS_MAXIMIZEBOX)));
+
+    QVERIFY(agent.installSystemButtons());
+    auto* closeButton = host.findChild<QPushButton*>(QStringLiteral("qwkWindowsCloseButton"));
+    QVERIFY(closeButton);
+    const qreal expectedRadius = QWK::Private::IsWindows11OrGreater_Real() ? 8.0 : 0.0;
+    QCOMPARE(closeButton->property("_qwk_effective_top_right_corner_radius").toReal(),
+             expectedRadius);
 
     agent.setResizable(true);
     QCoreApplication::processEvents();

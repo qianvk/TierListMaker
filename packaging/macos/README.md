@@ -22,5 +22,8 @@ xcrun notarytool submit TierListMaker-*.dmg --keychain-profile TierListMaker --w
 xcrun stapler staple TierListMaker-*.dmg
 ```
 
-The `Platform Installers` GitHub Actions workflow runs the same build for tags and manual releases.
-If `vkui` is private, configure a read-only `SUBMODULE_TOKEN` repository secret.
+The `Platform Installers` workflow runs the same build for tags and manual dispatches. With the
+signing and App Store Connect secrets listed in the parent packaging README, it imports the
+certificate into an ephemeral keychain, signs the deployed app and DMG, submits the DMG to Apple's
+notary service, and staples the ticket. A `vX.Y.Z` tag publishes the notarized DMG and its SHA-256
+checksum to the matching GitHub Release.

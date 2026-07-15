@@ -127,11 +127,7 @@ void AppDialog::installWindowChrome() {
         // A close-only dialog keeps the native AppKit control at its normal top-left position;
         // it must not be centered inside a three-button traffic-light reservation.
         m_windowAgent->setSystemButtonPosition(QWK::WindowAgentBase::Close,
-                                                kMacCloseButtonPosition);
-#elif defined(Q_OS_WIN)
-        if (auto* closeButton = m_windowAgent->systemButton(QWK::WindowAgentBase::Close)) {
-            closeButton->setProperty("_qwk_top_right_corner_radius", 12.0);
-        }
+                                               kMacCloseButtonPosition);
 #endif
         if (m_fallbackCloseButton) {
             m_windowAgent->setHitTestVisible(m_fallbackCloseButton, true);
