@@ -1,5 +1,6 @@
 #include <QDialog>
 #include <QOperatingSystemVersion>
+#include <QPointer>
 #include <QPushButton>
 #include <QWidget>
 #include <QtTest>
@@ -27,6 +28,10 @@ LRESULT hitTestAt(QWidget& host, const QPoint& clientPosition) {
     POINT nativePosition{clientPosition.x(), clientPosition.y()};
     ::ClientToScreen(hwnd, &nativePosition);
     return ::SendMessageW(hwnd, WM_NCHITTEST, 0, MAKELPARAM(nativePosition.x, nativePosition.y));
+}
+
+bool nativeWindowEnabled(QWidget& host) {
+    return ::IsWindowEnabled(reinterpret_cast<HWND>(host.winId()));
 }
 } // namespace
 #endif
@@ -97,30 +102,42 @@ void WindowResizePolicyTest::transientAgentNeverClaimsOwnerWindow() {
     QVERIFY(QTest::qWaitForWindowExposed(&host));
     QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
 
-    QDialog dialog(&host, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
-                              Qt::WindowCloseButtonHint);
-    dialog.setWindowModality(Qt::WindowModal);
-    dialog.resize(360, 220);
-    QWidget dialogTitleBar(&dialog);
-    dialogTitleBar.setGeometry(0, 0, dialog.width(), 44);
+    for (int cycle = 0; cycle < 12; ++cycle) {
+        QPointer<QDialog> dialog =
+            new QDialog(&host, Qt::Dialog | Qt::CustomizeWindowHint | Qt::WindowTitleHint |
+                                   Qt::WindowCloseButtonHint);
+        dialog->setAttribute(Qt::WA_DeleteOnClose);
+        dialog->setWindowModality(Qt::ApplicationModal);
+        dialog->resize(360, 220);
+        auto* dialogTitleBar = new QWidget(dialog);
+        dialogTitleBar->setGeometry(0, 0, dialog->width(), 44);
 
-    QWK::WidgetWindowAgent dialogAgent;
-    QVERIFY(!dialog.internalWinId());
-    QVERIFY(dialogAgent.setup(&dialog));
-    QVERIFY(dialogAgent.addTitleBar(&dialogTitleBar));
+        auto* dialogAgent = new QWK::WidgetWindowAgent(dialog);
+        QVERIFY(!dialog->internalWinId());
+        QVERIFY(dialogAgent->setup(dialog));
+        QVERIFY(!dialog->internalWinId());
+        QVERIFY(dialogAgent->installSystemButtons());
+        QVERIFY(dialogAgent->addTitleBar(dialogTitleBar));
 
-    // Agent setup must not hook the already-native owner while the dialog is still alien.
-    QVERIFY(!dialog.internalWinId());
-    QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
+        // Agent setup must never hook the already-native owner while the dialog is still alien.
+        QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
 
-    dialog.open();
-    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
-    QVERIFY(dialog.internalWinId());
-    dialog.reject();
-    QTRY_VERIFY(!dialog.isVisible());
+        dialog->show();
+        QVERIFY(QTest::qWaitForWindowExposed(dialog));
+        QVERIFY(dialog->internalWinId());
+        QTRY_VERIFY(!nativeWindowEnabled(host));
 
-    // Destroying or hiding the transient context must leave the owner's native hit testing intact.
-    QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
+        auto* closeButton =
+            dialog->findChild<QPushButton*>(QStringLiteral("qwkWindowsCloseButton"));
+        QVERIFY(closeButton);
+        QTest::mouseClick(closeButton, Qt::LeftButton);
+        QTRY_VERIFY(dialog.isNull());
+
+        // Destroying a modal transient must synchronously release its owner and preserve the
+        // original context across repeated native-window lifecycles.
+        QTRY_VERIFY(nativeWindowEnabled(host));
+        QCOMPARE(hitTestAt(host, QPoint(240, 22)), static_cast<LRESULT>(HTCAPTION));
+    }
 #else
     QSKIP("The native owner-window regression is specific to the Windows HWND backend.");
 #endif

@@ -7,6 +7,12 @@
 #include <QWindow>
 #include <QtTest>
 
+#include <QWKWidgets/widgetwindowagent.h>
+
+#if defined(Q_OS_WIN)
+#include <qt_windows.h>
+#endif
+
 using namespace tlm;
 
 class PreviewOverlayTest final : public QObject {
@@ -16,7 +22,21 @@ private slots:
     void blocksUnderlyingInputUntilCloseFinishes();
     void doubleClickingPreviewImageCloses();
     void clickingOutsidePreviewImageCloses();
+    void windowChromeDoesNotStealPreviewInput();
 };
+
+#if defined(Q_OS_WIN)
+namespace {
+LRESULT hitTestAt(QWidget& host, const QPoint& clientPosition) {
+    const HWND hwnd = reinterpret_cast<HWND>(host.winId());
+    POINT nativePosition{clientPosition.x(), clientPosition.y()};
+    ::ClientToScreen(hwnd, &nativePosition);
+    return ::SendMessageW(hwnd, WM_NCHITTEST, 0,
+                          MAKELPARAM(nativePosition.x, nativePosition.y));
+}
+
+} // namespace
+#endif
 
 void PreviewOverlayTest::blocksUnderlyingInputUntilCloseFinishes() {
     QWidget host;
@@ -70,16 +90,55 @@ void PreviewOverlayTest::doubleClickingPreviewImageCloses() {
     QSignalSpy closedSpy(&overlay, &PreviewOverlay::closed);
     overlay.openPreview(QRect(220, 180, 72, 72), image);
     QTRY_VERIFY_WITH_TIMEOUT(overlay.previewGeometry().width() > 400, 1000);
+    QCOMPARE(QWidget::mouseGrabber(), &overlay);
+    QCOMPARE(QWidget::keyboardGrabber(), &overlay);
 
     const QPoint imageCenter = overlay.previewGeometry().center();
     QCOMPARE(overlay.toolTipTextAt(imageCenter),
              QStringLiteral("Double-click image to close"));
-    // Use the native window dispatch path. Application event filters see the QWindow event before
-    // Qt translates it to the child overlay, which is where the original regression occurred.
+#if defined(Q_OS_WIN)
+    QCOMPARE(hitTestAt(host, imageCenter), static_cast<LRESULT>(HTCLIENT));
+#endif
     QTest::mouseDClick(host.windowHandle(), Qt::LeftButton, Qt::NoModifier, imageCenter);
 
     QTRY_COMPARE_WITH_TIMEOUT(closedSpy.count(), 1, 1000);
     QVERIFY(!overlay.isOpen());
+}
+
+void PreviewOverlayTest::windowChromeDoesNotStealPreviewInput() {
+#if defined(Q_OS_WIN)
+    QWidget host;
+    host.resize(800, 600);
+    QWidget titleBar(&host);
+    titleBar.setGeometry(0, 0, host.width(), 44);
+
+    QWK::WidgetWindowAgent agent;
+    agent.setResizable(true);
+    QVERIFY(agent.setup(&host));
+    QVERIFY(agent.addTitleBar(&titleBar));
+
+    PreviewOverlay overlay(&host);
+    overlay.setGeometry(host.rect());
+    QVERIFY(agent.setHitTestVisible(&titleBar, &overlay, true));
+
+    host.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&host));
+
+    QPixmap image(640, 360);
+    image.fill(QColor(68, 126, 214));
+    QSignalSpy closedSpy(&overlay, &PreviewOverlay::closed);
+    overlay.openPreview(QRect(220, 180, 72, 72), image);
+
+    const QPoint titleBarPoint(120, 22);
+    QCOMPARE(hitTestAt(host, titleBarPoint), static_cast<LRESULT>(HTCLIENT));
+    QCOMPARE(QWidget::mouseGrabber(), &overlay);
+    QTest::mouseClick(host.windowHandle(), Qt::LeftButton, Qt::NoModifier, titleBarPoint);
+
+    QTRY_COMPARE_WITH_TIMEOUT(closedSpy.count(), 1, 1000);
+    QVERIFY(!overlay.isOpen());
+#else
+    QSKIP("The non-client title-bar regression is specific to Windows.");
+#endif
 }
 
 void PreviewOverlayTest::clickingOutsidePreviewImageCloses() {

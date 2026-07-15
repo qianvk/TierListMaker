@@ -15,7 +15,7 @@ qt_add_executable(tst_PreviewOverlay
     "${PROJECT_SOURCE_DIR}/src/preview/PreviewOverlay.cpp"
     "${PROJECT_SOURCE_DIR}/src/preview/PreviewOverlay.h"
 )
-target_link_libraries(tst_PreviewOverlay PRIVATE tierlistmaker_core Qt6::Test)
+target_link_libraries(tst_PreviewOverlay PRIVATE tierlistmaker_core QWindowKit::Widgets Qt6::Test)
 target_include_directories(tst_PreviewOverlay PRIVATE "${PROJECT_SOURCE_DIR}/src")
 add_test(NAME tst_PreviewOverlay COMMAND tst_PreviewOverlay)
 

@@ -26,7 +26,6 @@ AppDialog::AppDialog(const QString& title, QWidget* parent)
       m_windowAgent(new QWK::WidgetWindowAgent(this)) {
     setObjectName(QStringLiteral("AppDialog"));
     setWindowTitle(title);
-    setModal(true);
     setWindowModality(Qt::ApplicationModal);
     setAttribute(Qt::WA_DontCreateNativeAncestors);
 

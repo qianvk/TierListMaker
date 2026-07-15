@@ -376,7 +376,15 @@ void PreviewOverlay::setInputBarrierActive(bool active) {
     }
     if (active) {
         qApp->installEventFilter(this);
+        grabMouse();
+        grabKeyboard();
     } else {
+        if (QWidget::mouseGrabber() == this) {
+            releaseMouse();
+        }
+        if (QWidget::keyboardGrabber() == this) {
+            releaseKeyboard();
+        }
         qApp->removeEventFilter(this);
     }
 }

@@ -128,6 +128,13 @@ void RootWidget::installWindowAgent(QWK::WidgetWindowAgent* agent) {
     m_windowAgent->addTitleBar(m_sidebarTitleBar);
     m_windowAgent->addTitleBar(m_titleBar);
 
+    if (m_previewOverlay) {
+        // The preview is a window-level input surface. While visible it must supersede every
+        // registered title bar so Windows routes pointer input through the client area.
+        m_windowAgent->setHitTestVisible(m_sidebarTitleBar, m_previewOverlay, true);
+        m_windowAgent->setHitTestVisible(m_titleBar, m_previewOverlay, true);
+    }
+
     const auto registerInteractiveChildren = [this](QWidget* titleBar) {
         const auto buttons = titleBar->findChildren<QAbstractButton*>();
         for (QAbstractButton* button : buttons) {
