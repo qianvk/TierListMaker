@@ -30,7 +30,7 @@ jobs:
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DTLM_BUILD_TESTS=ON
 
       - name: Build
-        run: cmake --build build --config Release
+        run: cmake --build build --config Release --parallel
 
       - name: Test
         run: ctest --test-dir build --output-on-failure -C Release
