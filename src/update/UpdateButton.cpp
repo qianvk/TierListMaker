@@ -90,7 +90,8 @@ void UpdateButton::paintEvent(QPaintEvent* event) {
     painter.setRenderHint(QPainter::Antialiasing);
     QColor accent = activeThemeTokens().accent;
     if (m_attention > 0.0) {
-        accent.setAlphaF(0.18 + 0.48 * std::sin(m_attention * std::numbers::pi));
+        accent.setAlphaF(static_cast<float>(
+            0.18 + 0.48 * std::sin(m_attention * std::numbers::pi)));
     }
     QPen pen(accent, 2.0, Qt::SolidLine, Qt::RoundCap);
     painter.setPen(pen);

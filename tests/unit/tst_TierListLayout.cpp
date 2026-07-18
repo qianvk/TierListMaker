@@ -98,15 +98,18 @@ void TierListLayoutTest::viewResizeRecomputesLayout() {
     view.resize(854, 650);
     view.show();
     QVERIFY(QTest::qWaitForWindowExposed(&view));
-    QTRY_COMPARE(view.viewport()->size(), QSize(854, 650));
+    QTRY_COMPARE(view.size(), QSize(854, 650));
+    QTRY_VERIFY(view.viewport()->width() > 0 && view.viewport()->height() > 0);
+    const QSize normalViewportSize = view.viewport()->size();
     const TierBoardLayoutMetrics normal =
-        TierListLayout::fitBoard({6, 6, 7, 31, 12}, view.viewport()->size(),
+        TierListLayout::fitBoard({6, 6, 7, 31, 12}, normalViewportSize,
                                  delegate.labelWidth());
     QTRY_COMPARE(model.rowUnitCountAt(3), normal.rowUnits.at(3));
     QTRY_COMPARE(model.rowUnitCountAt(4), normal.rowUnits.at(4));
 
     view.resize(1090, 650);
-    QTRY_COMPARE(view.viewport()->size(), QSize(1090, 650));
+    QTRY_COMPARE(view.size(), QSize(1090, 650));
+    QTRY_VERIFY(view.viewport()->width() > normalViewportSize.width());
     const TierBoardLayoutMetrics collapsed =
         TierListLayout::fitBoard({6, 6, 7, 31, 12}, view.viewport()->size(),
                                  delegate.labelWidth());

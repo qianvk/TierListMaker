@@ -34,7 +34,7 @@
 #include <vkui/widgets/controls/VkSwitch.h>
 
 #ifndef TLM_APP_VERSION
-#define TLM_APP_VERSION "0.2.0-beta.1"
+#define TLM_APP_VERSION "0.2.0-beta.2"
 #endif
 
 #ifndef TLM_GIT_COMMIT
