@@ -95,9 +95,11 @@ void TierListLayoutTest::viewResizeRecomputesLayout() {
     view.setItemDelegate(&delegate);
     model.setProject(&project);
 
+    // Reflow only needs widget events; native exposure is nondeterministic on headless CI runners.
+    view.setAttribute(Qt::WA_DontShowOnScreen);
     view.resize(854, 650);
     view.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    QCoreApplication::processEvents();
     QTRY_VERIFY(view.viewport()->width() > 0 && view.viewport()->height() > 0);
     const QSize normalViewportSize = view.viewport()->size();
     const TierBoardLayoutMetrics normal =

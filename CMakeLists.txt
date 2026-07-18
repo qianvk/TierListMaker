@@ -13,7 +13,7 @@ endif()
 
 option(TLM_BUILD_TESTS "Build TierListMaker tests" ON)
 option(TLM_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
-set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}-beta.3" CACHE STRING
+set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}-beta.4" CACHE STRING
     "Version embedded in the application and platform installers")
 if(NOT TLM_PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$")
     message(FATAL_ERROR "TLM_PACKAGE_VERSION must start with a semantic x.y.z version")
