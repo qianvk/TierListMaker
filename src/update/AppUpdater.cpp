@@ -25,7 +25,7 @@
 #include <utility>
 
 #ifndef TLM_APP_VERSION
-#define TLM_APP_VERSION "0.2.0-beta.2"
+#define TLM_APP_VERSION "0.2.0-beta.3"
 #endif
 
 #ifndef TLM_UPDATE_CHANNEL
