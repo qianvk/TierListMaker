@@ -330,3 +330,4 @@ jobs:
               --generate-notes \
               "${release_flags[@]}" \
               --title "TierListMaker ${GITHUB_REF_NAME}"
+          fi
