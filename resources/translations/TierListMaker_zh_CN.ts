@@ -99,14 +99,44 @@
         <translation>图片元数据格式错误。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="205"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="344"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="493"/>
+        <source>No update package is published for this platform.</source>
+        <translation>此平台尚未发布更新包。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="376"/>
+        <source>The update response does not contain a valid latest version.</source>
+        <translation>更新响应中没有有效的最新版本。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="382"/>
+        <source>The update package URL is not secure.</source>
+        <translation>更新包 URL 不安全。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="388"/>
+        <source>The update page URL is not secure.</source>
+        <translation>更新页面 URL 不安全。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="396"/>
+        <source>The update package checksum is invalid.</source>
+        <translation>更新包校验和无效。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="413"/>
+        <source>The update package type is not supported on this platform.</source>
+        <translation>此平台不支持该更新包类型。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="535"/>
         <source>The update response is not valid JSON.</source>
         <translation>更新响应不是有效的 JSON。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="216"/>
         <source>The update response does not contain a latest version.</source>
-        <translation>更新响应中没有最新版本信息。</translation>
+        <translation type="vanished">更新响应中没有最新版本信息。</translation>
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="138"/>
@@ -132,26 +162,31 @@
 <context>
     <name>QWK::WindowsCaptionButton</name>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="73"/>
         <source>Minimize</source>
-        <translation type="vanished">最小化</translation>
+        <translation>最小化</translation>
     </message>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="81"/>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="101"/>
         <source>Maximize</source>
-        <translation type="vanished">最大化</translation>
+        <translation>最大化</translation>
     </message>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="88"/>
         <source>Close</source>
-        <translation type="vanished">关闭</translation>
+        <translation>关闭</translation>
     </message>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="100"/>
         <source>Restore Down</source>
-        <translation type="vanished">向下还原</translation>
+        <translation>向下还原</translation>
     </message>
 </context>
 <context>
     <name>tlm::AppDialog</name>
     <message>
-        <location filename="../../src/window/AppDialog.cpp" line="100"/>
+        <location filename="../../src/window/AppDialog.cpp" line="99"/>
         <source>Close</source>
         <translation>关闭</translation>
     </message>
@@ -231,6 +266,54 @@
     <message>
         <source>Export</source>
         <translation type="vanished">导出</translation>
+    </message>
+</context>
+<context>
+    <name>tlm::AppUpdater</name>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="566"/>
+        <source>The update definition URL is not secure.</source>
+        <translation>更新定义 URL 不安全。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="594"/>
+        <source>The update response is too large.</source>
+        <translation>更新响应过大。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="699"/>
+        <source>The update cache directory could not be created.</source>
+        <translation>无法创建更新缓存目录。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="746"/>
+        <source>The update package is larger than expected.</source>
+        <translation>更新包大于预期大小。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="774"/>
+        <source>The update server returned HTTP %1.</source>
+        <translation>更新服务器返回了 HTTP %1。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="778"/>
+        <source>The downloaded update package has an unexpected size.</source>
+        <translation>下载的更新包大小与预期不符。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="782"/>
+        <source>The downloaded update package failed checksum verification.</source>
+        <translation>下载的更新包未通过校验和验证。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="806"/>
+        <source>The staged update package is no longer valid.</source>
+        <translation>已暂存的更新包不再有效。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="814"/>
+        <source>The update installer could not be opened.</source>
+        <translation>无法打开更新安装程序。</translation>
     </message>
 </context>
 <context>
@@ -766,8 +849,8 @@
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="272"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="536"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="296"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="575"/>
         <source>General</source>
         <translation>通用</translation>
     </message>
@@ -777,37 +860,35 @@
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="274"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="601"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="298"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="649"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="385"/>
         <source>English</source>
-        <translation>英语</translation>
+        <translation type="vanished">英语</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="386"/>
         <source>Simplified Chinese</source>
-        <translation>简体中文</translation>
+        <translation type="vanished">简体中文</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="396"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="433"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="384"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="399"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="421"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
         <source>System</source>
         <translation>跟随系统</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="273"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="534"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="548"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="297"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="573"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
         <source>Updates</source>
         <translation>更新</translation>
     </message>
@@ -819,34 +900,55 @@
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="340"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="255"/>
+        <source>Downloading update %1: %2%</source>
+        <translation>正在下载更新 %1：%2%</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="263"/>
+        <source>Update %1 is ready to install.</source>
+        <translation>更新 %1 已可安装。</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
+        <source>Install Update</source>
+        <translation>安装更新</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="609"/>
+        <source>Download Update</source>
+        <translation>下载更新</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="387"/>
         <source>Version %1 is available. Current version: %2%3</source>
         <translation>发现新版本 %1。当前版本：%2%3</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="347"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="394"/>
         <source>TierListMaker is up to date. Current version: %1</source>
         <translation>TierListMaker 已是最新版本。当前版本：%1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="361"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="403"/>
         <source>Update check failed: %1
 The project may not have published update metadata yet.</source>
         <translation>检查更新失败：%1
 项目可能还没有发布更新元数据。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="399"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
         <source>Light</source>
         <translation>浅色</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="399"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
         <source>Dark</source>
         <translation>深色</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="403"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
         <source>Appearance</source>
         <translation>外观</translation>
     </message>
@@ -867,107 +969,135 @@ The project may not have published update metadata yet.</source>
         <translation type="vanished">图片导入方式</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="406"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="443"/>
         <source>None</source>
         <translation>无</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="407"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="444"/>
         <source>Image</source>
         <translation>自身图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="417"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
         <source>Preview background</source>
         <translation>预览背景</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="420"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="457"/>
         <source>Open Gallery Overview</source>
         <translation>打开图库总览</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="422"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
         <source>Open Tier Overview</source>
         <translation>打开 tier 总览</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="424"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="461"/>
         <source>Do Nothing</source>
         <translation>不执行操作</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="477"/>
         <source>Empty tier area double-click</source>
         <translation>Tier 空白区域双击</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="451"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="488"/>
         <source>Empty tier area long press</source>
         <translation>Tier 空白区域长按</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="491"/>
         <source>Show tier list tooltips</source>
         <translation>显示分级列表操作提示</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="496"/>
         <source>Tier list tooltips</source>
         <translation>分级列表操作提示</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="462"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="499"/>
         <source>Enable autosave</source>
         <translation>启用自动保存</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="464"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="501"/>
         <source>Save behavior</source>
         <translation>保存行为</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="468"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="505"/>
         <source> min</source>
         <translation> 分钟</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="473"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="510"/>
         <source>Autosave interval</source>
         <translation>自动保存间隔</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="488"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="525"/>
         <source>Default project folder</source>
         <translation>默认项目文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="491"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="528"/>
         <source>Choose</source>
         <translation>选择</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="516"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="555"/>
         <source>Default Project Folder</source>
         <translation>默认项目文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="526"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="565"/>
         <source>Enable automatic update checks</source>
         <translation>启用自动检查更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="557"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="596"/>
         <source>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</source>
         <translation>点击“立即检查”时会执行手动检查。启用自动检查后，最多每天检查一次。不会自动下载或执行任何更新。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="567"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="606"/>
         <source>Check Now</source>
         <translation>立即检查</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="603"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="651"/>
+        <source>TierListMaker
+Version: %1
+License: MIT
+Qt: %2
+QWindowKit: 1.5.1
+VkUI: 0.1.0
+Build: %3
+Git: %4
+Platform: %5
+Copyright: 2026 TierListMaker contributors
+
+Links:
+https://github.com/qianvk/TierListMaker</source>
+        <translation>TierListMaker
+版本：%1
+许可证：MIT
+Qt：%2
+QWindowKit：1.5.1
+VkUI：0.1.0
+构建：%3
+Git：%4
+平台：%5
+版权所有：2026 TierListMaker 贡献者
+
+链接：
+https://github.com/qianvk/TierListMaker</translation>
+    </message>
+    <message>
         <source>TierListMaker
 Version: %1
 License: MIT
@@ -980,7 +1110,7 @@ Copyright: 2026 TierListMaker contributors
 
 Links:
 https://github.com/qianvk/TierListMaker</source>
-        <translation>TierListMaker
+        <translation type="vanished">TierListMaker
 版本：%1
 许可证：MIT
 Qt：%2
@@ -1026,7 +1156,7 @@ https://github.com/qianvk/TierListMaker</translation>
         <translation type="vanished">TierListMaker 不上传用户数据，默认不包含遥测。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="550"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="589"/>
         <source>Update definition:
 %1</source>
         <translation>更新定义：
@@ -1041,7 +1171,7 @@ https://github.com/qianvk/TierListMaker</translation>
         <translation type="vanished">检查更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="569"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="611"/>
         <source>Open Release Page</source>
         <translation>打开发布页</translation>
     </message>
@@ -1105,17 +1235,18 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::PreviewOverlay</name>
     <message>
-        <location filename="../../src/preview/PreviewOverlay.cpp" line="68"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="69"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="129"/>
         <source>Click outside to close. Double-click image to close.</source>
         <translation>点击外部关闭，双击图片关闭。</translation>
     </message>
     <message>
-        <location filename="../../src/preview/PreviewOverlay.cpp" line="263"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="136"/>
         <source>Double-click image to close</source>
         <translation>双击图片关闭</translation>
     </message>
     <message>
-        <location filename="../../src/preview/PreviewOverlay.cpp" line="264"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="137"/>
         <source>Click to close preview</source>
         <translation>点击关闭预览</translation>
     </message>
@@ -1509,38 +1640,78 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::RootWidget</name>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="331"/>
-        <location filename="../../src/window/RootWidget.cpp" line="360"/>
-        <location filename="../../src/window/RootWidget.cpp" line="442"/>
-        <location filename="../../src/window/RootWidget.cpp" line="549"/>
-        <location filename="../../src/window/RootWidget.cpp" line="686"/>
+        <location filename="../../src/window/RootWidget.cpp" line="323"/>
+        <location filename="../../src/window/RootWidget.cpp" line="352"/>
+        <location filename="../../src/window/RootWidget.cpp" line="448"/>
+        <location filename="../../src/window/RootWidget.cpp" line="571"/>
+        <location filename="../../src/window/RootWidget.cpp" line="707"/>
         <source>Collapse sidebar</source>
         <translation>折叠侧边栏</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="336"/>
-        <location filename="../../src/window/RootWidget.cpp" line="441"/>
-        <location filename="../../src/window/RootWidget.cpp" line="549"/>
-        <location filename="../../src/window/RootWidget.cpp" line="685"/>
+        <location filename="../../src/window/RootWidget.cpp" line="328"/>
+        <location filename="../../src/window/RootWidget.cpp" line="447"/>
+        <location filename="../../src/window/RootWidget.cpp" line="571"/>
+        <location filename="../../src/window/RootWidget.cpp" line="706"/>
         <source>Show sidebar</source>
         <translation>显示侧边栏</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="349"/>
-        <location filename="../../src/window/RootWidget.cpp" line="445"/>
+        <location filename="../../src/window/RootWidget.cpp" line="341"/>
+        <location filename="../../src/window/RootWidget.cpp" line="451"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="448"/>
-        <location filename="../../src/window/RootWidget.cpp" line="491"/>
-        <location filename="../../src/window/RootWidget.cpp" line="851"/>
-        <location filename="../../src/window/RootWidget.cpp" line="998"/>
+        <location filename="../../src/window/RootWidget.cpp" line="370"/>
+        <source>Downloading update: %1%</source>
+        <translation>正在下载更新：%1%</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="454"/>
+        <location filename="../../src/window/RootWidget.cpp" line="498"/>
+        <location filename="../../src/window/RootWidget.cpp" line="884"/>
+        <location filename="../../src/window/RootWidget.cpp" line="1031"/>
         <source>Preferences</source>
         <translation>偏好设置</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="992"/>
+        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <source>Download update</source>
+        <translation>下载更新</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <source>Download update %1</source>
+        <translation>下载更新 %1</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="861"/>
+        <source>Downloading update</source>
+        <translation>正在下载更新</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <source>Install update</source>
+        <translation>安装更新</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <source>Install update %1</source>
+        <translation>安装更新 %1</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="868"/>
+        <source>Opening update installer</source>
+        <translation>正在打开更新安装程序</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="871"/>
+        <source>Updates</source>
+        <translation>更新</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="1025"/>
         <source>Projects</source>
         <translation>项目</translation>
     </message>
@@ -1602,105 +1773,105 @@ https://github.com/qianvk/vkframeless</translation>
 <context>
     <name>tlm::TierListView</name>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3521"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3480"/>
         <source>No images in tier list</source>
         <translation>tier list 中没有图片</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3012"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2971"/>
         <source>Open Tier Overview</source>
         <translation>打开 tier 总览</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2999"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2958"/>
         <source>Click to exit display</source>
         <translation>点击退出展示</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2997"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2956"/>
         <source>Double-click to preview. Drag to move.</source>
         <translation>双击预览，拖拽移动。</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1554"/>
-        <location filename="../../src/tier/TierListView.cpp" line="1602"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1513"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1561"/>
         <source>Edit</source>
         <translation>编辑</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1556"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1515"/>
         <source>Clear Images</source>
         <translation>清空图片</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1558"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1517"/>
         <source>Delete</source>
         <translation>删除</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1561"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1520"/>
         <source>Insert Row Above</source>
         <translation>在上方插入一行</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1563"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1522"/>
         <source>Insert Row Below</source>
         <translation>在下方插入一行</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1608"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1567"/>
         <source>Remove from Tier Row</source>
         <translation>移出分级行</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1609"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1568"/>
         <source>Remove from Image Gallery</source>
         <translation>移出图库</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2972"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2931"/>
         <source>Double-click to display this tier. Right-click for tier actions.</source>
         <translation>双击展示该分级。右键打开分级操作。</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3014"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2973"/>
         <source>Open Gallery Overview</source>
         <translation>打开图库总览</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3024"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2983"/>
         <source>Double-click: %1</source>
         <translation>双击：%1</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3028"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2987"/>
         <source>Long press: %1</source>
         <translation>长按：%1</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3035"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2994"/>
         <source>Option</source>
         <translation>Option</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3037"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2996"/>
         <source>Alt</source>
         <translation>Alt</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3039"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2998"/>
         <source>Hold %1 and drag: Move window
 Esc: Exit Focus Mode</source>
         <translation>按住 %1 并拖动：移动窗口
 Esc：退出专注模式</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3519"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3478"/>
         <source>No imported images</source>
         <translation>暂无已导入图片</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3520"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3479"/>
         <source>No images in this tier</source>
         <translation>该分级中没有图片</translation>
     </message>

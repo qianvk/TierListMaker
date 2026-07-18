@@ -33,6 +33,7 @@ private:
     void rebuildPreferencePages();
     void updateNavWidth();
     void refreshPreferenceControlStyles();
+    void refreshUpdateActions();
     void applyUpdateResult(const UpdateCheckResult& result);
     void applyUpdateFailure(const QString& reason);
     QWidget* createGeneralPage();
@@ -46,6 +47,7 @@ private:
     QStackedWidget* m_stack{nullptr};
     QLabel* m_updateStatusLabel{nullptr};
     QPushButton* m_checkUpdateButton{nullptr};
+    QPushButton* m_installUpdateButton{nullptr};
     QPushButton* m_openUpdateButton{nullptr};
     UpdateCheckResult m_lastUpdateResult;
 };

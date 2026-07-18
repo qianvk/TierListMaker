@@ -22,6 +22,7 @@ private slots:
     void blocksUnderlyingInputUntilCloseFinishes();
     void doubleClickingPreviewImageCloses();
     void clickingOutsidePreviewImageCloses();
+    void operationToolTipPreferenceIncludesPreview();
     void windowChromeDoesNotStealPreviewInput();
 };
 
@@ -160,6 +161,25 @@ void PreviewOverlayTest::clickingOutsidePreviewImageCloses() {
 
     QTRY_COMPARE_WITH_TIMEOUT(closedSpy.count(), 1, 1000);
     QVERIFY(!overlay.isOpen());
+}
+
+void PreviewOverlayTest::operationToolTipPreferenceIncludesPreview() {
+    PreviewOverlay overlay;
+    const QPoint position(8, 8);
+
+    QVERIFY(overlay.toolTipsEnabled());
+    QVERIFY(!overlay.toolTipTextAt(position).isEmpty());
+    QVERIFY(overlay.property("tlmToolTipsEnabled").toBool());
+
+    overlay.setToolTipsEnabled(false);
+    QVERIFY(!overlay.toolTipsEnabled());
+    QVERIFY(overlay.toolTipTextAt(position).isEmpty());
+    QVERIFY(!overlay.property("tlmToolTipsEnabled").toBool());
+    QVERIFY(overlay.toolTip().isEmpty());
+
+    overlay.setToolTipsEnabled(true);
+    QVERIFY(!overlay.toolTipTextAt(position).isEmpty());
+    QVERIFY(!overlay.toolTip().isEmpty());
 }
 
 QTEST_MAIN(PreviewOverlayTest)

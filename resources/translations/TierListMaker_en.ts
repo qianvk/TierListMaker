@@ -99,14 +99,44 @@
         <translation>Untitled Tier List</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="205"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="344"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="493"/>
+        <source>No update package is published for this platform.</source>
+        <translation>No update package is published for this platform.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="376"/>
+        <source>The update response does not contain a valid latest version.</source>
+        <translation>The update response does not contain a valid latest version.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="382"/>
+        <source>The update package URL is not secure.</source>
+        <translation>The update package URL is not secure.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="388"/>
+        <source>The update page URL is not secure.</source>
+        <translation>The update page URL is not secure.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="396"/>
+        <source>The update package checksum is invalid.</source>
+        <translation>The update package checksum is invalid.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="413"/>
+        <source>The update package type is not supported on this platform.</source>
+        <translation>The update package type is not supported on this platform.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="535"/>
         <source>The update response is not valid JSON.</source>
         <translation>The update response is not valid JSON.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="216"/>
         <source>The update response does not contain a latest version.</source>
-        <translation>The update response does not contain a latest version.</translation>
+        <translation type="vanished">The update response does not contain a latest version.</translation>
     </message>
     <message>
         <location filename="../../src/pages/EditPage.cpp" line="138"/>
@@ -132,26 +162,31 @@
 <context>
     <name>QWK::WindowsCaptionButton</name>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="73"/>
         <source>Minimize</source>
-        <translation type="vanished">Minimize</translation>
+        <translation>Minimize</translation>
     </message>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="81"/>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="101"/>
         <source>Maximize</source>
-        <translation type="vanished">Maximize</translation>
+        <translation>Maximize</translation>
     </message>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="88"/>
         <source>Close</source>
-        <translation type="vanished">Close</translation>
+        <translation>Close</translation>
     </message>
     <message>
+        <location filename="../../third_party/qwindowkit/src/widgets/widgetwindowagent_win.cpp" line="100"/>
         <source>Restore Down</source>
-        <translation type="vanished">Restore Down</translation>
+        <translation>Restore Down</translation>
     </message>
 </context>
 <context>
     <name>tlm::AppDialog</name>
     <message>
-        <location filename="../../src/window/AppDialog.cpp" line="100"/>
+        <location filename="../../src/window/AppDialog.cpp" line="99"/>
         <source>Close</source>
         <translation>Close</translation>
     </message>
@@ -207,6 +242,54 @@
         <location filename="../../src/window/AppTitleBar.cpp" line="223"/>
         <source>Exit Tier Focus</source>
         <translation>Exit Tier Focus</translation>
+    </message>
+</context>
+<context>
+    <name>tlm::AppUpdater</name>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="566"/>
+        <source>The update definition URL is not secure.</source>
+        <translation>The update definition URL is not secure.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="594"/>
+        <source>The update response is too large.</source>
+        <translation>The update response is too large.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="699"/>
+        <source>The update cache directory could not be created.</source>
+        <translation>The update cache directory could not be created.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="746"/>
+        <source>The update package is larger than expected.</source>
+        <translation>The update package is larger than expected.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="774"/>
+        <source>The update server returned HTTP %1.</source>
+        <translation>The update server returned HTTP %1.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="778"/>
+        <source>The downloaded update package has an unexpected size.</source>
+        <translation>The downloaded update package has an unexpected size.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="782"/>
+        <source>The downloaded update package failed checksum verification.</source>
+        <translation>The downloaded update package failed checksum verification.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="806"/>
+        <source>The staged update package is no longer valid.</source>
+        <translation>The staged update package is no longer valid.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="814"/>
+        <source>The update installer could not be opened.</source>
+        <translation>The update installer could not be opened.</translation>
     </message>
 </context>
 <context>
@@ -625,23 +708,23 @@
     <name>tlm::PreferencesPage</name>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="272"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="536"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="296"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="575"/>
         <source>General</source>
         <translation>General</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="274"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="601"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="298"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="649"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="273"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="534"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="548"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="297"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="573"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
         <source>Updates</source>
         <translation>Updates</translation>
     </message>
@@ -653,160 +736,207 @@
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="340"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="255"/>
+        <source>Downloading update %1: %2%</source>
+        <translation>Downloading update %1: %2%</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="263"/>
+        <source>Update %1 is ready to install.</source>
+        <translation>Update %1 is ready to install.</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
+        <source>Install Update</source>
+        <translation>Install Update</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="609"/>
+        <source>Download Update</source>
+        <translation>Download Update</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="387"/>
         <source>Version %1 is available. Current version: %2%3</source>
         <translation>Version %1 is available. Current version: %2%3</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="347"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="394"/>
         <source>TierListMaker is up to date. Current version: %1</source>
         <translation>TierListMaker is up to date. Current version: %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="361"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="403"/>
         <source>Update check failed: %1
 The project may not have published update metadata yet.</source>
         <translation>Update check failed: %1
 The project may not have published update metadata yet.</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="384"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="399"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="421"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
         <source>System</source>
         <translation>System</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="385"/>
         <source>English</source>
-        <translation>English</translation>
+        <translation type="vanished">English</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="386"/>
         <source>Simplified Chinese</source>
-        <translation>Simplified Chinese</translation>
+        <translation type="vanished">Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="396"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="433"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="399"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
         <source>Light</source>
         <translation>Light</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="399"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="403"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
         <source>Appearance</source>
         <translation>Appearance</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="406"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="443"/>
         <source>None</source>
         <translation>None</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="407"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="444"/>
         <source>Image</source>
         <translation>Image</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="417"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
         <source>Preview background</source>
         <translation>Preview background</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="420"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="457"/>
         <source>Open Gallery Overview</source>
         <translation>Open Gallery Overview</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="422"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
         <source>Open Tier Overview</source>
         <translation>Open Tier Overview</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="424"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="461"/>
         <source>Do Nothing</source>
         <translation>Do Nothing</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="477"/>
         <source>Empty tier area double-click</source>
         <translation>Empty tier area double-click</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="451"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="488"/>
         <source>Empty tier area long press</source>
         <translation>Empty tier area long press</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="491"/>
         <source>Show tier list tooltips</source>
         <translation>Show tier list tooltips</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="496"/>
         <source>Tier list tooltips</source>
         <translation>Tier list tooltips</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="462"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="499"/>
         <source>Enable autosave</source>
         <translation>Enable autosave</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="464"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="501"/>
         <source>Save behavior</source>
         <translation>Save behavior</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="468"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="505"/>
         <source> min</source>
         <translation> min</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="473"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="510"/>
         <source>Autosave interval</source>
         <translation>Autosave interval</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="488"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="525"/>
         <source>Default project folder</source>
         <translation>Default project folder</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="491"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="528"/>
         <source>Choose</source>
         <translation>Choose</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="516"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="555"/>
         <source>Default Project Folder</source>
         <translation>Default Project Folder</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="526"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="565"/>
         <source>Enable automatic update checks</source>
         <translation>Enable automatic update checks</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="557"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="596"/>
         <source>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</source>
         <translation>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="567"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="606"/>
         <source>Check Now</source>
         <translation>Check Now</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="603"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="651"/>
+        <source>TierListMaker
+Version: %1
+License: MIT
+Qt: %2
+QWindowKit: 1.5.1
+VkUI: 0.1.0
+Build: %3
+Git: %4
+Platform: %5
+Copyright: 2026 TierListMaker contributors
+
+Links:
+https://github.com/qianvk/TierListMaker</source>
+        <translation>TierListMaker
+Version: %1
+License: MIT
+Qt: %2
+QWindowKit: 1.5.1
+VkUI: 0.1.0
+Build: %3
+Git: %4
+Platform: %5
+Copyright: 2026 TierListMaker contributors
+
+Links:
+https://github.com/qianvk/TierListMaker</translation>
+    </message>
+    <message>
         <source>TierListMaker
 Version: %1
 License: MIT
@@ -819,7 +949,7 @@ Copyright: 2026 TierListMaker contributors
 
 Links:
 https://github.com/qianvk/TierListMaker</source>
-        <translation>TierListMaker
+        <translation type="vanished">TierListMaker
 Version: %1
 License: MIT
 Qt: %2
@@ -833,14 +963,14 @@ Links:
 https://github.com/qianvk/TierListMaker</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="550"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="589"/>
         <source>Update definition:
 %1</source>
         <translation>Update definition:
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="569"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="611"/>
         <source>Open Release Page</source>
         <translation>Open Release Page</translation>
     </message>
@@ -848,17 +978,18 @@ https://github.com/qianvk/TierListMaker</translation>
 <context>
     <name>tlm::PreviewOverlay</name>
     <message>
-        <location filename="../../src/preview/PreviewOverlay.cpp" line="68"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="69"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="129"/>
         <source>Click outside to close. Double-click image to close.</source>
         <translation>Click outside to close. Double-click image to close.</translation>
     </message>
     <message>
-        <location filename="../../src/preview/PreviewOverlay.cpp" line="263"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="136"/>
         <source>Double-click image to close</source>
         <translation>Double-click image to close</translation>
     </message>
     <message>
-        <location filename="../../src/preview/PreviewOverlay.cpp" line="264"/>
+        <location filename="../../src/preview/PreviewOverlay.cpp" line="137"/>
         <source>Click to close preview</source>
         <translation>Click to close preview</translation>
     </message>
@@ -1212,38 +1343,78 @@ https://github.com/qianvk/TierListMaker</translation>
 <context>
     <name>tlm::RootWidget</name>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="331"/>
-        <location filename="../../src/window/RootWidget.cpp" line="360"/>
-        <location filename="../../src/window/RootWidget.cpp" line="442"/>
-        <location filename="../../src/window/RootWidget.cpp" line="549"/>
-        <location filename="../../src/window/RootWidget.cpp" line="686"/>
+        <location filename="../../src/window/RootWidget.cpp" line="323"/>
+        <location filename="../../src/window/RootWidget.cpp" line="352"/>
+        <location filename="../../src/window/RootWidget.cpp" line="448"/>
+        <location filename="../../src/window/RootWidget.cpp" line="571"/>
+        <location filename="../../src/window/RootWidget.cpp" line="707"/>
         <source>Collapse sidebar</source>
         <translation>Collapse sidebar</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="336"/>
-        <location filename="../../src/window/RootWidget.cpp" line="441"/>
-        <location filename="../../src/window/RootWidget.cpp" line="549"/>
-        <location filename="../../src/window/RootWidget.cpp" line="685"/>
+        <location filename="../../src/window/RootWidget.cpp" line="328"/>
+        <location filename="../../src/window/RootWidget.cpp" line="447"/>
+        <location filename="../../src/window/RootWidget.cpp" line="571"/>
+        <location filename="../../src/window/RootWidget.cpp" line="706"/>
         <source>Show sidebar</source>
         <translation>Show sidebar</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="349"/>
-        <location filename="../../src/window/RootWidget.cpp" line="445"/>
+        <location filename="../../src/window/RootWidget.cpp" line="341"/>
+        <location filename="../../src/window/RootWidget.cpp" line="451"/>
         <source>New</source>
         <translation>New</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="448"/>
-        <location filename="../../src/window/RootWidget.cpp" line="491"/>
-        <location filename="../../src/window/RootWidget.cpp" line="851"/>
-        <location filename="../../src/window/RootWidget.cpp" line="998"/>
+        <location filename="../../src/window/RootWidget.cpp" line="370"/>
+        <source>Downloading update: %1%</source>
+        <translation>Downloading update: %1%</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="454"/>
+        <location filename="../../src/window/RootWidget.cpp" line="498"/>
+        <location filename="../../src/window/RootWidget.cpp" line="884"/>
+        <location filename="../../src/window/RootWidget.cpp" line="1031"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="992"/>
+        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <source>Download update</source>
+        <translation>Download update</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <source>Download update %1</source>
+        <translation>Download update %1</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="861"/>
+        <source>Downloading update</source>
+        <translation>Downloading update</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <source>Install update</source>
+        <translation>Install update</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <source>Install update %1</source>
+        <translation>Install update %1</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="868"/>
+        <source>Opening update installer</source>
+        <translation>Opening update installer</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="871"/>
+        <source>Updates</source>
+        <translation>Updates</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="1025"/>
         <source>Projects</source>
         <translation>Projects</translation>
     </message>
@@ -1298,105 +1469,105 @@ https://github.com/qianvk/TierListMaker</translation>
 <context>
     <name>tlm::TierListView</name>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3521"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3480"/>
         <source>No images in tier list</source>
         <translation>No images in tier list</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3012"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2971"/>
         <source>Open Tier Overview</source>
         <translation>Open Tier Overview</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2999"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2958"/>
         <source>Click to exit display</source>
         <translation>Click to exit display</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2997"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2956"/>
         <source>Double-click to preview. Drag to move.</source>
         <translation>Double-click to preview. Drag to move.</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1554"/>
-        <location filename="../../src/tier/TierListView.cpp" line="1602"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1513"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1561"/>
         <source>Edit</source>
         <translation>Edit</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1556"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1515"/>
         <source>Clear Images</source>
         <translation>Clear Images</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1558"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1517"/>
         <source>Delete</source>
         <translation>Delete</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1561"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1520"/>
         <source>Insert Row Above</source>
         <translation>Insert Row Above</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1563"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1522"/>
         <source>Insert Row Below</source>
         <translation>Insert Row Below</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1608"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1567"/>
         <source>Remove from Tier Row</source>
         <translation>Remove from Tier Row</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="1609"/>
+        <location filename="../../src/tier/TierListView.cpp" line="1568"/>
         <source>Remove from Image Gallery</source>
         <translation>Remove from Image Gallery</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="2972"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2931"/>
         <source>Double-click to display this tier. Right-click for tier actions.</source>
         <translation>Double-click to display this tier. Right-click for tier actions.</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3014"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2973"/>
         <source>Open Gallery Overview</source>
         <translation>Open Gallery Overview</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3024"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2983"/>
         <source>Double-click: %1</source>
         <translation>Double-click: %1</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3028"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2987"/>
         <source>Long press: %1</source>
         <translation>Long press: %1</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3035"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2994"/>
         <source>Option</source>
         <translation>Option</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3037"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2996"/>
         <source>Alt</source>
         <translation>Alt</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3039"/>
+        <location filename="../../src/tier/TierListView.cpp" line="2998"/>
         <source>Hold %1 and drag: Move window
 Esc: Exit Focus Mode</source>
         <translation>Hold %1 and drag: Move window
 Esc: Exit Focus Mode</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3519"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3478"/>
         <source>No imported images</source>
         <translation>No imported images</translation>
     </message>
     <message>
-        <location filename="../../src/tier/TierListView.cpp" line="3520"/>
+        <location filename="../../src/tier/TierListView.cpp" line="3479"/>
         <source>No images in this tier</source>
         <translation>No images in this tier</translation>
     </message>

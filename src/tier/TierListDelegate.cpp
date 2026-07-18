@@ -1,6 +1,7 @@
 #include "tier/TierListDelegate.h"
 
 #include "theme/Theme.h"
+#include "tier/TierListLayout.h"
 #include "tier/TierListModel.h"
 #include "tier/TierListView.h"
 
@@ -22,12 +23,6 @@ namespace tlm {
 namespace {
 constexpr int kMinimumLabelWidth = 82;
 constexpr int kMaximumLabelWidth = 190;
-constexpr int kTileMargin = 0;
-constexpr int kTileSpacing = 0;
-constexpr int kNominalTileExtent = 84;
-constexpr int kMinTileSide = 34;
-constexpr int kMaxTileSide = 512;
-
 constexpr qreal kDefaultBackgroundIconVisibility = 0.22;
 
 qreal canvasBackgroundVisibility(const TierProject* project) {
@@ -80,18 +75,6 @@ QPainterPath rowClipPath(const QRect& rect, bool firstRow, bool lastRow) {
     return rounded.united(squareMask);
 }
 
-int tileSideForLineHeight(int lineHeight) {
-    return qBound(kMinTileSide, lineHeight, kMaxTileSide);
-}
-
-int imagesPerLineForTileSide(int viewportWidth, int tileSide, int labelWidth) {
-    const int contentWidth = qMax(1, viewportWidth - labelWidth - kTileMargin * 2);
-    return qMax(1, (contentWidth + kTileSpacing) / (qMax(kMinTileSide, tileSide) + kTileSpacing));
-}
-
-int imagesPerLineForWidth(int viewportWidth) {
-    return imagesPerLineForTileSide(viewportWidth, kNominalTileExtent, kMinimumLabelWidth);
-}
 } // namespace
 
 TierListDelegate::TierListDelegate(QObject* parent) : QStyledItemDelegate(parent) {}
@@ -130,22 +113,6 @@ int TierListDelegate::outerRadius() {
     return platformOuterRadius();
 }
 
-int TierListDelegate::rowUnitsForImageCount(int imageCount, int viewportWidth) {
-    const int perLine = imagesPerLineForWidth(viewportWidth);
-    return qMax(1, (qMax(0, imageCount) + perLine - 1) / perLine);
-}
-
-int TierListDelegate::rowUnitsForImageCount(int imageCount, int viewportWidth, int lineHeight) {
-    return rowUnitsForImageCount(imageCount, viewportWidth, lineHeight, kMinimumLabelWidth);
-}
-
-int TierListDelegate::rowUnitsForImageCount(int imageCount, int viewportWidth, int lineHeight,
-                                            int labelWidth) {
-    const int perLine = imagesPerLineForTileSide(viewportWidth, tileSideForLineHeight(lineHeight),
-                                                 qMax(kMinimumLabelWidth, labelWidth));
-    return qMax(1, (qMax(0, imageCount) + perLine - 1) / perLine);
-}
-
 QRect TierListDelegate::labelRect(const QRect& rowRect) const {
     return QRect(rowRect.left(), rowRect.top(), labelWidth(), rowRect.height());
 }
@@ -163,23 +130,10 @@ QVector<QRect> TierListDelegate::tileRectsForCount(const QModelIndex& index, con
         return rects;
     }
 
-    const int rowUnits = qMax(1, index.data(TierListModel::RowUnitCountRole).toInt());
-    const int lineHeight = qMax(1, qRound(static_cast<qreal>(rowRect.height()) / rowUnits));
-    const int currentLabelWidth = labelWidth();
-    const QRect contentRect(rowRect.left() + currentLabelWidth + 1, rowRect.top(),
-                            qMax(1, rowRect.width() - currentLabelWidth - 2), rowRect.height());
-    const int availableWidth = qMax(1, contentRect.width() - kTileMargin * 2);
-    const int tileSide = qMax(1, qMin(tileSideForLineHeight(lineHeight), availableWidth));
-    const int widthCapacity = qMax(1, (availableWidth + kTileSpacing) / (tileSide + kTileSpacing));
-    const int perLine = qMax(1, widthCapacity);
-
+    const TierRowGrid grid = TierListLayout::gridForRow(
+        rowRect, index.data(TierListModel::RowUnitCountRole).toInt(), labelWidth());
     for (int i = 0; i < itemCount; ++i) {
-        const int line = i / perLine;
-        const int column = i % perLine;
-        const int x = contentRect.left() + kTileMargin + column * (tileSide + kTileSpacing);
-        const int lineTop = rowRect.top() + line * lineHeight;
-        const int y = lineTop;
-        rects.append(QRect(x, y, tileSide, tileSide));
+        rects.append(grid.tileRect(i));
     }
     return rects;
 }
@@ -269,32 +223,11 @@ int TierListDelegate::insertionIndexForPosition(const QModelIndex& index, const 
                                                 const QPoint& point, int itemCount) const {
     itemCount = qMax(0, itemCount);
 
-    // Project the cursor directly onto the virtual grid. This is more stable than walking
-    // painted rects because drag animations and magnification are intentionally paint-only.
-    const int rowUnits = qMax(1, index.data(TierListModel::RowUnitCountRole).toInt());
-    const int lineHeight = qMax(1, qRound(static_cast<qreal>(rowRect.height()) / rowUnits));
-    const int currentLabelWidth = labelWidth();
-    const QRect contentRect(rowRect.left() + currentLabelWidth + 1, rowRect.top(),
-                            qMax(1, rowRect.width() - currentLabelWidth - 2), rowRect.height());
-    const int availableWidth = qMax(1, contentRect.width() - kTileMargin * 2);
-    const int tileSide = qMax(1, qMin(tileSideForLineHeight(lineHeight), availableWidth));
-    const int step = qMax(1, tileSide + kTileSpacing);
-    const int perLine = qMax(1, (availableWidth + kTileSpacing) / step);
-    const int totalSlots = itemCount + 1;
-    const int maxLine = qMax(0, (totalSlots - 1) / perLine);
-
-    const int line = qBound(0, (point.y() - rowRect.top()) / lineHeight, maxLine);
-    const int relativeX = point.x() - contentRect.left() - kTileMargin;
-    int column = 0;
-    if (relativeX > 0) {
-        column = relativeX / step;
-        const int cellX = relativeX - column * step;
-        if (cellX > tileSide / 2) {
-            ++column;
-        }
-    }
-    column = qBound(0, column, perLine);
-    return qBound(0, line * perLine + column, itemCount);
+    // Project directly onto the same grid used by sizing and painting. Drag animations remain
+    // paint-only and therefore cannot alter insertion semantics.
+    const TierRowGrid grid = TierListLayout::gridForRow(
+        rowRect, index.data(TierListModel::RowUnitCountRole).toInt(), labelWidth());
+    return grid.insertionIndex(point, itemCount);
 }
 
 void TierListDelegate::paint(QPainter* painter, const QStyleOptionViewItem& option,

@@ -1,6 +1,6 @@
 #include <QDialog>
-#include <QOperatingSystemVersion>
 #include <QPointer>
+#include <QPixmap>
 #include <QPushButton>
 #include <QWidget>
 #include <QtTest>
@@ -67,10 +67,14 @@ void WindowResizePolicyTest::nativeResizeIsOptIn() {
     QVERIFY(agent.installSystemButtons());
     auto* closeButton = host.findChild<QPushButton*>(QStringLiteral("qwkWindowsCloseButton"));
     QVERIFY(closeButton);
-    const qreal expectedRadius =
-        QOperatingSystemVersion::current() >= QOperatingSystemVersion::Windows11 ? 8.0 : 0.0;
-    QCOMPARE(closeButton->property("_qwk_effective_top_right_corner_radius").toReal(),
-             expectedRadius);
+    QCOMPARE(closeButton->mapTo(&host, closeButton->rect().topRight()), host.rect().topRight());
+    closeButton->setDown(true);
+    QPixmap closeBackplate(closeButton->size());
+    closeBackplate.fill(Qt::transparent);
+    closeButton->render(&closeBackplate);
+    closeButton->setDown(false);
+    QCOMPARE(closeBackplate.toImage().pixelColor(closeBackplate.width() - 1, 0),
+             QColor(196, 43, 28));
 
     agent.setResizable(true);
     QCoreApplication::processEvents();

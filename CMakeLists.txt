@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(TierListMaker
-    VERSION 0.1.0
+    VERSION 0.2.0
     DESCRIPTION "A native Qt 6 desktop tier-list editor"
     HOMEPAGE_URL "https://github.com/qianvk/TierListMaker"
     LANGUAGES CXX
@@ -13,7 +13,7 @@ endif()
 
 option(TLM_BUILD_TESTS "Build TierListMaker tests" ON)
 option(TLM_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
-set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}" CACHE STRING
+set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}-beta.1" CACHE STRING
     "Version embedded in the application and platform installers")
 if(NOT TLM_PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$")
     message(FATAL_ERROR "TLM_PACKAGE_VERSION must start with a semantic x.y.z version")
@@ -23,6 +23,17 @@ set(TLM_VERSION_MINOR "${CMAKE_MATCH_2}")
 set(TLM_VERSION_PATCH "${CMAKE_MATCH_3}")
 set(TLM_NUMERIC_VERSION
     "${TLM_VERSION_MAJOR}.${TLM_VERSION_MINOR}.${TLM_VERSION_PATCH}")
+
+set(_tlm_default_update_channel "stable")
+if(TLM_PACKAGE_VERSION MATCHES "-")
+    set(_tlm_default_update_channel "beta")
+endif()
+set(TLM_UPDATE_CHANNEL "${_tlm_default_update_channel}" CACHE STRING
+    "Update feed channel embedded in the application")
+set_property(CACHE TLM_UPDATE_CHANNEL PROPERTY STRINGS stable beta)
+set(TLM_UPDATE_MANIFEST_URL
+    "https://api.github.com/repos/qianvk/TierListMaker/releases?per_page=20"
+    CACHE STRING "HTTPS release feed embedded in the application")
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
@@ -75,6 +86,8 @@ set(TLM_CORE_SOURCES
     src/theme/ThemeTokens.h
     src/tier/TierImage.cpp
     src/tier/TierImage.h
+    src/tier/TierListLayout.cpp
+    src/tier/TierListLayout.h
     src/tier/TierProject.cpp
     src/tier/TierProject.h
     src/tier/TierRow.cpp
@@ -121,6 +134,8 @@ set(TLM_APP_SOURCES
     src/tier/TierListView.h
     src/update/AppUpdater.cpp
     src/update/AppUpdater.h
+    src/update/UpdateButton.cpp
+    src/update/UpdateButton.h
     src/widgets/DestructiveActionDialog.cpp
     src/widgets/DestructiveActionDialog.h
     src/widgets/EmptyStateWidget.cpp
@@ -198,6 +213,8 @@ endif()
 target_compile_definitions(TierListMaker PRIVATE
     TLM_APP_VERSION="${TLM_PACKAGE_VERSION}"
     TLM_GIT_COMMIT="${TLM_GIT_COMMIT}"
+    TLM_UPDATE_CHANNEL="${TLM_UPDATE_CHANNEL}"
+    TLM_UPDATE_MANIFEST_URL="${TLM_UPDATE_MANIFEST_URL}"
 )
 qt_add_translations(TierListMaker
     TS_FILES

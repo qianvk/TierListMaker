@@ -1,5 +1,5 @@
-function(add_tlm_unit_test target source)
-    qt_add_executable(${target} ${source})
+function(add_tlm_unit_test target)
+    qt_add_executable(${target} ${ARGN})
     target_link_libraries(${target} PRIVATE tierlistmaker_core Qt6::Test)
     target_include_directories(${target} PRIVATE "${PROJECT_SOURCE_DIR}/src")
     add_test(NAME ${target} COMMAND ${target})
@@ -9,6 +9,23 @@ add_tlm_unit_test(tst_ProjectSerializer tst_ProjectSerializer.cpp)
 add_tlm_unit_test(tst_RecentProjectsStore tst_RecentProjectsStore.cpp)
 add_tlm_unit_test(tst_AssetManager tst_AssetManager.cpp)
 add_tlm_unit_test(tst_ThemeManager tst_ThemeManager.cpp)
+add_tlm_unit_test(tst_AppUpdater
+    tst_AppUpdater.cpp
+    "${PROJECT_SOURCE_DIR}/src/update/AppUpdater.cpp"
+    "${PROJECT_SOURCE_DIR}/src/update/AppUpdater.h"
+)
+target_link_libraries(tst_AppUpdater PRIVATE Qt6::Network)
+add_tlm_unit_test(tst_TierListLayout
+    tst_TierListLayout.cpp
+    "${PROJECT_SOURCE_DIR}/src/tier/TierDragController.cpp"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierDragController.h"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierListDelegate.cpp"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierListDelegate.h"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierListModel.cpp"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierListModel.h"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierListView.cpp"
+    "${PROJECT_SOURCE_DIR}/src/tier/TierListView.h"
+)
 
 qt_add_executable(tst_WindowLifecycle
     tst_WindowLifecycle.cpp

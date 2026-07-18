@@ -7,8 +7,8 @@
 #include "pages/PreferencesPage.h"
 #include "pages/ProjectsPage.h"
 #include "preview/PreviewOverlay.h"
-#include "theme/Theme.h"
 #include "update/AppUpdater.h"
+#include "update/UpdateButton.h"
 #include "window/AppDialog.h"
 #include "window/AppTitleBar.h"
 #include "window/SidebarToggleButton.h"
@@ -23,11 +23,8 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QKeySequence>
-#include <QLabel>
 #include <QLineEdit>
 #include <QMouseEvent>
-#include <QPaintEvent>
-#include <QPainter>
 #include <QResizeEvent>
 #include <QShortcut>
 #include <QShowEvent>
@@ -56,20 +53,6 @@ constexpr int kSplitterHandleWidth = 0;
 constexpr int kTitleBarHeight = 54;
 constexpr int kSidebarToggleInset = 14;
 [[maybe_unused]] constexpr int kTitleBarControlGap = 10;
-
-class StatusBadge final : public QLabel {
-public:
-    using QLabel::QLabel;
-
-protected:
-    void paintEvent(QPaintEvent*) override {
-        QPainter painter(this);
-        painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(activeThemeTokens().destructive);
-        painter.drawEllipse(rect());
-    }
-};
 
 Qt::KeyboardModifier physicalControlModifier() {
 #if defined(Q_OS_MACOS) || defined(Q_OS_MAC)
@@ -205,7 +188,6 @@ void RootWidget::resizeEvent(QResizeEvent* event) {
     }
     layoutTitleBars();
     layoutSidebarToggleButton();
-    layoutPreferenceBadge();
     if (m_previewOverlay) {
         m_previewOverlay->setGeometry(rect());
         if (m_previewOverlay->isOpen()) {
@@ -273,6 +255,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     m_previewOverlay->setGeometry(rect());
     m_previewOverlay->setBackgroundMode(settings ? settings->previewBackgroundMode()
                                                  : PreviewBackgroundMode::None);
+    m_previewOverlay->setToolTipsEnabled(settings ? settings->tierListToolTipsEnabled() : true);
     connect(m_editPage, &EditPage::imagePreviewRequested, m_previewOverlay,
             &PreviewOverlay::openPreview);
     connect(m_editPage, &EditPage::imagePreviewCloseRequested, m_previewOverlay,
@@ -280,6 +263,8 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     if (settings) {
         connect(settings, &AppSettings::previewBackgroundModeChanged, m_previewOverlay,
                 &PreviewOverlay::setBackgroundMode);
+        connect(settings, &AppSettings::tierListToolTipsEnabledChanged, m_previewOverlay,
+                &PreviewOverlay::setToolTipsEnabled);
     }
     connect(m_previewOverlay, &PreviewOverlay::opened, this, [this]() {
         if (m_windowAgent && !m_previewSystemButtonStateCaptured) {
@@ -369,9 +354,23 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
             [this]() { setSidebarCollapsed(!m_sidebarCollapsed); });
 
     if (updater) {
-        connect(updater, &AppUpdater::updateNotificationChanged, this,
-                &RootWidget::setUpdateBadgeVisible);
-        setUpdateBadgeVisible(updater->hasUpdateAvailable());
+        connect(updater, &AppUpdater::stateChanged, this,
+                [this](UpdateState) { refreshUpdateButton(); });
+        connect(updater, &AppUpdater::downloadProgress, this,
+                [this](qint64 received, qint64 total) {
+                    if (!m_updateButton) {
+                        return;
+                    }
+                    m_updateButton->setDownloadProgress(received, total);
+                    if (total > 0) {
+                        const int percent = qBound(
+                            0, qRound(100.0 * static_cast<qreal>(received) /
+                                      static_cast<qreal>(total)),
+                            100);
+                        m_updateButton->setToolTip(tr("Downloading update: %1%").arg(percent));
+                    }
+                });
+        refreshUpdateButton();
     }
 
     m_sidebarAnimation = new QVariantAnimation(this);
@@ -454,6 +453,7 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
         if (m_preferencesButton) {
             m_preferencesButton->setToolTip(tr("Preferences"));
         }
+        refreshUpdateButton();
     });
 
     m_sidebarModel->setPageEnabled(AppPage::Edit, false);
@@ -502,14 +502,29 @@ QFrame* RootWidget::createSidebar(QWidget* parent) {
     m_preferencesButton->setAutoRaise(true);
     connect(m_preferencesButton, &QToolButton::clicked, this,
             [this]() { switchToPage(AppPage::Preferences); });
-    m_sidebarLayout->addWidget(m_preferencesButton, 0, Qt::AlignLeft);
 
-    m_preferencesBadge = new StatusBadge(m_preferencesButton);
-    m_preferencesBadge->setObjectName(QStringLiteral("PreferencesUpdateBadge"));
-    m_preferencesBadge->setFixedSize(8, 8);
-    m_preferencesBadge->setAttribute(Qt::WA_TransparentForMouseEvents);
-    m_preferencesBadge->hide();
-    layoutPreferenceBadge();
+    m_updateButton = new UpdateButton(sidebar);
+    m_updateButton->setReducedMotion(m_settings && m_settings->reducedMotion());
+    connect(m_updateButton, &QToolButton::clicked, this, [this]() {
+        if (m_updater) {
+            m_updater->startUpdate();
+        }
+    });
+    if (m_settings) {
+        connect(m_settings, &AppSettings::changed, m_updateButton, [this]() {
+            if (m_updateButton && m_settings) {
+                m_updateButton->setReducedMotion(m_settings->reducedMotion());
+            }
+        });
+    }
+
+    auto* footer = new QHBoxLayout;
+    footer->setContentsMargins(0, 0, 0, 0);
+    footer->setSpacing(6);
+    footer->addWidget(m_preferencesButton);
+    footer->addWidget(m_updateButton);
+    footer->addStretch(1);
+    m_sidebarLayout->addLayout(footer);
     return sidebar;
 }
 
@@ -599,7 +614,6 @@ void RootWidget::setSidebarWidth(int width) {
     layoutSidebarSurface();
     layoutTitleBars();
     layoutSidebarToggleButton();
-    layoutPreferenceBadge();
 }
 
 void RootWidget::synchronizeInitialLayout() {
@@ -831,20 +845,32 @@ void RootWidget::layoutSidebarToggleButton() {
     updateTitleBarLeadingReservation();
 }
 
-void RootWidget::layoutPreferenceBadge() {
-    if (!m_preferencesButton || !m_preferencesBadge) {
+void RootWidget::refreshUpdateButton() {
+    if (!m_updateButton || !m_updater) {
         return;
     }
-    m_preferencesBadge->move(m_preferencesButton->width() - m_preferencesBadge->width() - 4, 5);
-    m_preferencesBadge->raise();
-}
-
-void RootWidget::setUpdateBadgeVisible(bool visible) {
-    if (!m_preferencesBadge) {
-        return;
+    const UpdateState state = m_updater->state();
+    m_updateButton->setUpdateState(state);
+    const QString version = m_updater->lastResult().latestVersion;
+    switch (state) {
+    case UpdateState::Available:
+        m_updateButton->setToolTip(
+            version.isEmpty() ? tr("Download update") : tr("Download update %1").arg(version));
+        break;
+    case UpdateState::Downloading:
+        m_updateButton->setToolTip(tr("Downloading update"));
+        break;
+    case UpdateState::Ready:
+        m_updateButton->setToolTip(
+            version.isEmpty() ? tr("Install update") : tr("Install update %1").arg(version));
+        break;
+    case UpdateState::Installing:
+        m_updateButton->setToolTip(tr("Opening update installer"));
+        break;
+    default:
+        m_updateButton->setToolTip(tr("Updates"));
+        break;
     }
-    m_preferencesBadge->setVisible(visible);
-    layoutPreferenceBadge();
 }
 
 void RootWidget::showPreferencesDialog() {

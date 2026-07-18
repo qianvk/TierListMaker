@@ -27,10 +27,6 @@ public:
     int labelWidth() const;
     static int minimumLabelWidth();
     static int outerRadius();
-    static int rowUnitsForImageCount(int imageCount, int viewportWidth);
-    static int rowUnitsForImageCount(int imageCount, int viewportWidth, int lineHeight);
-    static int rowUnitsForImageCount(int imageCount, int viewportWidth, int lineHeight,
-                                     int labelWidth);
 
     QRect labelRect(const QRect& rowRect) const;
     QVector<QRect> tileRects(const QModelIndex& index, const QRect& rowRect) const;

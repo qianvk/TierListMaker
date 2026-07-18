@@ -35,6 +35,11 @@ public:
     }
     void setBackgroundMode(PreviewBackgroundMode mode);
 
+    bool toolTipsEnabled() const {
+        return m_toolTipsEnabled;
+    }
+    void setToolTipsEnabled(bool enabled);
+
     bool isOpen() const {
         return m_open;
     }
@@ -75,6 +80,7 @@ private:
     bool m_open{false};
     bool m_closing{false};
     bool m_inputBarrierActive{false};
+    bool m_toolTipsEnabled{true};
 };
 
 } // namespace tlm

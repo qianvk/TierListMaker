@@ -5,6 +5,7 @@
 #include "logging/Logger.h"
 #include "tier/TierDragController.h"
 #include "tier/TierListDelegate.h"
+#include "tier/TierListLayout.h"
 #include "tier/TierListModel.h"
 
 #include <QAction>
@@ -1104,64 +1105,22 @@ void TierListView::refreshLayoutMetrics() {
         return;
     }
 
-    const int availableHeight = qMax(1, viewport()->height());
-    const int viewportWidth = qMax(1, viewport()->width());
     const int labelWidth =
         tierDelegate() ? tierDelegate()->labelWidth() : TierListDelegate::minimumLabelWidth();
-    auto imageCountAt = [this, model](int row) {
+    QVector<int> imageCounts;
+    imageCounts.reserve(rows);
+    for (int row = 0; row < rows; ++row) {
         if (m_imageDragActive) {
-            return previewImageCountForRow(row);
+            imageCounts.append(previewImageCountForRow(row));
+            continue;
         }
         const TierRow* tierRow = model->tierRowAt(row);
-        return tierRow ? static_cast<int>(tierRow->imageIds.size()) : 0;
-    };
-    auto distributeHeights = [rows, availableHeight](const QVector<int>& units) {
-        int totalUnits = 0;
-        for (int unit : units) {
-            totalUnits += qMax(1, unit);
-        }
-
-        const int baseUnitHeight = qMax(1, availableHeight / qMax(1, totalUnits));
-        int remainingPixels = availableHeight - baseUnitHeight * totalUnits;
-        QVector<int> heights;
-        heights.reserve(rows);
-        for (int row = 0; row < rows; ++row) {
-            const int unit = qMax(1, units.at(row));
-            const int extra = qBound(0, remainingPixels, unit);
-            heights.append(unit * baseUnitHeight + extra);
-            remainingPixels -= extra;
-        }
-        return heights;
-    };
-
-    QVector<int> rowUnits;
-    rowUnits.reserve(rows);
-    for (int row = 0; row < rows; ++row) {
-        rowUnits.append(TierListDelegate::rowUnitsForImageCount(
-            imageCountAt(row), viewportWidth, kInitialLayoutLineHeight, labelWidth));
+        imageCounts.append(tierRow ? static_cast<int>(tierRow->imageIds.size()) : 0);
     }
 
-    QVector<int> rowHeights;
-    for (int pass = 0; pass < 10; ++pass) {
-        rowHeights = distributeHeights(rowUnits);
-        QVector<int> nextUnits;
-        nextUnits.reserve(rows);
-        bool changed = false;
-        for (int row = 0; row < rows; ++row) {
-            const int lineHeight = qMax(1, rowHeights.at(row) / qMax(1, rowUnits.at(row)));
-            const int units = TierListDelegate::rowUnitsForImageCount(
-                imageCountAt(row), viewportWidth, lineHeight, labelWidth);
-            nextUnits.append(units);
-            changed = changed || units != rowUnits.at(row);
-        }
-        rowUnits = std::move(nextUnits);
-        if (!changed) {
-            break;
-        }
-    }
-    rowHeights = distributeHeights(rowUnits);
-
-    model->setLayoutMetrics(std::move(rowHeights), std::move(rowUnits));
+    TierBoardLayoutMetrics metrics = TierListLayout::fitBoard(
+        imageCounts, viewport()->size(), labelWidth);
+    model->setLayoutMetrics(std::move(metrics.rowHeights), std::move(metrics.rowUnits));
     doItemsLayout();
     invalidateMissionControlLayout();
     viewport()->update();

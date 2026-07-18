@@ -14,7 +14,6 @@ class QResizeEvent;
 class QShowEvent;
 class QSplitter;
 class QStackedWidget;
-class QLabel;
 class QToolButton;
 class QVBoxLayout;
 class QVariantAnimation;
@@ -39,6 +38,7 @@ class SidebarView;
 class ThemeManager;
 class ThumbnailCache;
 class AppUpdater;
+class UpdateButton;
 
 /** Root content widget registered with QWindowKit and responsible for page routing. */
 class RootWidget : public QWidget {
@@ -84,9 +84,8 @@ private:
     void layoutSidebarSurface();
     void layoutTitleBars();
     void layoutSidebarToggleButton();
-    void layoutPreferenceBadge();
     void updateTitleBarLeadingReservation();
-    void setUpdateBadgeVisible(bool visible);
+    void refreshUpdateButton();
     int minimumSidebarToggleX() const;
     void setTierFocusMode(bool enabled);
     void showPreferencesDialog();
@@ -108,7 +107,7 @@ private:
     QToolButton* m_newProjectButton{nullptr};
     SidebarToggleButton* m_sidebarToggleButton{nullptr};
     QToolButton* m_preferencesButton{nullptr};
-    QLabel* m_preferencesBadge{nullptr};
+    UpdateButton* m_updateButton{nullptr};
     QVariantAnimation* m_sidebarAnimation{nullptr};
     QStackedWidget* m_pages{nullptr};
     EditPage* m_editPage{nullptr};

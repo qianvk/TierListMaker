@@ -68,6 +68,7 @@ PreviewOverlay::PreviewOverlay(QWidget* parent)
     setCursor(Qt::ArrowCursor);
     setToolTip(tr("Click outside to close. Double-click image to close."));
     setProperty("tlmToolTipProvider", QVariant::fromValue(static_cast<QObject*>(this)));
+    setProperty("tlmToolTipsEnabled", true);
 
     m_animationGroup->addAnimation(m_geometryAnimation);
     m_animationGroup->addAnimation(m_backdropAnimation);
@@ -119,7 +120,19 @@ void PreviewOverlay::setBackgroundMode(PreviewBackgroundMode mode) {
                      .arg(backgroundModeName(mode).toString()));
 }
 
+void PreviewOverlay::setToolTipsEnabled(bool enabled) {
+    if (m_toolTipsEnabled == enabled) {
+        return;
+    }
+    m_toolTipsEnabled = enabled;
+    setProperty("tlmToolTipsEnabled", enabled);
+    setToolTip(enabled ? tr("Click outside to close. Double-click image to close.") : QString());
+}
+
 QString PreviewOverlay::toolTipTextAt(QPoint position) const {
+    if (!m_toolTipsEnabled) {
+        return {};
+    }
     return m_previewGeometry.contains(position) ? tr("Double-click image to close")
                                                 : tr("Click to close preview");
 }
@@ -266,6 +279,10 @@ void PreviewOverlay::mousePressEvent(QMouseEvent* event) {
 }
 
 void PreviewOverlay::mouseMoveEvent(QMouseEvent* event) {
+    if (!m_toolTipsEnabled) {
+        QWidget::mouseMoveEvent(event);
+        return;
+    }
     const QString hint = toolTipTextAt(event->pos());
     if (toolTip() != hint) {
         setToolTip(hint);

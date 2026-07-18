@@ -52,7 +52,7 @@ ctest --test-dir build/default --output-on-failure
 ## Runtime Requirements
 
 - Qt 6 Core, Gui, Widgets, Svg, Network, and Concurrent modules.
-- QWindowKit (`dev` branch commit) and VkUI from `third_party/`.
+- QWindowKit 1.5.1 and VkUI 0.1.0, pinned as submodules under `third_party/`.
 - A desktop platform supported by Qt 6.
 
 ## Third-Party Dependencies

@@ -34,7 +34,7 @@
 #include <vkui/widgets/controls/VkSwitch.h>
 
 #ifndef TLM_APP_VERSION
-#define TLM_APP_VERSION "0.1.0"
+#define TLM_APP_VERSION "0.2.0-beta.1"
 #endif
 
 #ifndef TLM_GIT_COMMIT
@@ -239,8 +239,32 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
         connect(m_updater, &AppUpdater::noUpdateAvailable, this,
                 &PreferencesPage::applyUpdateResult);
         connect(m_updater, &AppUpdater::checkFailed, this, &PreferencesPage::applyUpdateFailure);
+        connect(m_updater, &AppUpdater::updateFailed, this, &PreferencesPage::applyUpdateFailure);
         connect(m_updater, &AppUpdater::updateNotificationChanged, this,
                 &PreferencesPage::setUpdateNotificationVisible);
+        connect(m_updater, &AppUpdater::stateChanged, this,
+                [this](UpdateState) { refreshUpdateActions(); });
+        connect(m_updater, &AppUpdater::downloadProgress, this,
+                [this](qint64 received, qint64 total) {
+                    if (m_updateStatusLabel && total > 0) {
+                        const int percent = qBound(
+                            0, qRound(100.0 * static_cast<qreal>(received) /
+                                      static_cast<qreal>(total)),
+                            100);
+                        m_updateStatusLabel->setText(
+                            tr("Downloading update %1: %2%")
+                                .arg(m_updater ? m_updater->lastResult().latestVersion : QString())
+                                .arg(percent));
+                    }
+                });
+        connect(m_updater, &AppUpdater::updateReady, this, [this](const QString&) {
+            if (m_updateStatusLabel && m_updater) {
+                m_updateStatusLabel->setText(
+                    tr("Update %1 is ready to install.")
+                        .arg(m_updater->lastResult().latestVersion));
+            }
+            refreshUpdateActions();
+        });
         setUpdateNotificationVisible(m_updater->hasUpdateAvailable());
     }
     if (m_languageManager) {
@@ -297,6 +321,7 @@ void PreferencesPage::rebuildPreferencePages() {
     }
     m_updateStatusLabel = nullptr;
     m_checkUpdateButton = nullptr;
+    m_installUpdateButton = nullptr;
     m_openUpdateButton = nullptr;
     m_stack->addWidget(createGeneralPage());
     m_stack->addWidget(createUpdatePage());
@@ -331,6 +356,28 @@ void PreferencesPage::refreshPreferenceControlStyles() {
     update();
 }
 
+void PreferencesPage::refreshUpdateActions() {
+    const UpdateState state = m_updater ? m_updater->state() : UpdateState::Idle;
+    if (m_checkUpdateButton) {
+        m_checkUpdateButton->setEnabled(state != UpdateState::Checking &&
+                                        state != UpdateState::Downloading &&
+                                        state != UpdateState::Installing);
+    }
+    if (m_installUpdateButton) {
+        const bool ready = state == UpdateState::Ready;
+        const bool available = state == UpdateState::Available;
+        m_installUpdateButton->setVisible(m_updater && m_updater->hasUpdateAvailable());
+        m_installUpdateButton->setEnabled(ready || available);
+        m_installUpdateButton->setText(ready ? tr("Install Update") : tr("Download Update"));
+        m_installUpdateButton->setIcon(vkui::icon(
+            ready ? vkui::VkSymbol::Checkmark : vkui::VkSymbol::Download,
+            vkui::VkIconRole::Accent));
+    }
+    if (m_openUpdateButton) {
+        m_openUpdateButton->setEnabled(m_updater && m_updater->hasUpdateAvailable());
+    }
+}
+
 void PreferencesPage::applyUpdateResult(const UpdateCheckResult& result) {
     m_lastUpdateResult = result;
     setUpdateNotificationVisible(result.updateAvailable);
@@ -347,12 +394,7 @@ void PreferencesPage::applyUpdateResult(const UpdateCheckResult& result) {
                 tr("TierListMaker is up to date. Current version: %1").arg(result.currentVersion));
         }
     }
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setEnabled(true);
-    }
-    if (m_openUpdateButton) {
-        m_openUpdateButton->setEnabled(result.updateAvailable);
-    }
+    refreshUpdateActions();
 }
 
 void PreferencesPage::applyUpdateFailure(const QString& reason) {
@@ -361,12 +403,7 @@ void PreferencesPage::applyUpdateFailure(const QString& reason) {
             tr("Update check failed: %1\nThe project may not have published update metadata yet.")
                 .arg(reason));
     }
-    if (m_checkUpdateButton) {
-        m_checkUpdateButton->setEnabled(true);
-    }
-    if (m_openUpdateButton) {
-        m_openUpdateButton->setEnabled(true);
-    }
+    refreshUpdateActions();
 }
 
 QWidget* PreferencesPage::createGeneralPage() {
@@ -382,8 +419,8 @@ QWidget* PreferencesPage::createGeneralPage() {
 
     auto* language = new QComboBox(page);
     language->addItem(tr("System"), QStringLiteral("system"));
-    language->addItem(tr("English"), QStringLiteral("en"));
-    language->addItem(tr("Simplified Chinese"), QStringLiteral("zh_CN"));
+    language->addItem(QStringLiteral("English"), QStringLiteral("en"));
+    language->addItem(QStringLiteral("简体中文"), QStringLiteral("zh_CN"));
     language->setCurrentIndex(qMax(0, language->findData(m_settings->language())));
     connect(language, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             [this, language](int index) {
@@ -489,6 +526,8 @@ QWidget* PreferencesPage::createGeneralPage() {
     projectFolderLabel->setMinimumWidth(120);
     auto* chooseProjectFolder =
         new QPushButton(vkui::icon(vkui::VkSymbol::Folder), tr("Choose"), projectFolderRow);
+    chooseProjectFolder->setAutoDefault(false);
+    chooseProjectFolder->setDefault(false);
     projectFolderHeader->addWidget(projectFolderLabel);
     projectFolderHeader->addStretch(1);
     projectFolderHeader->addWidget(chooseProjectFolder);
@@ -565,10 +604,13 @@ QWidget* PreferencesPage::createUpdatePage() {
     auto* actions = new QHBoxLayout;
     m_checkUpdateButton =
         new QPushButton(vkui::icon(vkui::VkSymbol::Download), tr("Check Now"), page);
+    m_installUpdateButton =
+        new QPushButton(vkui::icon(vkui::VkSymbol::Download, vkui::VkIconRole::Accent),
+                        tr("Download Update"), page);
     m_openUpdateButton =
         new QPushButton(vkui::icon(vkui::VkSymbol::Share), tr("Open Release Page"), page);
-    m_openUpdateButton->setEnabled(m_updater && m_updater->hasUpdateAvailable());
     actions->addWidget(m_checkUpdateButton);
+    actions->addWidget(m_installUpdateButton);
     actions->addWidget(m_openUpdateButton);
     actions->addStretch();
     layout->addLayout(actions);
@@ -576,6 +618,11 @@ QWidget* PreferencesPage::createUpdatePage() {
     connect(m_checkUpdateButton, &QPushButton::clicked, this, [this]() {
         if (m_updater) {
             m_updater->checkForUpdates();
+        }
+    });
+    connect(m_installUpdateButton, &QPushButton::clicked, this, [this]() {
+        if (m_updater) {
+            m_updater->startUpdate();
         }
     });
     connect(m_openUpdateButton, &QPushButton::clicked, this, [this]() {
@@ -587,6 +634,7 @@ QWidget* PreferencesPage::createUpdatePage() {
     if (m_updater && m_updater->lastResult().latestVersion.size() > 0) {
         applyUpdateResult(m_updater->lastResult());
     }
+    refreshUpdateActions();
 
     layout->addStretch();
     return page;
@@ -600,8 +648,8 @@ QWidget* PreferencesPage::createAboutPage() {
     layout->setSpacing(12);
     layout->addWidget(new SectionHeader(tr("About"), page));
     auto* text =
-        new QLabel(tr("TierListMaker\nVersion: %1\nLicense: MIT\nQt: %2\nQWindowKit (dev) and "
-                      "VkUI: linked dependencies\nBuild: %3\nGit: "
+        new QLabel(tr("TierListMaker\nVersion: %1\nLicense: MIT\nQt: %2\nQWindowKit: 1.5.1\n"
+                      "VkUI: 0.1.0\nBuild: %3\nGit: "
                       "%4\nPlatform: %5\nCopyright: 2026 TierListMaker "
                       "contributors\n\nLinks:\nhttps://github.com/"
                       "qianvk/TierListMaker")

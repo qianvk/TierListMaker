@@ -47,7 +47,7 @@ qreal relativeLuminance(const QColor& color) {
 class TextOnlyToolTipLabel final : public QLabel {
 public:
     explicit TextOnlyToolTipLabel(QWidget* parent = nullptr)
-        : QLabel(parent, Qt::Tool | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus |
+        : QLabel(parent, Qt::ToolTip | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus |
                              Qt::NoDropShadowWindowHint) {
         setAttribute(Qt::WA_TranslucentBackground);
         setAttribute(Qt::WA_ShowWithoutActivating);
@@ -166,8 +166,13 @@ protected:
 
 private:
     void showTip(const QString& text, const QPoint& globalPos, QWidget* owner) {
-        if (!m_tip) {
-            m_tip = new TextOnlyToolTipLabel();
+        QWidget* ownerWindow = owner ? owner->window() : nullptr;
+        if (!m_tip || m_tipOwnerWindow != ownerWindow) {
+            delete m_tip.data();
+            // A tooltip must be transient to the window that owns its content. This is
+            // particularly important for application-modal dialogs on macOS.
+            m_tip = new TextOnlyToolTipLabel(ownerWindow);
+            m_tipOwnerWindow = ownerWindow;
             m_tip->setFont(QToolTip::font());
         }
 
@@ -198,6 +203,7 @@ private:
     }
 
     QPointer<TextOnlyToolTipLabel> m_tip;
+    QPointer<QWidget> m_tipOwnerWindow;
     QPointer<QWidget> m_owner;
 };
 } // namespace
@@ -220,11 +226,14 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv) {
     m_assetManager = std::make_unique<AssetManager>();
     m_thumbnailCache = std::make_unique<ThumbnailCache>();
     m_updater = std::make_unique<AppUpdater>();
-    connect(m_updater.get(), &AppUpdater::checkingStarted, this, [this](const QUrl&) {
+    const auto recordSuccessfulUpdateCheck = [this](const UpdateCheckResult&) {
         if (m_settings) {
             m_settings->setLastUpdateCheckAt(QDateTime::currentDateTimeUtc());
         }
-    });
+    };
+    connect(m_updater.get(), &AppUpdater::updateAvailable, this, recordSuccessfulUpdateCheck);
+    connect(m_updater.get(), &AppUpdater::noUpdateAvailable, this,
+            recordSuccessfulUpdateCheck);
 }
 
 Application::~Application() = default;

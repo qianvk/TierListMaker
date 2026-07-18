@@ -24,7 +24,7 @@ if(NOT EXISTS "${TLM_VKUI_DIR}/CMakeLists.txt")
 endif()
 
 # Embed both UI dependencies statically so platform installers only need to deploy Qt runtime
-# libraries. QWindowKit is pinned by the parent repository to its dev branch commit.
+# libraries. Both dependencies are pinned to release commits by the parent repository.
 set(QWINDOWKIT_BUILD_STATIC ON CACHE BOOL "Build QWindowKit statically" FORCE)
 set(QWINDOWKIT_BUILD_WIDGETS ON CACHE BOOL "Build QWindowKit Widgets" FORCE)
 set(QWINDOWKIT_BUILD_QUICK OFF CACHE BOOL "Build QWindowKit Quick" FORCE)

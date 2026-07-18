@@ -141,6 +141,36 @@ jobs:
           -G ${{ matrix.cpack_generator }}
           -B dist
 
+      - name: Audit Windows runtime payload
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --install build/package --prefix "${{ github.workspace }}/runtime-audit"
+          $forbidden = @(
+            'd3dcompiler_47.dll',
+            'dxcompiler.dll',
+            'dxil.dll',
+            'opengl32sw.dll',
+            'vc_redist.x64.exe'
+          )
+          $unexpected = Get-ChildItem runtime-audit -Recurse -File |
+            Where-Object { $forbidden -contains $_.Name.ToLowerInvariant() }
+          if ($unexpected) {
+            throw "Forbidden deployment dependencies: $($unexpected.Name -join ', ')"
+          }
+          $required = @(
+            'msvcp140.dll',
+            'msvcp140_1.dll',
+            'msvcp140_2.dll',
+            'vcruntime140.dll',
+            'vcruntime140_1.dll'
+          )
+          foreach ($name in $required) {
+            if (-not (Test-Path "runtime-audit/bin/$name")) {
+              throw "Missing required MSVC runtime: $name"
+            }
+          }
+
       - name: Sign Windows installer
         if: runner.os == 'Windows' && env.HAS_WINDOWS_CERTIFICATE == 'true'
         shell: pwsh
@@ -222,15 +252,77 @@ jobs:
           path: release-assets
           merge-multiple: true
 
+      - name: Generate update manifest
+        shell: bash
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          channel="stable"
+          if [[ "${version}" == *-* ]]; then
+            channel="beta"
+          fi
+          windows_path="$(find release-assets -maxdepth 1 -name '*-Windows-*.exe' -print -quit)"
+          macos_path="$(find release-assets -maxdepth 1 -name '*-Darwin-*.dmg' -print -quit)"
+          test -n "${windows_path}" && test -n "${macos_path}"
+
+          windows_name="$(basename "${windows_path}")"
+          macos_name="$(basename "${macos_path}")"
+          windows_sha="$(shasum -a 256 "${windows_path}" | cut -d ' ' -f 1)"
+          macos_sha="$(shasum -a 256 "${macos_path}" | cut -d ' ' -f 1)"
+          windows_size="$(stat -f '%z' "${windows_path}")"
+          macos_size="$(stat -f '%z' "${macos_path}")"
+          release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
+          asset_root="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
+
+          jq -n \
+            --arg channel "${channel}" \
+            --arg version "${version}" \
+            --arg release_url "${release_url}" \
+            --arg asset_root "${asset_root}" \
+            --arg windows_name "${windows_name}" \
+            --arg windows_sha "${windows_sha}" \
+            --argjson windows_size "${windows_size}" \
+            --arg macos_name "${macos_name}" \
+            --arg macos_sha "${macos_sha}" \
+            --argjson macos_size "${macos_size}" \
+            '{
+              "schema-version": 1,
+              channel: $channel,
+              updates: {
+                windows: {
+                  "latest-version": $version,
+                  "download-url": ($asset_root + "/" + $windows_name),
+                  "release-url": $release_url,
+                  "file-name": $windows_name,
+                  sha256: $windows_sha,
+                  size: $windows_size
+                },
+                macos: {
+                  "latest-version": $version,
+                  "download-url": ($asset_root + "/" + $macos_name),
+                  "release-url": $release_url,
+                  "file-name": $macos_name,
+                  sha256: $macos_sha,
+                  size: $macos_size
+                }
+              }
+            }' > release-assets/updates.json
+
       - name: Publish release assets
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          release_flags=()
+          if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then
+            release_flags+=(--prerelease)
+          fi
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" release-assets/* --clobber
+            gh release edit "${GITHUB_REF_NAME}" "${release_flags[@]}" \
+              --title "TierListMaker ${GITHUB_REF_NAME}"
           else
             gh release create "${GITHUB_REF_NAME}" release-assets/* \
               --verify-tag \
               --generate-notes \
+              "${release_flags[@]}" \
               --title "TierListMaker ${GITHUB_REF_NAME}"
