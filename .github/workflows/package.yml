@@ -59,7 +59,7 @@ jobs:
           if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             version="${GITHUB_REF_NAME#v}"
           else
-            version="0.1.0-dev.${GITHUB_RUN_NUMBER}"
+            version="0.2.0-dev.${GITHUB_RUN_NUMBER}"
           fi
           echo "TLM_PACKAGE_VERSION=${version}" >> "${GITHUB_ENV}"
 
@@ -106,17 +106,19 @@ jobs:
           if [[ "${RUNNER_OS}" == "macOS" && "${HAS_MACOS_CERTIFICATE}" == "true" ]]; then
             signing_identity="${MACOS_SIGNING_IDENTITY}"
           fi
-          cmake -S . -B build/package -G Ninja \
+          # Let CMake select the platform-native generator. In particular, forcing
+          # Ninja on Windows can pair MinGW from PATH with the MSVC Qt package.
+          cmake -S . -B build/package \
             -DCMAKE_BUILD_TYPE=Release \
             -DTLM_BUILD_TESTS=ON \
             "-DTLM_PACKAGE_VERSION=${TLM_PACKAGE_VERSION}" \
             "-DTLM_MACOS_CODESIGN_IDENTITY=${signing_identity}"
 
       - name: Build
-        run: cmake --build build/package --parallel
+        run: cmake --build build/package --config Release --parallel
 
       - name: Test
-        run: ctest --test-dir build/package --output-on-failure
+        run: ctest --test-dir build/package --output-on-failure -C Release
 
       - name: Sign Windows application
         if: runner.os == 'Windows' && env.HAS_WINDOWS_CERTIFICATE == 'true'
@@ -132,12 +134,13 @@ jobs:
             /tr https://timestamp.digicert.com `
             /f $env:WINDOWS_CERTIFICATE_PATH `
             /p $env:WINDOWS_CERTIFICATE_PASSWORD `
-            build/package/TierListMaker.exe
+            build/package/Release/TierListMaker.exe
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Package
         run: >-
           cpack --config build/package/CPackConfig.cmake
+          -C Release
           -G ${{ matrix.cpack_generator }}
           -B dist
 
@@ -145,7 +148,8 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          cmake --install build/package --prefix "${{ github.workspace }}/runtime-audit"
+          cmake --install build/package --config Release `
+            --prefix "${{ github.workspace }}/runtime-audit"
           $forbidden = @(
             'd3dcompiler_47.dll',
             'dxcompiler.dll',
