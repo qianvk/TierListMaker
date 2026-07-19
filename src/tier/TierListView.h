@@ -1,5 +1,6 @@
 #pragma once
 
+#include "assets/CoverImageCache.h"
 #include "settings/AppSettings.h"
 
 #include <QHash>
@@ -169,9 +170,9 @@ private:
     QRect missionImageRect(const QString& imageId) const;
     void paintMissionControl(QPainter* painter);
     QHash<QString, QRectF> normalImageRects() const;
-    QRectF interpolatedMissionRect(const QString& imageId, const QRectF& targetRect) const;
+    QRectF interpolatedMissionRect(const MissionTile& tile) const;
     QVector<MissionTile> missionDisplayTiles() const;
-    QPixmap missionPixmapForImage(const QString& imageId, QSize targetPixelSize, bool fullQuality);
+    QPixmap missionPixmapForImage(const QString& imageId, QSize targetPixelSize);
     int rowDropIndexForPosition(const QPoint& point, const QString& rowId) const;
     QModelIndex imageDropIndexForPosition(const QPoint& point) const;
     QRect animatedVisualRect(const QModelIndex& index) const;
@@ -180,7 +181,6 @@ private:
     bool acceptsTierDrag(const QMimeData* mimeData) const;
     void paintCanvasBackground(QPainter* painter);
     QString resolvedCanvasBackgroundPath() const;
-    QPixmap canvasBackgroundPixmap(const QString& path);
 
     PressKind m_pressKind{PressKind::None};
     QPoint m_pressPosition;
@@ -214,8 +214,8 @@ private:
     QVariantAnimation* m_imagePlaceholderAnimation{nullptr};
     bool m_imageDragSynchronousFeedback{false};
 
-    QString m_canvasBackgroundCachePath;
-    QPixmap m_canvasBackgroundCache;
+    CoverImageCache m_canvasBackgroundCache;
+    QPixmap m_defaultBackgroundIcon;
     bool m_missionControlActive{false};
     bool m_missionFromGallery{false};
     QString m_missionTierRowId;

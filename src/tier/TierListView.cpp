@@ -47,7 +47,6 @@ namespace {
 constexpr int kRowReorderAnimationMs = 190;
 constexpr int kImageReorderAnimationMs = 145;
 constexpr int kInitialLayoutLineHeight = 84;
-constexpr int kMissionLayoutSearchSteps = 34;
 constexpr int kMissionTransitionMs = 320;
 constexpr int kMissionHoverMs = 220;
 constexpr auto kDefaultBackgroundIconPath = ":/images/app-icon.png";
@@ -119,25 +118,7 @@ QPainterPath placeholderClipPath(const QRectF& rect, bool firstRow, bool lastRow
 struct MissionInput {
     QString imageId;
     QSize sourceSize;
-    QSizeF preferredSize;
-    qreal aspect{1.0};
-    int sourceOrder{0};
 };
-
-struct MissionPlacement {
-    int inputIndex{-1};
-    QRectF imageRect;
-};
-
-bool rectContainsRect(const QRectF& outer, const QRectF& inner) {
-    constexpr qreal kEpsilon = 0.25;
-    const qreal outerRight = outer.left() + outer.width();
-    const qreal outerBottom = outer.top() + outer.height();
-    const qreal innerRight = inner.left() + inner.width();
-    const qreal innerBottom = inner.top() + inner.height();
-    return outer.left() <= inner.left() + kEpsilon && outer.top() <= inner.top() + kEpsilon &&
-           outerRight + kEpsilon >= innerRight && outerBottom + kEpsilon >= innerBottom;
-}
 
 QRect centeredPixmapCropRect(const QPixmap& pixmap, const QSize& targetSize) {
     if (pixmap.isNull() || targetSize.isEmpty()) {
@@ -183,6 +164,20 @@ QSizeF missionSizeForLongSide(qreal aspect, qreal longSide) {
         return QSizeF(longSide, longSide / aspect);
     }
     return QSizeF(longSide * aspect, longSide);
+}
+
+QRectF missionAspectFitRect(const QRectF& bounds, qreal aspect) {
+    if (!bounds.isValid() || bounds.isEmpty() || aspect <= 0.0) {
+        return bounds;
+    }
+
+    QSizeF size;
+    if (bounds.width() / bounds.height() > aspect) {
+        size = QSizeF(bounds.height() * aspect, bounds.height());
+    } else {
+        size = QSizeF(bounds.width(), bounds.width() / aspect);
+    }
+    return QRectF(bounds.center() - QPointF(size.width() / 2.0, size.height() / 2.0), size);
 }
 
 qreal missionLayoutMarginForSize(const QSizeF& viewportSize) {
@@ -596,194 +591,6 @@ missionTilesWithHoverExpansion(QVector<TierListView::MissionTile> tiles, int hov
     return tiles;
 }
 
-class MissionMaxRectsPacker {
-public:
-    explicit MissionMaxRectsPacker(const QRectF& bounds)
-        : m_bounds(bounds), m_center(bounds.center()) {
-        m_freeRects.append(bounds);
-    }
-
-    QRectF insert(const QSizeF& size) {
-        constexpr qreal kEpsilon = 0.25;
-        int bestIndex = -1;
-        QRectF bestRect;
-        qreal bestCenterScore = std::numeric_limits<qreal>::max();
-        qreal bestShortScore = std::numeric_limits<qreal>::max();
-        qreal bestAreaScore = std::numeric_limits<qreal>::max();
-
-        for (int i = 0; i < m_freeRects.size(); ++i) {
-            const QRectF freeRect = m_freeRects.at(i);
-            if (size.width() > freeRect.width() || size.height() > freeRect.height()) {
-                continue;
-            }
-
-            // Place each candidate as close to the board center as that free rectangle allows.
-            const qreal x = missionClamp(freeRect.left(), m_center.x() - size.width() / 2.0,
-                                         freeRect.left() + freeRect.width() - size.width());
-            const qreal y = missionClamp(freeRect.top(), m_center.y() - size.height() / 2.0,
-                                         freeRect.top() + freeRect.height() - size.height());
-            const QRectF candidate(x, y, size.width(), size.height());
-            const QPointF delta = candidate.center() - m_center;
-            const qreal centerScore = delta.x() * delta.x() + delta.y() * delta.y();
-            const qreal shortScore =
-                qMin(freeRect.width() - size.width(), freeRect.height() - size.height());
-            const qreal areaScore =
-                freeRect.width() * freeRect.height() - size.width() * size.height();
-
-            if (centerScore < bestCenterScore - kEpsilon ||
-                (qAbs(centerScore - bestCenterScore) <= kEpsilon &&
-                 (shortScore < bestShortScore - kEpsilon ||
-                  (qAbs(shortScore - bestShortScore) <= kEpsilon && areaScore < bestAreaScore)))) {
-                bestIndex = i;
-                bestRect = candidate;
-                bestCenterScore = centerScore;
-                bestShortScore = shortScore;
-                bestAreaScore = areaScore;
-            }
-        }
-
-        if (bestIndex < 0) {
-            return {};
-        }
-
-        splitFreeRects(bestRect);
-        pruneFreeRects();
-        return bestRect;
-    }
-
-private:
-    void splitFreeRects(const QRectF& usedRect) {
-        QVector<QRectF> nextFreeRects;
-        nextFreeRects.reserve(m_freeRects.size() * 2);
-
-        for (const QRectF& freeRect : std::as_const(m_freeRects)) {
-            if (!freeRect.intersects(usedRect)) {
-                nextFreeRects.append(freeRect);
-                continue;
-            }
-
-            const QRectF intersection = freeRect.intersected(usedRect);
-            if (!intersection.isValid() || intersection.isEmpty()) {
-                nextFreeRects.append(freeRect);
-                continue;
-            }
-
-            const qreal freeRight = freeRect.left() + freeRect.width();
-            const qreal freeBottom = freeRect.top() + freeRect.height();
-            const qreal usedRight = usedRect.left() + usedRect.width();
-            const qreal usedBottom = usedRect.top() + usedRect.height();
-
-            // Split around an arbitrary centered placement, then prune contained free rects.
-            appendFreeRect(nextFreeRects,
-                           QRectF(freeRect.left(), freeRect.top(),
-                                  usedRect.left() - freeRect.left(), freeRect.height()));
-            appendFreeRect(nextFreeRects, QRectF(usedRight, freeRect.top(), freeRight - usedRight,
-                                                 freeRect.height()));
-            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), freeRect.top(), freeRect.width(),
-                                                 usedRect.top() - freeRect.top()));
-            appendFreeRect(nextFreeRects, QRectF(freeRect.left(), usedBottom, freeRect.width(),
-                                                 freeBottom - usedBottom));
-        }
-
-        m_freeRects = std::move(nextFreeRects);
-    }
-
-    void appendFreeRect(QVector<QRectF>& rects, const QRectF& rect) const {
-        if (rect.width() < 1.0 || rect.height() < 1.0) {
-            return;
-        }
-        const QRectF clipped = rect.intersected(m_bounds);
-        if (clipped.width() >= 1.0 && clipped.height() >= 1.0) {
-            rects.append(clipped);
-        }
-    }
-
-    void pruneFreeRects() {
-        QVector<QRectF> pruned;
-        pruned.reserve(m_freeRects.size());
-        for (int i = 0; i < m_freeRects.size(); ++i) {
-            bool contained = false;
-            for (int j = 0; j < m_freeRects.size(); ++j) {
-                if (i != j && rectContainsRect(m_freeRects.at(j), m_freeRects.at(i))) {
-                    contained = true;
-                    break;
-                }
-            }
-            if (!contained) {
-                pruned.append(m_freeRects.at(i));
-            }
-        }
-        m_freeRects = std::move(pruned);
-    }
-
-    QRectF m_bounds;
-    QPointF m_center;
-    QVector<QRectF> m_freeRects;
-};
-
-QVector<MissionPlacement> packMissionTilesAtScale(const QVector<MissionInput>& items,
-                                                  const QRectF& bounds, qreal gap, qreal scale) {
-    QVector<int> order;
-    order.reserve(items.size());
-    for (int i = 0; i < items.size(); ++i) {
-        order.append(i);
-    }
-    std::stable_sort(order.begin(), order.end(), [&items](int left, int right) {
-        const QSizeF leftSize = items.at(left).preferredSize;
-        const QSizeF rightSize = items.at(right).preferredSize;
-        const qreal leftArea = leftSize.width() * leftSize.height();
-        const qreal rightArea = rightSize.width() * rightSize.height();
-        if (!qFuzzyCompare(leftArea + 1.0, rightArea + 1.0)) {
-            return leftArea > rightArea;
-        }
-        return items.at(left).sourceOrder < items.at(right).sourceOrder;
-    });
-
-    MissionMaxRectsPacker packer(bounds);
-    QVector<MissionPlacement> placements;
-    placements.reserve(items.size());
-    const qreal padding = qMax<qreal>(0.0, gap);
-    for (int inputIndex : std::as_const(order)) {
-        const MissionInput& item = items.at(inputIndex);
-        const QSizeF imageSize(qMax<qreal>(1.0, item.preferredSize.width() * scale),
-                               qMax<qreal>(1.0, item.preferredSize.height() * scale));
-        const QSizeF paddedSize(imageSize.width() + padding, imageSize.height() + padding);
-        if (paddedSize.width() > bounds.width() || paddedSize.height() > bounds.height()) {
-            return {};
-        }
-
-        const QRectF paddedRect = packer.insert(paddedSize);
-        if (!paddedRect.isValid() || paddedRect.isEmpty()) {
-            return {};
-        }
-        placements.append(MissionPlacement{
-            inputIndex,
-            paddedRect.adjusted(padding / 2.0, padding / 2.0, -padding / 2.0, -padding / 2.0),
-        });
-    }
-    return placements;
-}
-
-void centerMissionPlacements(QVector<MissionPlacement>& placements, const QRectF& bounds) {
-    if (placements.isEmpty()) {
-        return;
-    }
-
-    QRectF groupRect = placements.first().imageRect;
-    for (const MissionPlacement& placement : std::as_const(placements)) {
-        groupRect = groupRect.united(placement.imageRect);
-    }
-
-    QPointF delta = bounds.center() - groupRect.center();
-    const qreal maxDx = bounds.left() + bounds.width() - (groupRect.left() + groupRect.width());
-    const qreal maxDy = bounds.top() + bounds.height() - (groupRect.top() + groupRect.height());
-    delta.setX(missionClamp(bounds.left() - groupRect.left(), delta.x(), maxDx));
-    delta.setY(missionClamp(bounds.top() - groupRect.top(), delta.y(), maxDy));
-    for (MissionPlacement& placement : placements) {
-        placement.imageRect.translate(delta);
-    }
-}
-
 QVector<TierListView::MissionTile> layoutMissionTiles(const QVector<MissionInput>& items,
                                                       const QRectF& bounds, qreal gap) {
     QVector<TierListView::MissionTile> tiles;
@@ -792,73 +599,49 @@ QVector<TierListView::MissionTile> layoutMissionTiles(const QVector<MissionInput
         return tiles;
     }
 
-    const qreal boundsArea = qMax<qreal>(1.0, bounds.width() * bounds.height());
-    qreal preferredArea = 0.0;
+    QVector<QSizeF> sourceSizes;
+    sourceSizes.reserve(items.size());
     for (const MissionInput& item : items) {
-        preferredArea += item.preferredSize.width() * item.preferredSize.height();
-    }
-    const qreal packingGap = qMax<qreal>(0.0, gap);
-    const qreal fillTarget = items.size() <= 2 ? 0.54 : 0.84;
-    const qreal areaDrivenScale =
-        std::sqrt((boundsArea * fillTarget) / qMax<qreal>(1.0, preferredArea));
-    const qreal highLimit = qBound<qreal>(0.08, areaDrivenScale, 2.35);
-
-    QVector<MissionPlacement> bestPlacements;
-    qreal low = 0.02;
-    qreal high = highLimit;
-    for (int step = 0; step < kMissionLayoutSearchSteps; ++step) {
-        const qreal mid = (low + high) / 2.0;
-        QVector<MissionPlacement> placements =
-            packMissionTilesAtScale(items, bounds, packingGap, mid);
-        if (placements.size() == items.size()) {
-            bestPlacements = std::move(placements);
-            low = mid;
-        } else {
-            high = mid;
-        }
+        sourceSizes.append(QSizeF(item.sourceSize));
     }
 
-    if (bestPlacements.isEmpty()) {
-        bestPlacements = packMissionTilesAtScale(items, bounds, 0.0, 0.02);
-    }
-    if (bestPlacements.size() != items.size()) {
+    const MissionControlLayoutMetrics layout =
+        TierListLayout::fitMissionControl(sourceSizes, bounds, gap);
+    if (layout.itemRects.size() != items.size()) {
         Logger::warn(
             QStringLiteral("tier.list.mission.pack.incomplete images=%1 placed=%2 bounds=(%3,%4)")
                 .arg(items.size())
-                .arg(bestPlacements.size())
+                .arg(layout.itemRects.size())
                 .arg(qRound(bounds.width()))
                 .arg(qRound(bounds.height())));
+        return tiles;
     }
-    centerMissionPlacements(bestPlacements, bounds);
 
-    std::stable_sort(bestPlacements.begin(), bestPlacements.end(),
-                     [&items](const MissionPlacement& left, const MissionPlacement& right) {
-                         return items.at(left.inputIndex).sourceOrder <
-                                items.at(right.inputIndex).sourceOrder;
-                     });
-
-    qreal packedArea = 0.0;
-    for (const MissionPlacement& placement : std::as_const(bestPlacements)) {
-        const MissionInput& item = items.at(placement.inputIndex);
-        packedArea += placement.imageRect.width() * placement.imageRect.height();
-        tiles.append(TierListView::MissionTile{item.imageId, placement.imageRect, item.sourceSize});
+    for (int index = 0; index < items.size(); ++index) {
+        const MissionInput& item = items.at(index);
+        const QRectF rect = layout.itemRects.at(index);
+        tiles.append(TierListView::MissionTile{item.imageId, rect, item.sourceSize});
     }
-    Logger::debug(QStringLiteral("tier.list.mission.pack algorithm=maxrects-center images=%1 "
-                                 "scale=%2 occupancy=%3 gap=%4")
+
+    Logger::debug(QStringLiteral("tier.list.mission.pack algorithm=balanced-maxrects images=%1 "
+                                 "scale=%2 occupancy=%3 occupancyX=%4 occupancyY=%5 gap=%6")
                       .arg(items.size())
-                      .arg(low, 0, 'f', 3)
-                      .arg(packedArea / boundsArea, 0, 'f', 3)
-                      .arg(packingGap, 0, 'f', 1));
+                      .arg(layout.scale, 0, 'f', 3)
+                      .arg(layout.imageAreaOccupancy, 0, 'f', 3)
+                      .arg(layout.horizontalOccupancy, 0, 'f', 3)
+                      .arg(layout.verticalOccupancy, 0, 'f', 3)
+                      .arg(gap, 0, 'f', 1));
     return tiles;
 }
 
 qreal missionTileAspect(const TierListView::MissionTile& tile) {
     if (tile.sourceSize.isValid()) {
-        return qMax<qreal>(0.01, static_cast<qreal>(tile.sourceSize.width()) /
-                                     qMax(1, tile.sourceSize.height()));
+        return static_cast<qreal>(qMax(1, tile.sourceSize.width())) /
+               qMax(1, tile.sourceSize.height());
     }
     if (tile.rect.height() > 0.5) {
-        return qMax<qreal>(0.01, tile.rect.width() / tile.rect.height());
+        return qMax<qreal>(std::numeric_limits<qreal>::epsilon(),
+                           tile.rect.width() / tile.rect.height());
     }
     return 1.0;
 }
@@ -1118,8 +901,8 @@ void TierListView::refreshLayoutMetrics() {
         imageCounts.append(tierRow ? static_cast<int>(tierRow->imageIds.size()) : 0);
     }
 
-    TierBoardLayoutMetrics metrics = TierListLayout::fitBoard(
-        imageCounts, viewport()->size(), labelWidth);
+    TierBoardLayoutMetrics metrics =
+        TierListLayout::fitBoard(imageCounts, viewport()->size(), labelWidth);
     model->setLayoutMetrics(std::move(metrics.rowHeights), std::move(metrics.rowUnits));
     doItemsLayout();
     invalidateMissionControlLayout();
@@ -3295,12 +3078,6 @@ void TierListView::ensureMissionControlLayout() const {
         QRectF(viewport()->rect()).adjusted(margin, margin, -margin, -margin);
     QVector<MissionInput> inputs;
     inputs.reserve(imageIds.size());
-    const QHash<QString, QRectF> preferredRects =
-        m_missionFromGallery
-            ? QHash<QString, QRectF>()
-            : (m_missionNormalRects.isEmpty() ? normalImageRects() : m_missionNormalRects);
-    const qreal fallbackLongSide =
-        qBound<qreal>(42.0, qMin(viewport()->width(), viewport()->height()) / 9.0, 96.0);
 
     for (const QString& imageId : imageIds) {
         QSize sourceSize = m_missionSourceSizeCache.value(imageId);
@@ -3313,19 +3090,7 @@ void TierListView::ensureMissionControlLayout() const {
         if (!sourceSize.isValid()) {
             sourceSize = QSize(1, 1);
         }
-        const qreal aspect = qMax<qreal>(0.01, static_cast<qreal>(sourceSize.width()) /
-                                                   qMax(1, sourceSize.height()));
-        const QRectF preferredRect = preferredRects.value(imageId);
-        const qreal preferredLongSide = preferredRect.isValid()
-                                            ? qMax(preferredRect.width(), preferredRect.height())
-                                            : fallbackLongSide;
-        inputs.append(MissionInput{
-            imageId,
-            sourceSize,
-            missionSizeForLongSide(aspect, preferredLongSide),
-            aspect,
-            static_cast<int>(inputs.size()),
-        });
+        inputs.append(MissionInput{imageId, sourceSize});
     }
 
     m_missionTiles = layoutMissionTiles(inputs, layoutBounds, gap);
@@ -3360,35 +3125,37 @@ QHash<QString, QRectF> TierListView::normalImageRects() const {
     return rects;
 }
 
-QRectF TierListView::interpolatedMissionRect(const QString& imageId,
-                                             const QRectF& targetRect) const {
+QRectF TierListView::interpolatedMissionRect(const MissionTile& tile) const {
+    const QRectF targetRect = tile.rect;
+    const qreal aspect = missionTileAspect(tile);
+    QRectF sourceRect;
     if (m_missionFromGallery) {
         // Gallery images now begin at the board center. The former gallery-icon leg is omitted,
         // while the same center-to-mosaic transition is used in both directions.
         const qreal boardSide = qMax<qreal>(1.0, qMin(viewport()->width(), viewport()->height()));
         const qreal startLongSide = qBound<qreal>(28.0, boardSide * 0.055, 48.0);
-        const qreal targetLongSide = qMax<qreal>(1.0, qMax(targetRect.width(), targetRect.height()));
+        const qreal targetLongSide =
+            qMax<qreal>(1.0, qMax(targetRect.width(), targetRect.height()));
         const qreal startScale = qBound<qreal>(0.16, startLongSide / targetLongSide, 0.55);
-        QRectF sourceRect(QPointF(), targetRect.size() * startScale);
+        sourceRect = QRectF(QPointF(), targetRect.size() * startScale);
         sourceRect.moveCenter(QRectF(viewport()->rect()).center());
-
-        const qreal p = qBound<qreal>(0.0, m_missionTransitionProgress, 1.0);
-        return QRectF(sourceRect.x() + (targetRect.x() - sourceRect.x()) * p,
-                      sourceRect.y() + (targetRect.y() - sourceRect.y()) * p,
-                      sourceRect.width() + (targetRect.width() - sourceRect.width()) * p,
-                      sourceRect.height() + (targetRect.height() - sourceRect.height()) * p);
-    }
-
-    QRectF sourceRect = m_missionNormalRects.value(imageId);
-    if (!sourceRect.isValid()) {
-        sourceRect = targetRect;
+    } else {
+        sourceRect = m_missionNormalRects.value(tile.imageId);
+        if (!sourceRect.isValid()) {
+            sourceRect = targetRect;
+        } else {
+            // Normal rows use cropped cells. Start the full-image transition from an
+            // aspect-fitted rectangle so no animation frame stretches the source image.
+            sourceRect = missionAspectFitRect(sourceRect, aspect);
+        }
     }
 
     const qreal p = qBound<qreal>(0.0, m_missionTransitionProgress, 1.0);
-    return QRectF(sourceRect.x() + (targetRect.x() - sourceRect.x()) * p,
-                  sourceRect.y() + (targetRect.y() - sourceRect.y()) * p,
-                  sourceRect.width() + (targetRect.width() - sourceRect.width()) * p,
-                  sourceRect.height() + (targetRect.height() - sourceRect.height()) * p);
+    const QPointF center = sourceRect.center() + (targetRect.center() - sourceRect.center()) * p;
+    const qreal sourceLongSide = qMax(sourceRect.width(), sourceRect.height());
+    const qreal targetLongSide = qMax(targetRect.width(), targetRect.height());
+    const qreal longSide = sourceLongSide + (targetLongSide - sourceLongSide) * p;
+    return missionRectAroundCenter(center, missionSizeForLongSide(aspect, longSide));
 }
 
 QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
@@ -3418,7 +3185,7 @@ QVector<TierListView::MissionTile> TierListView::missionDisplayTiles() const {
     }
 
     for (MissionTile& tile : tiles) {
-        tile.rect = interpolatedMissionRect(tile.imageId, tile.rect);
+        tile.rect = interpolatedMissionRect(tile);
     }
     return tiles;
 }
@@ -3448,13 +3215,11 @@ QRect TierListView::missionImageRect(const QString& imageId) const {
     return {};
 }
 
-QPixmap TierListView::missionPixmapForImage(const QString& imageId, QSize targetPixelSize,
-                                            bool fullQuality) {
+QPixmap TierListView::missionPixmapForImage(const QString& imageId, QSize targetPixelSize) {
     TierListDelegate* delegate = tierDelegate();
     if (!delegate) {
         return {};
     }
-    Q_UNUSED(fullQuality);
     return delegate->pixmapForImageId(imageId, targetPixelSize);
 }
 
@@ -3481,6 +3246,17 @@ void TierListView::paintMissionControl(QPainter* painter) {
         return;
     }
 
+    QHash<QString, QSizeF> decodeSizes;
+    decodeSizes.reserve(m_missionTiles.size());
+    for (const MissionTile& baseTile : std::as_const(m_missionTiles)) {
+        QSizeF size = baseTile.rect.size();
+        if (baseTile.imageId == m_missionHoverImageId && m_missionHoverProgress > 0.001 &&
+            m_missionTransitionProgress >= 0.999) {
+            size = missionHoverTargetRect(baseTile, viewport()->size()).size();
+        }
+        decodeSizes.insert(baseTile.imageId, size);
+    }
+
     painter->save();
     if (m_missionFromGallery) {
         const qreal transition = qBound<qreal>(0.0, m_missionTransitionProgress, 1.0);
@@ -3500,13 +3276,12 @@ void TierListView::paintMissionControl(QPainter* painter) {
             continue;
         }
 
-        const bool fullQuality =
-            tile.imageId == m_missionHoverImageId && m_missionHoverProgress > 0.001;
         const qreal deviceRatio =
             viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
-        const QSize targetPixelSize(qCeil(rect.width() * deviceRatio),
-                                    qCeil(rect.height() * deviceRatio));
-        QPixmap pixmap = missionPixmapForImage(tile.imageId, targetPixelSize, fullQuality);
+        const QSizeF decodeSize = decodeSizes.value(tile.imageId, rect.size());
+        const QSize targetPixelSize(qCeil(decodeSize.width() * deviceRatio),
+                                    qCeil(decodeSize.height() * deviceRatio));
+        QPixmap pixmap = missionPixmapForImage(tile.imageId, targetPixelSize);
         painter->save();
         QPainterPath tileClip;
         const qreal radius = missionTileCornerRadius(rect);
@@ -3514,7 +3289,10 @@ void TierListView::paintMissionControl(QPainter* painter) {
         painter->setClipPath(tileClip, Qt::IntersectClip);
         painter->fillPath(tileClip, colors.elevatedBackground);
         if (!pixmap.isNull()) {
-            painter->drawPixmap(rect, pixmap, QRectF(pixmap.rect()));
+            const qreal pixmapAspect =
+                static_cast<qreal>(pixmap.width()) / qMax(1, pixmap.height());
+            painter->drawPixmap(missionAspectFitRect(rect, pixmapAspect), pixmap,
+                                QRectF(pixmap.rect()));
         }
         painter->restore();
 
@@ -3636,13 +3414,6 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
 
     const QString backgroundPath = resolvedCanvasBackgroundPath();
     const bool defaultIconBackground = backgroundPath.isEmpty();
-    const QString pixmapPath =
-        defaultIconBackground ? QString::fromUtf8(kDefaultBackgroundIconPath) : backgroundPath;
-
-    const QPixmap pixmap = canvasBackgroundPixmap(pixmapPath);
-    if (pixmap.isNull()) {
-        return;
-    }
     TierListModel* model = tierModel();
     const TierProject* project = model ? model->project() : nullptr;
     const qreal backgroundVisibility = canvasBackgroundVisibility(project);
@@ -3672,6 +3443,13 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
 
     painter->setOpacity(backgroundVisibility);
     if (defaultIconBackground) {
+        if (m_defaultBackgroundIcon.isNull()) {
+            m_defaultBackgroundIcon = QPixmap(QString::fromUtf8(kDefaultBackgroundIconPath));
+        }
+        if (m_defaultBackgroundIcon.isNull()) {
+            painter->restore();
+            return;
+        }
         const qreal shortSide =
             qMax<qreal>(1.0, qMin(contentBounds.width(), contentBounds.height()));
         const qreal maxSide = qMax<qreal>(32.0, shortSide - 18.0);
@@ -3680,26 +3458,18 @@ void TierListView::paintCanvasBackground(QPainter* painter) {
         const qreal side = qBound<qreal>(lowerSide, shortSide * 0.38, upperSide);
         const QRectF iconTarget(contentBounds.center().x() - side / 2.0,
                                 contentBounds.center().y() - side / 2.0, side, side);
-        painter->drawPixmap(iconTarget, pixmap, QRectF(pixmap.rect()));
+        painter->drawPixmap(iconTarget, m_defaultBackgroundIcon,
+                            QRectF(m_defaultBackgroundIcon.rect()));
     } else {
-        const QSizeF targetSize = contentBounds.size();
-        const QSize sourceSize = pixmap.size();
-        const qreal targetRatio = targetSize.width() / qMax<qreal>(1.0, targetSize.height());
-        const qreal sourceRatio =
-            static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
-        QRect sourceRect;
-        if (sourceRatio > targetRatio) {
-            const int cropWidth = qRound(sourceSize.height() * targetRatio);
-            sourceRect =
-                QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
-        } else {
-            const int cropHeight = qRound(sourceSize.width() / targetRatio);
-            sourceRect =
-                QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
+        const qreal deviceRatio =
+            viewport() ? viewport()->devicePixelRatioF() : devicePixelRatioF();
+        const QSize logicalSize(qMax(1, qCeil(contentBounds.width())),
+                                qMax(1, qCeil(contentBounds.height())));
+        const QPixmap& cover =
+            m_canvasBackgroundCache.pixmap(backgroundPath, logicalSize, deviceRatio);
+        if (!cover.isNull()) {
+            painter->drawPixmap(contentBounds, cover, QRectF(cover.rect()));
         }
-        // Crop from the original cached pixmap on every paint so resize changes never distort the
-        // ratio.
-        painter->drawPixmap(contentBounds, pixmap, sourceRect);
     }
     painter->restore();
 }
@@ -3728,22 +3498,6 @@ QString TierListView::resolvedCanvasBackgroundPath() const {
         return QDir(QFileInfo(project->filePath).absolutePath()).filePath(storedPath);
     }
     return storedPath;
-}
-
-QPixmap TierListView::canvasBackgroundPixmap(const QString& path) {
-    if (path.isEmpty()) {
-        m_canvasBackgroundCachePath.clear();
-        m_canvasBackgroundCache = {};
-        return {};
-    }
-    if (m_canvasBackgroundCachePath != path) {
-        m_canvasBackgroundCachePath = path;
-        m_canvasBackgroundCache = QPixmap(path);
-        Logger::debug(QStringLiteral("tier.list.background.cache path=\"%1\" valid=%2")
-                          .arg(path)
-                          .arg(!m_canvasBackgroundCache.isNull()));
-    }
-    return m_canvasBackgroundCache;
 }
 
 bool TierListView::acceptsTierDrag(const QMimeData* mimeData) const {

@@ -9,6 +9,7 @@ add_tlm_unit_test(tst_ProjectSerializer tst_ProjectSerializer.cpp)
 add_tlm_unit_test(tst_RecentProjectsStore tst_RecentProjectsStore.cpp)
 add_tlm_unit_test(tst_AssetManager tst_AssetManager.cpp)
 add_tlm_unit_test(tst_ThemeManager tst_ThemeManager.cpp)
+add_tlm_unit_test(tst_ThumbnailCache tst_ThumbnailCache.cpp)
 add_tlm_unit_test(tst_AppUpdater
     tst_AppUpdater.cpp
     "${PROJECT_SOURCE_DIR}/src/update/AppUpdater.cpp"

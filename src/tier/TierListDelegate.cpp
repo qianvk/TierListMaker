@@ -7,6 +7,7 @@
 
 #include <QApplication>
 #include <QFontMetrics>
+#include <QImageIOHandler>
 #include <QImageReader>
 #include <QPainter>
 #include <QPainterPath>
@@ -205,8 +206,13 @@ QSize TierListDelegate::sourceSizeForImageId(const QString& imageId) const {
 
     QImageReader reader(m_assetManager->resolvedImagePath(*m_project, *image));
     reader.setAutoTransform(true);
-    const QSize size = reader.size();
+    QSize size = reader.size();
     if (size.isValid()) {
+        // QImageReader reports the encoded dimensions before applying EXIF orientation.
+        // Mission Control lays out the auto-transformed image, so quarter turns must swap axes.
+        if (reader.transformation().testFlag(QImageIOHandler::TransformationRotate90)) {
+            size.transpose();
+        }
         return size;
     }
     const QPixmap pixmap = pixmapForImage(*image);

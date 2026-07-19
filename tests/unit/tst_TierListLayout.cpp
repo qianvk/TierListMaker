@@ -17,6 +17,7 @@ private slots:
     void girlsProjectKeepsEveryImageInsideItsRow();
     void expandedWidthsReflowRows();
     void viewResizeRecomputesLayout();
+    void missionControlBalancesCenteredFreePacking();
 };
 
 namespace {
@@ -116,6 +117,63 @@ void TierListLayoutTest::viewResizeRecomputesLayout() {
     QTRY_COMPARE(model.rowUnitCountAt(3), collapsed.rowUnits.at(3));
     QTRY_COMPARE(model.rowUnitCountAt(4), collapsed.rowUnits.at(4));
     QVERIFY(normal.rowUnits != collapsed.rowUnits);
+}
+
+void TierListLayoutTest::missionControlBalancesCenteredFreePacking() {
+    const QVector<QSizeF> sourceSizes{
+        {1000.0, 1500.0}, {1500.0, 2000.0}, {1600.0, 2000.0}, {1800.0, 2000.0},
+        {2400.0, 2400.0}, {3600.0, 2000.0}, {3000.0, 2250.0}, {2400.0, 2000.0},
+        {3000.0, 1800.0}, {2400.0, 1200.0},
+    };
+    const QRectF bounds(20.0, 30.0, 1200.0, 700.0);
+    constexpr qreal gap = 12.0;
+    constexpr qreal epsilon = 0.01;
+
+    const MissionControlLayoutMetrics layout =
+        TierListLayout::fitMissionControl(sourceSizes, bounds, gap);
+    QCOMPARE(layout.itemRects.size(), sourceSizes.size());
+    QVERIFY(layout.scale > 0.0);
+    QVERIFY(qMin(layout.horizontalOccupancy, layout.verticalOccupancy) > 0.55);
+    QVERIFY(qAbs(layout.horizontalOccupancy - layout.verticalOccupancy) < 0.30);
+    const qreal packedDensity =
+        layout.imageAreaOccupancy /
+        (layout.horizontalOccupancy * layout.verticalOccupancy);
+    QVERIFY(packedDensity > 0.50);
+
+    QRectF groupRect;
+    bool hasDifferentHeights = false;
+    for (int index = 0; index < layout.itemRects.size(); ++index) {
+        const QRectF rect = layout.itemRects.at(index);
+        QVERIFY(rect.left() >= bounds.left() - epsilon);
+        QVERIFY(rect.top() >= bounds.top() - epsilon);
+        QVERIFY(rect.right() <= bounds.right() + epsilon);
+        QVERIFY(rect.bottom() <= bounds.bottom() + epsilon);
+        QVERIFY(qAbs(rect.width() / rect.height() -
+                     sourceSizes.at(index).width() / sourceSizes.at(index).height()) <
+                epsilon);
+        QVERIFY(qAbs(rect.width() / sourceSizes.at(index).width() - layout.scale) < epsilon);
+        QVERIFY(qAbs(rect.height() / sourceSizes.at(index).height() - layout.scale) < epsilon);
+        if (index > 0 &&
+            qAbs(rect.height() - layout.itemRects.constFirst().height()) > epsilon) {
+            hasDifferentHeights = true;
+        }
+        groupRect = groupRect.isValid() ? groupRect.united(rect) : rect;
+    }
+    QVERIFY(hasDifferentHeights);
+    QVERIFY(qAbs(groupRect.center().x() - bounds.center().x()) < epsilon);
+    QVERIFY(qAbs(groupRect.center().y() - bounds.center().y()) < epsilon);
+
+    for (int first = 0; first < layout.itemRects.size(); ++first) {
+        for (int second = first + 1; second < layout.itemRects.size(); ++second) {
+            const QRectF left = layout.itemRects.at(first);
+            const QRectF right = layout.itemRects.at(second);
+            const bool separated = left.right() + gap <= right.left() + epsilon ||
+                                   right.right() + gap <= left.left() + epsilon ||
+                                   left.bottom() + gap <= right.top() + epsilon ||
+                                   right.bottom() + gap <= left.top() + epsilon;
+            QVERIFY2(separated, "Mission Control images overlap or violate the fixed gap.");
+        }
+    }
 }
 
 QTEST_MAIN(TierListLayoutTest)

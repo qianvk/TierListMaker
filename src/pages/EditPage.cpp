@@ -1,5 +1,6 @@
 #include "pages/EditPage.h"
 
+#include "assets/CoverImageCache.h"
 #include "widgets/DestructiveActionDialog.h"
 
 #include "logging/Logger.h"
@@ -97,8 +98,7 @@ protected:
         // A single geometry produces both edges and corners, avoiding seams or radial corner blobs.
         for (int distance = kTierBoardShadowExtent; distance >= 0; --distance) {
             const qreal d = static_cast<qreal>(distance);
-            const qreal targetOpacity =
-                peakOpacity * std::exp(-(d * d) / (2.0 * sigma * sigma));
+            const qreal targetOpacity = peakOpacity * std::exp(-(d * d) / (2.0 * sigma * sigma));
             const qreal layerOpacity =
                 1.0 - (1.0 - targetOpacity) / qMax<qreal>(0.0001, 1.0 - accumulatedOpacity);
             accumulatedOpacity = targetOpacity;
@@ -314,15 +314,28 @@ public:
         setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     }
 
-    void setPreview(const QString& imagePath, bool centeredIcon, qreal visibility,
-                    const QString& defaultText) {
-        if (m_imagePath != imagePath) {
+    bool setPreview(const QString& imagePath, bool centeredIcon, const QString& defaultText) {
+        if (m_imagePath != imagePath || m_centeredIcon != centeredIcon) {
             m_imagePath = imagePath;
-            m_pixmap = QPixmap(m_imagePath);
+            m_centeredIcon = centeredIcon;
+            if (m_centeredIcon) {
+                m_iconPixmap = QPixmap(m_imagePath);
+            }
         }
-        m_centeredIcon = centeredIcon;
-        m_visibility = qBound<qreal>(0.0, visibility, 1.0);
         m_defaultText = defaultText;
+        update();
+        if (m_centeredIcon) {
+            return !m_iconPixmap.isNull();
+        }
+        return !m_coverCache.pixmap(m_imagePath, size(), devicePixelRatioF()).isNull();
+    }
+
+    void setVisibility(qreal visibility) {
+        visibility = qBound<qreal>(0.0, visibility, 1.0);
+        if (qFuzzyCompare(m_visibility + 1.0, visibility + 1.0)) {
+            return;
+        }
+        m_visibility = visibility;
         update();
     }
 
@@ -339,13 +352,19 @@ protected:
         const ThemeTokens& colors = activeThemeTokens();
         painter.fillPath(clip, colors.elevatedBackground);
 
-        if (!m_pixmap.isNull() && !rect().isEmpty()) {
+        const QPixmap* previewPixmap = nullptr;
+        if (m_centeredIcon) {
+            previewPixmap = &m_iconPixmap;
+        } else {
+            previewPixmap = &m_coverCache.pixmap(m_imagePath, rect().size(), devicePixelRatioF());
+        }
+        if (previewPixmap && !previewPixmap->isNull() && !rect().isEmpty()) {
             painter.setOpacity(m_visibility);
             if (m_centeredIcon) {
-                painter.drawPixmap(centeredIconTargetRect(rect()), m_pixmap,
-                                   QRectF(m_pixmap.rect()));
+                painter.drawPixmap(centeredIconTargetRect(rect()), *previewPixmap,
+                                   QRectF(previewPixmap->rect()));
             } else {
-                painter.drawPixmap(rect(), m_pixmap, sourceRectForTarget(rect().size()));
+                painter.drawPixmap(rect(), *previewPixmap, QRectF(previewPixmap->rect()));
             }
             painter.setOpacity(1.0);
         } else {
@@ -369,25 +388,9 @@ private:
         return QRectF(center.x() - side / 2.0, center.y() - side / 2.0, side, side);
     }
 
-    QRect sourceRectForTarget(const QSize& targetSize) const {
-        if (m_pixmap.isNull() || targetSize.isEmpty()) {
-            return {};
-        }
-        const QSize sourceSize = m_pixmap.size();
-        const qreal targetRatio =
-            static_cast<qreal>(targetSize.width()) / qMax(1, targetSize.height());
-        const qreal sourceRatio =
-            static_cast<qreal>(sourceSize.width()) / qMax(1, sourceSize.height());
-        if (sourceRatio > targetRatio) {
-            const int cropWidth = qRound(sourceSize.height() * targetRatio);
-            return QRect((sourceSize.width() - cropWidth) / 2, 0, cropWidth, sourceSize.height());
-        }
-        const int cropHeight = qRound(sourceSize.width() / targetRatio);
-        return QRect(0, (sourceSize.height() - cropHeight) / 2, sourceSize.width(), cropHeight);
-    }
-
     QString m_imagePath;
-    QPixmap m_pixmap;
+    QPixmap m_iconPixmap;
+    CoverImageCache m_coverCache;
     QString m_defaultText;
     qreal m_visibility{1.0};
     bool m_centeredIcon{false};
@@ -886,29 +889,28 @@ void EditPage::configureBackground(QWidget* anchor) {
     pathLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     pathLabel->setWordWrap(true);
 
-    auto updatePreview = [&]() {
-        const QPixmap pixmap(selectedPath);
-        if (!clearBackground && !pixmap.isNull()) {
-            preview->setPreview(selectedPath, false, backgroundVisibility,
-                                tr("Default Background"));
-            pathLabel->setText(QFileInfo(selectedPath).fileName());
-        } else {
-            preview->setPreview(QString::fromUtf8(kDefaultBackgroundIconPath), true,
-                                backgroundVisibility, tr("Default Background"));
-            pathLabel->setText(tr("Default Background"));
+    auto* previewFrameTimer = new QTimer(popoverContent);
+    previewFrameTimer->setSingleShot(true);
+    previewFrameTimer->setInterval(16);
+    connect(previewFrameTimer, &QTimer::timeout, popoverContent, [this]() {
+        if (m_board) {
+            m_board->refreshVisuals();
         }
+    });
+    auto requestBoardPreviewFrame = [previewFrameTimer]() {
+        if (!previewFrameTimer->isActive()) {
+            previewFrameTimer->start();
+        }
+    };
 
+    auto applyPreviewCanvas = [&]() {
         m_project.canvas = originalCanvas;
         if (!clearBackground && !selectedPath.isEmpty()) {
             m_project.canvas.insert(QStringLiteral("backgroundImagePath"), selectedPath);
         } else {
             m_project.canvas.remove(QStringLiteral("backgroundImagePath"));
         }
-        if (!clearBackground && !selectedPath.isEmpty()) {
-            m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
-        } else {
-            m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
-        }
+        m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
         m_project.canvas.remove(QStringLiteral("backgroundImageOpacity"));
         m_project.canvas.remove(QStringLiteral("backgroundOpacity"));
         m_project.canvas.remove(QStringLiteral("tierListOpacity"));
@@ -916,9 +918,22 @@ void EditPage::configureBackground(QWidget* anchor) {
         m_project.canvas.insert(QStringLiteral("previewImagesHidden"), true);
         m_project.dirty = originalDirty;
         m_project.updatedAt = originalUpdatedAt;
-        if (m_board) {
-            m_board->refreshVisuals();
+        requestBoardPreviewFrame();
+    };
+
+    auto updatePreviewContent = [&]() {
+        const bool customImageReady =
+            !clearBackground && !selectedPath.isEmpty() &&
+            preview->setPreview(selectedPath, false, tr("Default Background"));
+        if (customImageReady) {
+            pathLabel->setText(QFileInfo(selectedPath).fileName());
+        } else {
+            preview->setPreview(QString::fromUtf8(kDefaultBackgroundIconPath), true,
+                                tr("Default Background"));
+            pathLabel->setText(tr("Default Background"));
         }
+        preview->setVisibility(backgroundVisibility);
+        applyPreviewCanvas();
     };
 
     auto* choose = new QPushButton(tr("Choose Image"), popoverContent);
@@ -966,7 +981,7 @@ void EditPage::configureBackground(QWidget* anchor) {
         selectedPath = imagePath;
         clearBackground = false;
         Logger::info(QStringLiteral("tier.edit.background.preview path=\"%1\"").arg(imagePath));
-        updatePreview();
+        updatePreviewContent();
     });
     connect(clear, &QPushButton::clicked, &dialog, [&]() {
         selectedPath.clear();
@@ -978,17 +993,19 @@ void EditPage::configureBackground(QWidget* anchor) {
         }
         updateOpacityLabel();
         Logger::info(QStringLiteral("tier.edit.background.preview.clear"));
-        updatePreview();
+        updatePreviewContent();
     });
     connect(opacitySlider, &QSlider::valueChanged, &dialog, [&](int value) {
         backgroundVisibility = static_cast<qreal>(value) / 100.0;
         updateOpacityLabel();
-        updatePreview();
+        preview->setVisibility(backgroundVisibility);
+        m_project.canvas.insert(QStringLiteral("backgroundVisibility"), backgroundVisibility);
+        requestBoardPreviewFrame();
     });
     connect(buttons, &QDialogButtonBox::accepted, &dialog, &BackgroundPopover::accept);
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &BackgroundPopover::reject);
 
-    updatePreview();
+    updatePreviewContent();
     const int backgroundResult = dialog.execFor(anchor ? anchor : this);
     m_closeBackgroundPopover = {};
     if (m_activePopover == TransientPopover::Background) {
@@ -1287,9 +1304,9 @@ void EditPage::toggleGalleryMissionControlMode() {
 
 void EditPage::layoutOverlays() {
     if (m_boardShadow && m_board) {
-        m_boardShadow->setGeometry(m_board->geometry().adjusted(
-            -kTierBoardShadowExtent, -kTierBoardShadowExtent, kTierBoardShadowExtent,
-            kTierBoardShadowExtent));
+        m_boardShadow->setGeometry(
+            m_board->geometry().adjusted(-kTierBoardShadowExtent, -kTierBoardShadowExtent,
+                                         kTierBoardShadowExtent, kTierBoardShadowExtent));
         m_boardShadow->setVisible(!m_tierFocusMode);
         m_boardShadow->stackUnder(m_board);
     }
@@ -1406,10 +1423,10 @@ void EditPage::setProject(TierProject project) {
 }
 
 void EditPage::showError(const QString& title, const Error& error) {
-    AppMessageDialog::critical(
-        this, title,
-        error.details.isEmpty() ? error.message
-                                : QStringLiteral("%1\n\n%2").arg(error.message, error.details));
+    AppMessageDialog::critical(this, title,
+                               error.details.isEmpty()
+                                   ? error.message
+                                   : QStringLiteral("%1\n\n%2").arg(error.message, error.details));
 }
 
 QString EditPage::chooseSavePath() {
@@ -1669,8 +1686,7 @@ bool EditPage::saveManagedTemplateFromPrompt(QWidget* reopenAnchor) {
     connect(buttons, &QDialogButtonBox::rejected, &dialog, &QDialog::reject);
     connect(buttons, &QDialogButtonBox::accepted, &dialog, [&]() {
         if (nameEdit->text().trimmed().isEmpty()) {
-            AppMessageDialog::warning(&dialog, tr("Save Template"),
-                                      tr("Enter a template name."));
+            AppMessageDialog::warning(&dialog, tr("Save Template"), tr("Enter a template name."));
             return;
         }
         dialog.accept();
@@ -2025,8 +2041,7 @@ void EditPage::clearTierRowImages(const QString& rowId) {
 
 void EditPage::deleteTierRow(const QString& rowId) {
     if (m_project.rows.size() <= 1) {
-        AppMessageDialog::information(this, tr("Delete Row"),
-                                      tr("At least one row is required."));
+        AppMessageDialog::information(this, tr("Delete Row"), tr("At least one row is required."));
         return;
     }
     const TierRow* row = m_project.rowById(rowId);

@@ -8,12 +8,14 @@
 
 namespace tlm {
 
-/** Multi-resolution image cache that decodes only as much quality as the current paint size needs. */
+/**
+ * Multi-resolution image cache that decodes only as much quality as the current paint size needs.
+ */
 class ThumbnailCache : public QObject {
     Q_OBJECT
 
 public:
-    explicit ThumbnailCache(QObject* parent = nullptr);
+    explicit ThumbnailCache(QObject* parent = nullptr, qsizetype cacheBudgetBytes = 0);
 
     QPixmap thumbnail(const QString& cacheKey) const;
     QPixmap thumbnail(const QString& cacheKey, QSize minimumPixelSize) const;
@@ -40,12 +42,15 @@ private:
     static qsizetype pixmapCostBytes(const QPixmap& pixmap);
     QPixmap bestThumbnail(const QString& cacheKey, QSize minimumPixelSize) const;
     void insertEntry(const QString& cacheKey, QSize requestSize, const QPixmap& pixmap);
+    void pruneRedundantVariants(const QString& cacheKey);
+    void removeEntry(const QString& variantKey);
     void trimToBudget();
 
-    QHash<QString, CacheEntry> m_cache;
+    mutable QHash<QString, CacheEntry> m_cache;
     QSet<QString> m_pending;
+    qsizetype m_cacheBudgetBytes{0};
     qsizetype m_cacheCostBytes{0};
-    quint64 m_serial{0};
+    mutable quint64 m_serial{0};
     quint64 m_generation{0};
 };
 

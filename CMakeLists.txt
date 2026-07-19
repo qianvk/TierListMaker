@@ -54,6 +54,8 @@ set(CMAKE_AUTOUIC ON)
 set(TLM_CORE_SOURCES
     src/assets/AssetManager.cpp
     src/assets/AssetManager.h
+    src/assets/CoverImageCache.cpp
+    src/assets/CoverImageCache.h
     src/assets/ImageLoader.cpp
     src/assets/ImageLoader.h
     src/assets/ThumbnailCache.cpp

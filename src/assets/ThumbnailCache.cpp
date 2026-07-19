@@ -14,6 +14,7 @@ namespace tlm {
 
 namespace {
 constexpr qsizetype kCacheBudgetBytes = 96 * 1024 * 1024;
+constexpr int kMaximumVariantsPerImage = 2;
 constexpr int kDefaultRequestSide = 192;
 constexpr int kMaxCachedDecodeSide = 2048;
 constexpr qreal kNativeLongSideRatio = 0.72;
@@ -57,7 +58,9 @@ QSize adaptiveDecodeSize(const QSize& sourceSize, QSize requestedSize) {
 }
 } // namespace
 
-ThumbnailCache::ThumbnailCache(QObject* parent) : QObject(parent) {}
+ThumbnailCache::ThumbnailCache(QObject* parent, qsizetype cacheBudgetBytes)
+    : QObject(parent),
+      m_cacheBudgetBytes(cacheBudgetBytes > 0 ? cacheBudgetBytes : kCacheBudgetBytes) {}
 
 QPixmap ThumbnailCache::thumbnail(const QString& cacheKey) const {
     return bestThumbnail(cacheKey, {});
@@ -74,25 +77,30 @@ bool ThumbnailCache::hasThumbnail(const QString& cacheKey) const {
 bool ThumbnailCache::hasThumbnail(const QString& cacheKey, QSize minimumPixelSize) const {
     minimumPixelSize = normalizedRequestSize(minimumPixelSize);
     UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageCheck);
-    for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+    auto best = m_cache.end();
+    qint64 bestArea = std::numeric_limits<qint64>::max();
+    for (auto it = m_cache.begin(); it != m_cache.end(); ++it) {
         const CacheEntry& entry = it.value();
         if (entry.baseKey != cacheKey || entry.pixmap.isNull()) {
             continue;
         }
-#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
         // requestSize describes the decode quality. The decoded pixmap keeps its aspect ratio,
         // so comparing both pixmap dimensions against a square paint request permanently marks
         // wide and tall images as undersized.
         const QSize coveredSize = entry.requestSize;
-#else
-        const QSize pixmapSize = entry.pixmap.size();
-        const QSize coveredSize = pixmapSize;
-#endif
         if (coveredSize.width() >= minimumPixelSize.width() &&
             coveredSize.height() >= minimumPixelSize.height()) {
-            UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageHit);
-            return true;
+            const qint64 area = static_cast<qint64>(coveredSize.width()) * coveredSize.height();
+            if (area < bestArea) {
+                bestArea = area;
+                best = it;
+            }
         }
+    }
+    if (best != m_cache.end()) {
+        best.value().serial = ++m_serial;
+        UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageHit);
+        return true;
     }
     UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailCoverageMiss);
     return false;
@@ -184,12 +192,12 @@ qsizetype ThumbnailCache::pixmapCostBytes(const QPixmap& pixmap) {
 QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixelSize) const {
     UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailPixmapLookup);
     const bool hasMinimum = !minimumPixelSize.isEmpty();
-    const CacheEntry* bestCovering = nullptr;
-    const CacheEntry* largestFallback = nullptr;
+    auto bestCovering = m_cache.end();
+    auto largestFallback = m_cache.end();
     qint64 bestCoveringArea = std::numeric_limits<qint64>::max();
     qint64 largestArea = -1;
 
-    for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+    for (auto it = m_cache.begin(); it != m_cache.end(); ++it) {
         const CacheEntry& entry = it.value();
         if (entry.baseKey != cacheKey || entry.pixmap.isNull()) {
             continue;
@@ -198,31 +206,25 @@ QPixmap ThumbnailCache::bestThumbnail(const QString& cacheKey, QSize minimumPixe
         const qint64 area = static_cast<qint64>(pixmapSize.width()) * pixmapSize.height();
         if (area > largestArea) {
             largestArea = area;
-            largestFallback = &entry;
+            largestFallback = it;
         }
-#if defined(Q_OS_WIN) || defined(Q_OS_LINUX)
         const QSize coveredSize = entry.requestSize;
         const qint64 coveringArea = static_cast<qint64>(coveredSize.width()) * coveredSize.height();
-#else
-        const QSize coveredSize = pixmapSize;
-        const qint64 coveringArea = area;
-#endif
         if (hasMinimum && coveredSize.width() >= minimumPixelSize.width() &&
             coveredSize.height() >= minimumPixelSize.height() && coveringArea < bestCoveringArea) {
             bestCoveringArea = coveringArea;
-            bestCovering = &entry;
+            bestCovering = it;
         }
         if (!hasMinimum && area < bestCoveringArea) {
             bestCoveringArea = area;
-            bestCovering = &entry;
+            bestCovering = it;
         }
     }
 
-    if (bestCovering) {
-        return bestCovering->pixmap;
-    }
-    if (largestFallback) {
-        return largestFallback->pixmap;
+    auto selected = bestCovering != m_cache.end() ? bestCovering : largestFallback;
+    if (selected != m_cache.end()) {
+        selected.value().serial = ++m_serial;
+        return selected.value().pixmap;
     }
     return {};
 }
@@ -236,25 +238,99 @@ void ThumbnailCache::insertEntry(const QString& cacheKey, QSize requestSize,
     }
     m_cache.insert(key, CacheEntry{cacheKey, requestSize, pixmap, nextCost, ++m_serial});
     m_cacheCostBytes += nextCost;
+    pruneRedundantVariants(cacheKey);
     trimToBudget();
 }
 
-void ThumbnailCache::trimToBudget() {
-    while (m_cacheCostBytes > kCacheBudgetBytes && m_cache.size() > 1) {
-        auto victim = m_cache.end();
-        quint64 oldest = std::numeric_limits<quint64>::max();
-        for (auto it = m_cache.begin(); it != m_cache.end(); ++it) {
-            if (it.value().serial < oldest) {
-                oldest = it.value().serial;
-                victim = it;
+void ThumbnailCache::pruneRedundantVariants(const QString& cacheKey) {
+    while (true) {
+        QString baselineKey;
+        qint64 baselineArea = std::numeric_limits<qint64>::max();
+        int variantCount = 0;
+        for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+            const CacheEntry& entry = it.value();
+            if (entry.baseKey != cacheKey) {
+                continue;
+            }
+            ++variantCount;
+            const qint64 area =
+                static_cast<qint64>(entry.requestSize.width()) * entry.requestSize.height();
+            if (area < baselineArea) {
+                baselineArea = area;
+                baselineKey = it.key();
             }
         }
-        if (victim == m_cache.end()) {
-            break;
+        if (variantCount <= kMaximumVariantsPerImage) {
+            return;
         }
-        m_cacheCostBytes -= victim.value().costBytes;
-        UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailEvicted);
-        m_cache.erase(victim);
+
+        QString victimKey;
+        quint64 oldest = std::numeric_limits<quint64>::max();
+        for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+            if (it.value().baseKey == cacheKey && it.key() != baselineKey &&
+                it.value().serial < oldest) {
+                oldest = it.value().serial;
+                victimKey = it.key();
+            }
+        }
+        if (victimKey.isEmpty()) {
+            return;
+        }
+        removeEntry(victimKey);
+    }
+}
+
+void ThumbnailCache::removeEntry(const QString& key) {
+    const auto it = m_cache.find(key);
+    if (it == m_cache.end()) {
+        return;
+    }
+    m_cacheCostBytes -= it.value().costBytes;
+    UiPerformanceMonitor::increment(UiPerformanceMonitor::Counter::ThumbnailEvicted);
+    m_cache.erase(it);
+}
+
+void ThumbnailCache::trimToBudget() {
+    while (m_cacheCostBytes > m_cacheBudgetBytes && m_cache.size() > 1) {
+        QHash<QString, int> variantCounts;
+        QHash<QString, QString> baselineKeys;
+        QHash<QString, qint64> baselineAreas;
+        for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+            const CacheEntry& entry = it.value();
+            ++variantCounts[entry.baseKey];
+            const qint64 area =
+                static_cast<qint64>(entry.requestSize.width()) * entry.requestSize.height();
+            if (!baselineAreas.contains(entry.baseKey) ||
+                area < baselineAreas.value(entry.baseKey)) {
+                baselineAreas.insert(entry.baseKey, area);
+                baselineKeys.insert(entry.baseKey, it.key());
+            }
+        }
+
+        QString victimKey;
+        quint64 oldest = std::numeric_limits<quint64>::max();
+        // Detail variants are expendable; retaining one baseline prevents visible images from
+        // falling back to a loading glyph while a larger hover rendition is decoded.
+        for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+            const bool redundant = variantCounts.value(it.value().baseKey) > 1 &&
+                                   baselineKeys.value(it.value().baseKey) != it.key();
+            if (redundant && it.value().serial < oldest) {
+                oldest = it.value().serial;
+                victimKey = it.key();
+            }
+        }
+        if (victimKey.isEmpty()) {
+            for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it) {
+                if (it.value().serial < oldest) {
+                    oldest = it.value().serial;
+                    victimKey = it.key();
+                }
+            }
+        }
+        if (victimKey.isEmpty()) {
+            return;
+        }
+        removeEntry(victimKey);
     }
 }
 
