@@ -99,38 +99,58 @@
         <translation>Untitled Tier List</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="344"/>
-        <location filename="../../src/update/AppUpdater.cpp" line="493"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="437"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="659"/>
         <source>No update package is published for this platform.</source>
         <translation>No update package is published for this platform.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="376"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="493"/>
         <source>The update response does not contain a valid latest version.</source>
         <translation>The update response does not contain a valid latest version.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="382"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="499"/>
         <source>The update package URL is not secure.</source>
         <translation>The update package URL is not secure.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="388"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="505"/>
         <source>The update page URL is not secure.</source>
         <translation>The update page URL is not secure.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="396"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="511"/>
+        <source>The update metadata URL is not secure.</source>
+        <translation>The update metadata URL is not secure.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="517"/>
+        <source>The executable update URL is not secure.</source>
+        <translation>The executable update URL is not secure.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="525"/>
         <source>The update package checksum is invalid.</source>
         <translation>The update package checksum is invalid.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="413"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="534"/>
+        <source>The executable update checksum is invalid.</source>
+        <translation>The executable update checksum is invalid.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="543"/>
+        <source>The executable update metadata is incomplete.</source>
+        <translation>The executable update metadata is incomplete.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="559"/>
         <source>The update package type is not supported on this platform.</source>
         <translation>The update package type is not supported on this platform.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="535"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="706"/>
         <source>The update response is not valid JSON.</source>
         <translation>The update response is not valid JSON.</translation>
     </message>
@@ -247,47 +267,54 @@
 <context>
     <name>tlm::AppUpdater</name>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="566"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="755"/>
         <source>The update definition URL is not secure.</source>
         <translation>The update definition URL is not secure.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="594"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="805"/>
         <source>The update response is too large.</source>
         <translation>The update response is too large.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="699"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1023"/>
         <source>The update cache directory could not be created.</source>
         <translation>The update cache directory could not be created.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="746"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1072"/>
         <source>The update package is larger than expected.</source>
         <translation>The update package is larger than expected.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="774"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="844"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="924"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1100"/>
         <source>The update server returned HTTP %1.</source>
         <translation>The update server returned HTTP %1.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="778"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="941"/>
+        <source>The update metadata version does not match the release.</source>
+        <translation>The update metadata version does not match the release.</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="1104"/>
         <source>The downloaded update package has an unexpected size.</source>
         <translation>The downloaded update package has an unexpected size.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="782"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1108"/>
         <source>The downloaded update package failed checksum verification.</source>
         <translation>The downloaded update package failed checksum verification.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="806"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1132"/>
         <source>The staged update package is no longer valid.</source>
         <translation>The staged update package is no longer valid.</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="814"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1142"/>
         <source>The update installer could not be opened.</source>
         <translation>The update installer could not be opened.</translation>
     </message>
@@ -708,23 +735,23 @@
     <name>tlm::PreferencesPage</name>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="296"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="575"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="302"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
         <source>General</source>
         <translation>General</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="298"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="649"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="304"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="658"/>
         <source>About</source>
         <translation>About</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="297"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="573"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="303"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="585"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="599"/>
         <source>Updates</source>
         <translation>Updates</translation>
     </message>
@@ -736,7 +763,7 @@
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="255"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="256"/>
         <source>Downloading update %1: %2%</source>
         <translation>Downloading update %1: %2%</translation>
     </message>
@@ -746,36 +773,36 @@
         <translation>Update %1 is ready to install.</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="378"/>
         <source>Install Update</source>
         <translation>Install Update</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="609"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="378"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="618"/>
         <source>Download Update</source>
         <translation>Download Update</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="387"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="406"/>
         <source>Version %1 is available. Current version: %2%3</source>
         <translation>Version %1 is available. Current version: %2%3</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="394"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="413"/>
         <source>TierListMaker is up to date. Current version: %1</source>
         <translation>TierListMaker is up to date. Current version: %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="403"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="422"/>
         <source>Update check failed: %1
 The project may not have published update metadata yet.</source>
         <translation>Update check failed: %1
 The project may not have published update metadata yet.</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="421"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="455"/>
         <source>System</source>
         <translation>System</translation>
     </message>
@@ -788,127 +815,126 @@ The project may not have published update metadata yet.</translation>
         <translation type="vanished">Simplified Chinese</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="433"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="452"/>
         <source>Language</source>
         <translation>Language</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="455"/>
         <source>Light</source>
         <translation>Light</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="455"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
         <source>Appearance</source>
         <translation>Appearance</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="443"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="462"/>
         <source>None</source>
         <translation>None</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="444"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="463"/>
         <source>Image</source>
         <translation>Image</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="471"/>
         <source>Preview background</source>
         <translation>Preview background</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="457"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="474"/>
         <source>Open Gallery Overview</source>
         <translation>Open Gallery Overview</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="476"/>
         <source>Open Tier Overview</source>
         <translation>Open Tier Overview</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="461"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="478"/>
         <source>Do Nothing</source>
         <translation>Do Nothing</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="477"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="494"/>
         <source>Empty tier area double-click</source>
         <translation>Empty tier area double-click</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="488"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="505"/>
         <source>Empty tier area long press</source>
         <translation>Empty tier area long press</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="491"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="508"/>
         <source>Show tier list tooltips</source>
         <translation>Show tier list tooltips</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="496"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="512"/>
         <source>Tier list tooltips</source>
         <translation>Tier list tooltips</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="499"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="515"/>
         <source>Enable autosave</source>
         <translation>Enable autosave</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="501"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="517"/>
         <source>Save behavior</source>
         <translation>Save behavior</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="505"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="521"/>
         <source> min</source>
         <translation> min</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="510"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="526"/>
         <source>Autosave interval</source>
         <translation>Autosave interval</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="525"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="541"/>
         <source>Default project folder</source>
         <translation>Default project folder</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="528"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="544"/>
         <source>Choose</source>
         <translation>Choose</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="555"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="571"/>
         <source>Default Project Folder</source>
         <translation>Default Project Folder</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="565"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="581"/>
         <source>Enable automatic update checks</source>
         <translation>Enable automatic update checks</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="596"/>
         <source>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</source>
-        <translation>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</translation>
+        <translation type="vanished">Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="606"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="615"/>
         <source>Check Now</source>
         <translation>Check Now</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="651"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="660"/>
         <source>TierListMaker
 Version: %1
 License: MIT
@@ -963,14 +989,24 @@ Links:
 https://github.com/qianvk/TierListMaker</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="589"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="601"/>
         <source>Update definition:
 %1</source>
         <translation>Update definition:
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="611"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="394"/>
+        <source>Automatic update checks are off. You can still check manually; no update is downloaded or installed without your action.</source>
+        <translation>Automatic update checks are off. You can still check manually; no update is downloaded or installed without your action.</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="396"/>
+        <source>Automatic checks run at most once per day. No update is downloaded or installed without your action.</source>
+        <translation>Automatic checks run at most once per day. No update is downloaded or installed without your action.</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="620"/>
         <source>Open Release Page</source>
         <translation>Open Release Page</translation>
     </message>
@@ -1345,76 +1381,83 @@ https://github.com/qianvk/TierListMaker</translation>
     <message>
         <location filename="../../src/window/RootWidget.cpp" line="323"/>
         <location filename="../../src/window/RootWidget.cpp" line="352"/>
-        <location filename="../../src/window/RootWidget.cpp" line="448"/>
-        <location filename="../../src/window/RootWidget.cpp" line="571"/>
-        <location filename="../../src/window/RootWidget.cpp" line="707"/>
+        <location filename="../../src/window/RootWidget.cpp" line="447"/>
+        <location filename="../../src/window/RootWidget.cpp" line="573"/>
+        <location filename="../../src/window/RootWidget.cpp" line="709"/>
         <source>Collapse sidebar</source>
         <translation>Collapse sidebar</translation>
     </message>
     <message>
         <location filename="../../src/window/RootWidget.cpp" line="328"/>
-        <location filename="../../src/window/RootWidget.cpp" line="447"/>
-        <location filename="../../src/window/RootWidget.cpp" line="571"/>
-        <location filename="../../src/window/RootWidget.cpp" line="706"/>
+        <location filename="../../src/window/RootWidget.cpp" line="446"/>
+        <location filename="../../src/window/RootWidget.cpp" line="573"/>
+        <location filename="../../src/window/RootWidget.cpp" line="708"/>
         <source>Show sidebar</source>
         <translation>Show sidebar</translation>
     </message>
     <message>
         <location filename="../../src/window/RootWidget.cpp" line="341"/>
-        <location filename="../../src/window/RootWidget.cpp" line="451"/>
+        <location filename="../../src/window/RootWidget.cpp" line="450"/>
         <source>New</source>
         <translation>New</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="370"/>
+        <location filename="../../src/window/RootWidget.cpp" line="369"/>
         <source>Downloading update: %1%</source>
         <translation>Downloading update: %1%</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="454"/>
-        <location filename="../../src/window/RootWidget.cpp" line="498"/>
-        <location filename="../../src/window/RootWidget.cpp" line="884"/>
-        <location filename="../../src/window/RootWidget.cpp" line="1031"/>
+        <location filename="../../src/window/RootWidget.cpp" line="453"/>
+        <location filename="../../src/window/RootWidget.cpp" line="497"/>
+        <location filename="../../src/window/RootWidget.cpp" line="892"/>
+        <location filename="../../src/window/RootWidget.cpp" line="1039"/>
         <source>Preferences</source>
         <translation>Preferences</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <location filename="../../src/window/RootWidget.cpp" line="506"/>
+        <location filename="../../src/window/RootWidget.cpp" line="854"/>
+        <source>Install</source>
+        <translation>Install</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="865"/>
         <source>Download update</source>
         <translation>Download update</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <location filename="../../src/window/RootWidget.cpp" line="866"/>
         <source>Download update %1</source>
         <translation>Download update %1</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="861"/>
+        <location filename="../../src/window/RootWidget.cpp" line="869"/>
         <source>Downloading update</source>
         <translation>Downloading update</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <location filename="../../src/window/RootWidget.cpp" line="872"/>
         <source>Install update</source>
         <translation>Install update</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <location filename="../../src/window/RootWidget.cpp" line="873"/>
         <source>Install update %1</source>
         <translation>Install update %1</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="868"/>
+        <location filename="../../src/window/RootWidget.cpp" line="876"/>
         <source>Opening update installer</source>
         <translation>Opening update installer</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="871"/>
+        <location filename="../../src/window/RootWidget.cpp" line="857"/>
+        <location filename="../../src/window/RootWidget.cpp" line="879"/>
         <source>Updates</source>
         <translation>Updates</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="1025"/>
+        <location filename="../../src/window/RootWidget.cpp" line="1033"/>
         <source>Projects</source>
         <translation>Projects</translation>
     </message>

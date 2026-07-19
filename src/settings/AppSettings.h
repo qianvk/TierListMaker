@@ -1,7 +1,7 @@
 #pragma once
 
-#include <QObject>
 #include <QDateTime>
+#include <QObject>
 #include <QSettings>
 #include <QString>
 
@@ -36,8 +36,10 @@ public:
     bool autoUpdateEnabled() const;
     void setAutoUpdateEnabled(bool enabled);
     QDateTime lastUpdateCheckAt() const;
-    void setLastUpdateCheckAt(const QDateTime& checkedAt);
-    bool shouldRunAutoUpdateCheck(const QDateTime& now = QDateTime::currentDateTimeUtc()) const;
+    QString lastUpdateCheckVersion() const;
+    void recordSuccessfulUpdateCheck(const QString& version, const QDateTime& checkedAt);
+    bool shouldRunAutoUpdateCheck(const QString& currentVersion,
+                                  const QDateTime& now = QDateTime::currentDateTimeUtc()) const;
 
     BlankAreaAction blankDoubleClickAction() const;
     void setBlankDoubleClickAction(BlankAreaAction action);

@@ -2,6 +2,7 @@
 
 #include "update/AppUpdater.h"
 
+#include <QString>
 #include <QToolButton>
 #include <QVariantAnimation>
 
@@ -14,13 +15,14 @@ public:
 
     void setUpdateState(UpdateState state);
     void setDownloadProgress(qint64 bytesReceived, qint64 bytesTotal);
+    void setInstallText(const QString& text);
     void setReducedMotion(bool reduced);
 
 protected:
     void paintEvent(QPaintEvent* event) override;
 
 private:
-    void refreshIcon();
+    void refreshPresentation();
     void playAttentionAnimation();
 
     QVariantAnimation m_attentionAnimation;
@@ -29,6 +31,7 @@ private:
     qint64 m_bytesTotal{-1};
     qreal m_attention{0.0};
     bool m_reducedMotion{false};
+    QString m_installText;
 };
 
 } // namespace tlm

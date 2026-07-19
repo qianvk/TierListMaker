@@ -226,14 +226,36 @@ Application::Application(int& argc, char** argv) : QApplication(argc, argv) {
     m_assetManager = std::make_unique<AssetManager>();
     m_thumbnailCache = std::make_unique<ThumbnailCache>();
     m_updater = std::make_unique<AppUpdater>();
+    m_updater->setLanguage(m_settings->language());
+    connect(m_settings.get(), &AppSettings::languageChanged, m_updater.get(),
+            &AppUpdater::setLanguage);
+    m_updateCheckTimer = new QTimer(this);
+    m_updateCheckTimer->setSingleShot(true);
+    connect(m_updateCheckTimer, &QTimer::timeout, m_updater.get(), [this]() {
+        if (m_settings && m_settings->autoUpdateEnabled() && m_updater) {
+            m_updater->checkForUpdates();
+        }
+    });
     const auto recordSuccessfulUpdateCheck = [this](const UpdateCheckResult&) {
         if (m_settings) {
-            m_settings->setLastUpdateCheckAt(QDateTime::currentDateTimeUtc());
+            m_settings->recordSuccessfulUpdateCheck(QStringLiteral(TLM_APP_VERSION),
+                                                    QDateTime::currentDateTimeUtc());
         }
     };
     connect(m_updater.get(), &AppUpdater::updateAvailable, this, recordSuccessfulUpdateCheck);
-    connect(m_updater.get(), &AppUpdater::noUpdateAvailable, this,
-            recordSuccessfulUpdateCheck);
+    connect(m_updater.get(), &AppUpdater::noUpdateAvailable, this, recordSuccessfulUpdateCheck);
+    connect(m_settings.get(), &AppSettings::autoUpdateEnabledChanged, this, [this](bool enabled) {
+        if (enabled) {
+            scheduleAutoUpdateCheck(true);
+            return;
+        }
+        if (m_updateCheckTimer) {
+            m_updateCheckTimer->stop();
+        }
+        if (m_updater) {
+            m_updater->cancelCheck();
+        }
+    });
 }
 
 Application::~Application() = default;
@@ -270,17 +292,19 @@ void Application::configureFont() {
 #endif
 }
 
-void Application::scheduleAutoUpdateCheck() {
-    if (!m_settings || !m_updater || !m_settings->shouldRunAutoUpdateCheck()) {
+void Application::scheduleAutoUpdateCheck(bool resetCycle) {
+    if (!m_settings || !m_updater || !m_updateCheckTimer || !m_settings->autoUpdateEnabled()) {
+        if (m_updateCheckTimer) {
+            m_updateCheckTimer->stop();
+        }
         return;
     }
-    // Delay the network request until the first window has settled, matching the
-    // manual updater path while avoiding startup UI contention.
-    QTimer::singleShot(1500, m_updater.get(), [updater = m_updater.get()]() {
-        if (updater) {
-            updater->checkForUpdates();
-        }
-    });
+    if (!resetCycle && !m_settings->shouldRunAutoUpdateCheck(QStringLiteral(TLM_APP_VERSION))) {
+        return;
+    }
+    // A short, cancellable delay mirrors native updaters: it keeps startup responsive and lets
+    // a quickly reverted preference change stop the request before it begins.
+    m_updateCheckTimer->start(resetCycle ? 750 : 1500);
 }
 
 } // namespace tlm

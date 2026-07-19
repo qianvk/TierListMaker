@@ -15,6 +15,19 @@ both prerelease and stable releases and select the highest compatible Semantic V
 are accepted only when the release asset reports a matching platform, architecture, size, and
 SHA-256 digest.
 
-Windows packages intentionally omit the software OpenGL renderer, legacy D3D compiler, DXC, Qt
-translations, and the VC redistributable installer. CI audits those exclusions and installs only the
-five MSVC runtime DLLs imported by the application and deployed Qt libraries.
+When the selected release includes `updates.json`, the application reads optional release notes
+from `localizations.en.changelog` and `localizations.zh_CN.changelog`, using the application
+language (or the resolved system language). Missing or invalid localized metadata falls back to the
+GitHub release body and never changes the package URL, size, or checksum selected from the release.
+
+Every Windows release contains a full NSIS installer and a `WinUpdate` executable. The update
+package carries only the signed application executable, verifies the installed `runtime-version`,
+waits for the running application to exit, replaces it with rollback protection, and restarts it.
+Clients use the compact package only when its runtime generation and GitHub asset metadata match;
+otherwise they use the full installer. Bump `TLM_UPDATE_RUNTIME_VERSION` whenever Qt or the deployed
+dynamic plugin/runtime set changes. macOS continues to update with the complete signed DMG.
+
+The Windows NSIS installer installs machine-wide under `Program Files` by default. It intentionally
+omits the software OpenGL renderer, legacy D3D compiler, DXC, Qt translations, and the VC
+redistributable installer. CI audits those exclusions and installs only the five MSVC runtime DLLs
+imported by the application and deployed Qt libraries.

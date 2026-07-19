@@ -12,6 +12,7 @@ inline constexpr QStringView defaultProjectDirectory = u"save/defaultProjectDire
 inline constexpr QStringView defaultTemplate = u"template/default";
 inline constexpr QStringView autoUpdateEnabled = u"update/autoUpdateEnabled";
 inline constexpr QStringView lastUpdateCheckAt = u"update/lastCheckAt";
+inline constexpr QStringView lastUpdateCheckVersion = u"update/lastCheckVersion";
 inline constexpr QStringView blankDoubleClickAction = u"interaction/blankDoubleClickAction";
 inline constexpr QStringView blankLongPressAction = u"interaction/blankLongPressAction";
 inline constexpr QStringView tierListToolTipsEnabled = u"interaction/tierListToolTipsEnabled";

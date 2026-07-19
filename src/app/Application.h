@@ -3,6 +3,8 @@
 #include <QApplication>
 #include <memory>
 
+class QTimer;
+
 namespace tlm {
 
 class AppSettings;
@@ -29,7 +31,7 @@ public:
 private:
     void configureApplication();
     void configureFont();
-    void scheduleAutoUpdateCheck();
+    void scheduleAutoUpdateCheck(bool resetCycle = false);
 
     std::unique_ptr<Logger> m_logger;
     std::unique_ptr<UiPerformanceMonitor> m_performanceMonitor;
@@ -41,6 +43,7 @@ private:
     std::unique_ptr<AssetManager> m_assetManager;
     std::unique_ptr<ThumbnailCache> m_thumbnailCache;
     std::unique_ptr<AppUpdater> m_updater;
+    QTimer* m_updateCheckTimer{nullptr};
 };
 
 } // namespace tlm

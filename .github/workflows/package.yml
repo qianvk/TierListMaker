@@ -24,10 +24,12 @@ jobs:
             cpack_generator: DragNDrop
             artifact_name: TierListMaker-macOS
             artifact_glob: dist/*.dmg
+            runtime_metadata: ''
           - os: windows-latest
             cpack_generator: NSIS
             artifact_name: TierListMaker-Windows
             artifact_glob: dist/*.exe
+            runtime_metadata: dist/TierListMaker-Windows-runtime-version.txt
     runs-on: ${{ matrix.os }}
     timeout-minutes: 45
     env:
@@ -144,6 +146,15 @@ jobs:
           -G ${{ matrix.cpack_generator }}
           -B dist
 
+      - name: Build Windows executable update
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake --build build/package --config Release --target TierListMakerUpdatePackage
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Copy-Item build/package/updates/*-WinUpdate-*.exe dist/
+          Copy-Item build/package/TierListMaker-Windows-runtime-version.txt dist/
+
       - name: Audit Windows runtime payload
         if: runner.os == 'Windows'
         shell: pwsh
@@ -175,7 +186,7 @@ jobs:
             }
           }
 
-      - name: Sign Windows installer
+      - name: Sign Windows release packages
         if: runner.os == 'Windows' && env.HAS_WINDOWS_CERTIFICATE == 'true'
         shell: pwsh
         env:
@@ -184,13 +195,14 @@ jobs:
           $signTool = Get-ChildItem `
             "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
             Sort-Object FullName | Select-Object -Last 1
-          $installer = Get-ChildItem dist/*.exe | Select-Object -First 1
-          & $signTool.FullName sign /fd SHA256 /td SHA256 `
-            /tr https://timestamp.digicert.com `
-            /f $env:WINDOWS_CERTIFICATE_PATH `
-            /p $env:WINDOWS_CERTIFICATE_PASSWORD `
-            $installer.FullName
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($package in Get-ChildItem dist/*.exe) {
+            & $signTool.FullName sign /fd SHA256 /td SHA256 `
+              /tr https://timestamp.digicert.com `
+              /f $env:WINDOWS_CERTIFICATE_PATH `
+              /p $env:WINDOWS_CERTIFICATE_PASSWORD `
+              $package.FullName
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
 
       - name: Notarize macOS disk image
         if: >-
@@ -218,8 +230,9 @@ jobs:
       - name: Generate checksum
         shell: bash
         run: |
-          artifact="$(find dist -maxdepth 1 \( -name '*.dmg' -o -name '*.exe' \) -print -quit)"
-          cmake -E sha256sum "${artifact}" > "${artifact}.sha256"
+          while IFS= read -r artifact; do
+            cmake -E sha256sum "${artifact}" > "${artifact}.sha256"
+          done < <(find dist -maxdepth 1 \( -name '*.dmg' -o -name '*.exe' \) -print)
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
@@ -228,6 +241,7 @@ jobs:
           path: |
             ${{ matrix.artifact_glob }}
             ${{ matrix.artifact_glob }}.sha256
+            ${{ matrix.runtime_metadata }}
           if-no-files-found: error
           retention-days: 14
 
@@ -265,15 +279,22 @@ jobs:
             channel="beta"
           fi
           windows_path="$(find release-assets -maxdepth 1 -name '*-Windows-*.exe' -print -quit)"
+          windows_update_path="$(find release-assets -maxdepth 1 -name '*-WinUpdate-*.exe' -print -quit)"
           macos_path="$(find release-assets -maxdepth 1 -name '*-Darwin-*.dmg' -print -quit)"
-          test -n "${windows_path}" && test -n "${macos_path}"
+          runtime_path="release-assets/TierListMaker-Windows-runtime-version.txt"
+          test -n "${windows_path}" && test -n "${windows_update_path}" && \
+            test -n "${macos_path}" && test -f "${runtime_path}"
 
           windows_name="$(basename "${windows_path}")"
+          windows_update_name="$(basename "${windows_update_path}")"
           macos_name="$(basename "${macos_path}")"
           windows_sha="$(shasum -a 256 "${windows_path}" | cut -d ' ' -f 1)"
+          windows_update_sha="$(shasum -a 256 "${windows_update_path}" | cut -d ' ' -f 1)"
           macos_sha="$(shasum -a 256 "${macos_path}" | cut -d ' ' -f 1)"
           windows_size="$(stat -f '%z' "${windows_path}")"
+          windows_update_size="$(stat -f '%z' "${windows_update_path}")"
           macos_size="$(stat -f '%z' "${macos_path}")"
+          runtime_version="$(tr -d '\r\n' < "${runtime_path}")"
           release_url="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}"
           asset_root="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}"
 
@@ -285,20 +306,39 @@ jobs:
             --arg windows_name "${windows_name}" \
             --arg windows_sha "${windows_sha}" \
             --argjson windows_size "${windows_size}" \
+            --arg windows_update_name "${windows_update_name}" \
+            --arg windows_update_sha "${windows_update_sha}" \
+            --argjson windows_update_size "${windows_update_size}" \
+            --arg runtime_version "${runtime_version}" \
             --arg macos_name "${macos_name}" \
             --arg macos_sha "${macos_sha}" \
             --argjson macos_size "${macos_size}" \
             '{
-              "schema-version": 1,
+              "schema-version": 2,
               channel: $channel,
+              localizations: {
+                en: {
+                  changelog: ("TierListMaker " + $version + " is available. See the release page for details.")
+                },
+                zh_CN: {
+                  changelog: ("TierListMaker " + $version + " 已发布。详细内容请查看发布页面。")
+                }
+              },
               updates: {
                 windows: {
                   "latest-version": $version,
+                  "runtime-version": $runtime_version,
                   "download-url": ($asset_root + "/" + $windows_name),
                   "release-url": $release_url,
                   "file-name": $windows_name,
                   sha256: $windows_sha,
-                  size: $windows_size
+                  size: $windows_size,
+                  update: {
+                    "download-url": ($asset_root + "/" + $windows_update_name),
+                    "file-name": $windows_update_name,
+                    sha256: $windows_update_sha,
+                    size: $windows_update_size
+                  }
                 },
                 macos: {
                   "latest-version": $version,
@@ -310,6 +350,7 @@ jobs:
                 }
               }
             }' > release-assets/updates.json
+          rm -f "${runtime_path}"
 
       - name: Publish release assets
         shell: bash

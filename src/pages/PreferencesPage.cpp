@@ -238,30 +238,30 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
         connect(m_updater, &AppUpdater::updateAvailable, this, &PreferencesPage::applyUpdateResult);
         connect(m_updater, &AppUpdater::noUpdateAvailable, this,
                 &PreferencesPage::applyUpdateResult);
+        connect(m_updater, &AppUpdater::updateDetailsChanged, this,
+                &PreferencesPage::applyUpdateResult);
         connect(m_updater, &AppUpdater::checkFailed, this, &PreferencesPage::applyUpdateFailure);
         connect(m_updater, &AppUpdater::updateFailed, this, &PreferencesPage::applyUpdateFailure);
         connect(m_updater, &AppUpdater::updateNotificationChanged, this,
                 &PreferencesPage::setUpdateNotificationVisible);
         connect(m_updater, &AppUpdater::stateChanged, this,
                 [this](UpdateState) { refreshUpdateActions(); });
-        connect(m_updater, &AppUpdater::downloadProgress, this,
-                [this](qint64 received, qint64 total) {
-                    if (m_updateStatusLabel && total > 0) {
-                        const int percent = qBound(
-                            0, qRound(100.0 * static_cast<qreal>(received) /
-                                      static_cast<qreal>(total)),
-                            100);
-                        m_updateStatusLabel->setText(
-                            tr("Downloading update %1: %2%")
-                                .arg(m_updater ? m_updater->lastResult().latestVersion : QString())
-                                .arg(percent));
-                    }
-                });
+        connect(
+            m_updater, &AppUpdater::downloadProgress, this, [this](qint64 received, qint64 total) {
+                if (m_updateStatusLabel && total > 0) {
+                    const int percent = qBound(
+                        0, qRound(100.0 * static_cast<qreal>(received) / static_cast<qreal>(total)),
+                        100);
+                    m_updateStatusLabel->setText(
+                        tr("Downloading update %1: %2%")
+                            .arg(m_updater ? m_updater->lastResult().latestVersion : QString())
+                            .arg(percent));
+                }
+            });
         connect(m_updater, &AppUpdater::updateReady, this, [this](const QString&) {
             if (m_updateStatusLabel && m_updater) {
-                m_updateStatusLabel->setText(
-                    tr("Update %1 is ready to install.")
-                        .arg(m_updater->lastResult().latestVersion));
+                m_updateStatusLabel->setText(tr("Update %1 is ready to install.")
+                                                 .arg(m_updater->lastResult().latestVersion));
             }
             refreshUpdateActions();
         });
@@ -270,6 +270,12 @@ PreferencesPage::PreferencesPage(AppSettings* settings, LanguageManager* languag
     if (m_languageManager) {
         connect(m_languageManager, &LanguageManager::languageChanged, this,
                 &PreferencesPage::retranslateUi);
+    }
+    if (m_settings) {
+        connect(m_settings, &AppSettings::autoUpdateEnabledChanged, this, [this](bool) {
+            setUpdateNotificationVisible(m_updater && m_updater->hasUpdateAvailable());
+            refreshUpdatePolicyText();
+        });
     }
     updateNavWidth();
     QTimer::singleShot(0, this, &PreferencesPage::updateNavWidth);
@@ -306,7 +312,8 @@ void PreferencesPage::setUpdateNotificationVisible(bool visible) {
     if (!m_nav || m_nav->count() < 2) {
         return;
     }
-    m_nav->item(1)->setData(kUpdateBadgeRole, visible);
+    m_nav->item(1)->setData(kUpdateBadgeRole,
+                            visible && (!m_settings || m_settings->autoUpdateEnabled()));
     m_nav->viewport()->update();
 }
 
@@ -369,13 +376,25 @@ void PreferencesPage::refreshUpdateActions() {
         m_installUpdateButton->setVisible(m_updater && m_updater->hasUpdateAvailable());
         m_installUpdateButton->setEnabled(ready || available);
         m_installUpdateButton->setText(ready ? tr("Install Update") : tr("Download Update"));
-        m_installUpdateButton->setIcon(vkui::icon(
-            ready ? vkui::VkSymbol::Checkmark : vkui::VkSymbol::Download,
-            vkui::VkIconRole::Accent));
+        m_installUpdateButton->setIcon(
+            vkui::icon(ready ? vkui::VkSymbol::Checkmark : vkui::VkSymbol::Download,
+                       vkui::VkIconRole::Accent));
     }
     if (m_openUpdateButton) {
         m_openUpdateButton->setEnabled(m_updater && m_updater->hasUpdateAvailable());
     }
+}
+
+void PreferencesPage::refreshUpdatePolicyText() {
+    if (!m_updateStatusLabel || (m_updater && !m_updater->lastResult().latestVersion.isEmpty())) {
+        return;
+    }
+    m_updateStatusLabel->setText(
+        m_settings && !m_settings->autoUpdateEnabled()
+            ? tr("Automatic update checks are off. You can still check manually; no update is "
+                 "downloaded or installed without your action.")
+            : tr("Automatic checks run at most once per day. No update is downloaded or installed "
+                 "without your action."));
 }
 
 void PreferencesPage::applyUpdateResult(const UpdateCheckResult& result) {
@@ -441,17 +460,15 @@ QWidget* PreferencesPage::createGeneralPage() {
 
     auto* previewBackground = new QComboBox(page);
     previewBackground->addItem(tr("None"), static_cast<int>(PreviewBackgroundMode::None));
-    previewBackground->addItem(tr("Image"),
-                               static_cast<int>(PreviewBackgroundMode::SelfImage));
+    previewBackground->addItem(tr("Image"), static_cast<int>(PreviewBackgroundMode::SelfImage));
     previewBackground->setCurrentIndex(qMax(
         0, previewBackground->findData(static_cast<int>(m_settings->previewBackgroundMode()))));
     connect(previewBackground, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
             [this, previewBackground](int index) {
-                m_settings->setPreviewBackgroundMode(static_cast<PreviewBackgroundMode>(
-                    previewBackground->itemData(index).toInt()));
+                m_settings->setPreviewBackgroundMode(
+                    static_cast<PreviewBackgroundMode>(previewBackground->itemData(index).toInt()));
             });
-    settingsLayout->addWidget(
-        createSettingRow(tr("Preview background"), previewBackground, page));
+    settingsLayout->addWidget(createSettingRow(tr("Preview background"), previewBackground, page));
 
     const auto addBlankAreaActionItems = [](QComboBox* combo) {
         combo->addItem(tr("Open Gallery Overview"),
@@ -492,8 +509,7 @@ QWidget* PreferencesPage::createGeneralPage() {
     tierListToolTips->setChecked(m_settings->tierListToolTipsEnabled());
     connect(tierListToolTips, &QAbstractButton::toggled, m_settings,
             &AppSettings::setTierListToolTipsEnabled);
-    settingsLayout->addWidget(
-        createSettingRow(tr("Tier list tooltips"), tierListToolTips, page));
+    settingsLayout->addWidget(createSettingRow(tr("Tier list tooltips"), tierListToolTips, page));
 
     auto* autosave = new vkui::VkSwitch(page);
     autosave->setAccessibleName(tr("Enable autosave"));
@@ -564,12 +580,8 @@ QWidget* PreferencesPage::createGeneralPage() {
     auto* autoUpdate = new vkui::VkSwitch(page);
     autoUpdate->setAccessibleName(tr("Enable automatic update checks"));
     autoUpdate->setChecked(m_settings->autoUpdateEnabled());
-    connect(autoUpdate, &QAbstractButton::toggled, this, [this](bool enabled) {
-        m_settings->setAutoUpdateEnabled(enabled);
-        if (enabled && m_updater && !m_updater->isChecking()) {
-            m_updater->checkForUpdates();
-        }
-    });
+    connect(autoUpdate, &QAbstractButton::toggled, this,
+            [this](bool enabled) { m_settings->setAutoUpdateEnabled(enabled); });
     settingsLayout->addWidget(createSettingRow(tr("Updates"), autoUpdate, page));
 
     layout->addWidget(new SectionHeader(tr("General"), page));
@@ -592,11 +604,8 @@ QWidget* PreferencesPage::createUpdatePage() {
     endpoint->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(endpoint);
 
-    m_updateStatusLabel =
-        new QLabel(tr("Manual checks run when you click Check Now. Automatic checks run at most "
-                      "once per day when "
-                      "enabled. No update is downloaded or executed automatically."),
-                   page);
+    m_updateStatusLabel = new QLabel(page);
+    refreshUpdatePolicyText();
     m_updateStatusLabel->setWordWrap(true);
     m_updateStatusLabel->setTextInteractionFlags(Qt::TextSelectableByMouse);
     layout->addWidget(m_updateStatusLabel);

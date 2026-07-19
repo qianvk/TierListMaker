@@ -76,10 +76,12 @@ QString fallbackProjectDirectory() {
 } // namespace
 
 AppSettings::AppSettings(QObject* parent)
-    : QObject(parent), m_settings(QStringLiteral("TierListMaker"), QStringLiteral("TierListMaker")) {}
+    : QObject(parent),
+      m_settings(QStringLiteral("TierListMaker"), QStringLiteral("TierListMaker")) {}
 
 QString AppSettings::language() const {
-    return m_settings.value(settings_keys::language.toString(), QStringLiteral("system")).toString();
+    return m_settings.value(settings_keys::language.toString(), QStringLiteral("system"))
+        .toString();
 }
 
 void AppSettings::setLanguage(const QString& language) {
@@ -93,7 +95,8 @@ void AppSettings::setLanguage(const QString& language) {
 
 AppearanceMode AppSettings::appearance() const {
     return appearanceFromString(
-        m_settings.value(settings_keys::appearance.toString(), QStringLiteral("system")).toString());
+        m_settings.value(settings_keys::appearance.toString(), QStringLiteral("system"))
+            .toString());
 }
 
 void AppSettings::setAppearance(AppearanceMode mode) {
@@ -175,14 +178,23 @@ QDateTime AppSettings::lastUpdateCheckAt() const {
     return m_settings.value(settings_keys::lastUpdateCheckAt.toString()).toDateTime().toUTC();
 }
 
-void AppSettings::setLastUpdateCheckAt(const QDateTime& checkedAt) {
+QString AppSettings::lastUpdateCheckVersion() const {
+    return m_settings.value(settings_keys::lastUpdateCheckVersion.toString()).toString().trimmed();
+}
+
+void AppSettings::recordSuccessfulUpdateCheck(const QString& version, const QDateTime& checkedAt) {
     m_settings.setValue(settings_keys::lastUpdateCheckAt.toString(), checkedAt.toUTC());
+    m_settings.setValue(settings_keys::lastUpdateCheckVersion.toString(), version.trimmed());
     emit changed();
 }
 
-bool AppSettings::shouldRunAutoUpdateCheck(const QDateTime& now) const {
+bool AppSettings::shouldRunAutoUpdateCheck(const QString& currentVersion,
+                                           const QDateTime& now) const {
     if (!autoUpdateEnabled()) {
         return false;
+    }
+    if (lastUpdateCheckVersion() != currentVersion.trimmed()) {
+        return true;
     }
     const QDateTime lastCheck = lastUpdateCheckAt();
     if (!lastCheck.isValid()) {
@@ -193,11 +205,11 @@ bool AppSettings::shouldRunAutoUpdateCheck(const QDateTime& now) const {
 }
 
 BlankAreaAction AppSettings::blankDoubleClickAction() const {
-    return blankAreaActionFromString(
-        m_settings.value(settings_keys::blankDoubleClickAction.toString(),
-                         QStringLiteral("galleryMissionControl"))
-            .toString(),
-        BlankAreaAction::GalleryMissionControl);
+    return blankAreaActionFromString(m_settings
+                                         .value(settings_keys::blankDoubleClickAction.toString(),
+                                                QStringLiteral("galleryMissionControl"))
+                                         .toString(),
+                                     BlankAreaAction::GalleryMissionControl);
 }
 
 void AppSettings::setBlankDoubleClickAction(BlankAreaAction action) {
@@ -211,11 +223,11 @@ void AppSettings::setBlankDoubleClickAction(BlankAreaAction action) {
 }
 
 BlankAreaAction AppSettings::blankLongPressAction() const {
-    return blankAreaActionFromString(
-        m_settings.value(settings_keys::blankLongPressAction.toString(),
-                         QStringLiteral("tierMissionControl"))
-            .toString(),
-        BlankAreaAction::TierMissionControl);
+    return blankAreaActionFromString(m_settings
+                                         .value(settings_keys::blankLongPressAction.toString(),
+                                                QStringLiteral("tierMissionControl"))
+                                         .toString(),
+                                     BlankAreaAction::TierMissionControl);
 }
 
 void AppSettings::setBlankLongPressAction(BlankAreaAction action) {
@@ -258,7 +270,8 @@ void AppSettings::setPreviewBackgroundMode(PreviewBackgroundMode mode) {
 }
 
 QString AppSettings::defaultExportFormat() const {
-    return m_settings.value(settings_keys::exportFormat.toString(), QStringLiteral("png")).toString();
+    return m_settings.value(settings_keys::exportFormat.toString(), QStringLiteral("png"))
+        .toString();
 }
 
 void AppSettings::setDefaultExportFormat(const QString& format) {

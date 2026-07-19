@@ -11,6 +11,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QLocale>
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QRegularExpression>
@@ -32,8 +33,12 @@
 #define TLM_UPDATE_CHANNEL "beta"
 #endif
 
+#ifndef TLM_UPDATE_RUNTIME_VERSION
+#define TLM_UPDATE_RUNTIME_VERSION "qt-6.10.1-r1"
+#endif
+
 #ifndef TLM_UPDATE_MANIFEST_URL
-#define TLM_UPDATE_MANIFEST_URL                                                                  \
+#define TLM_UPDATE_MANIFEST_URL                                                                    \
     "https://api.github.com/repos/qianvk/TierListMaker/releases?per_page=20"
 #endif
 
@@ -61,6 +66,22 @@ QString platformKey() {
 #else
     return QStringLiteral("linux");
 #endif
+}
+
+QString normalizedLanguage(QString language) {
+    language = language.trimmed().replace(QLatin1Char('-'), QLatin1Char('_'));
+    if (language.isEmpty() ||
+        language.compare(QStringLiteral("system"), Qt::CaseInsensitive) == 0) {
+        language = QLocale::system().name();
+    }
+    if (language.startsWith(QStringLiteral("zh"), Qt::CaseInsensitive)) {
+        return QStringLiteral("zh_CN");
+    }
+    if (language.startsWith(QStringLiteral("en"), Qt::CaseInsensitive)) {
+        return QStringLiteral("en");
+    }
+    const qsizetype separator = language.indexOf(QLatin1Char('_'));
+    return (separator >= 0 ? language.first(separator) : language).toLower();
 }
 
 QString normalizedVersion(QString version) {
@@ -168,6 +189,67 @@ QString stringValue(const QJsonObject& object, std::initializer_list<const char*
     return {};
 }
 
+QString localizedTextValue(const QJsonValue& value) {
+    if (value.isString()) {
+        return value.toString().trimmed();
+    }
+    if (value.isObject()) {
+        return stringValue(value.toObject(), {"changelog", "changes", "notes", "body"});
+    }
+    return {};
+}
+
+void collectLocalizedChangelogs(const QJsonObject& object, QMap<QString, QString>* changelogs) {
+    if (!changelogs) {
+        return;
+    }
+    const auto collectObject = [changelogs](const QJsonObject& localized) {
+        for (auto it = localized.constBegin(); it != localized.constEnd(); ++it) {
+            const QString text = localizedTextValue(it.value());
+            if (text.isEmpty()) {
+                continue;
+            }
+            const QString key =
+                it.key().compare(QStringLiteral("default"), Qt::CaseInsensitive) == 0
+                    ? QStringLiteral("default")
+                    : normalizedLanguage(it.key());
+            changelogs->insert(key, text);
+        }
+    };
+
+    for (const QString& key : {QStringLiteral("localizations"), QStringLiteral("localized")}) {
+        const QJsonValue value = object.value(key);
+        if (value.isObject()) {
+            collectObject(value.toObject());
+        }
+    }
+    const QJsonValue changelog = object.value(QStringLiteral("changelog"));
+    if (changelog.isObject()) {
+        collectObject(changelog.toObject());
+    }
+}
+
+QString selectLocalizedChangelog(const QMap<QString, QString>& changelogs, const QString& language,
+                                 const QString& fallback = {}) {
+    const QString resolved = normalizedLanguage(language);
+    if (const auto exact = changelogs.constFind(resolved); exact != changelogs.cend()) {
+        return exact.value();
+    }
+    const QString base = resolved.section(QLatin1Char('_'), 0, 0);
+    if (const auto baseMatch = changelogs.constFind(base); baseMatch != changelogs.cend()) {
+        return baseMatch.value();
+    }
+    if (const auto english = changelogs.constFind(QStringLiteral("en"));
+        english != changelogs.cend()) {
+        return english.value();
+    }
+    if (const auto defaultText = changelogs.constFind(QStringLiteral("default"));
+        defaultText != changelogs.cend()) {
+        return defaultText.value();
+    }
+    return fallback.trimmed();
+}
+
 bool boolValue(const QJsonObject& object, std::initializer_list<const char*> keys,
                bool fallback = false) {
     for (const char* key : keys) {
@@ -196,7 +278,8 @@ qint64 integerValue(const QJsonObject& object, std::initializer_list<const char*
         const QJsonValue value = object.value(QString::fromLatin1(key));
         if (value.isDouble()) {
             const double number = value.toDouble(-1.0);
-            if (number >= 0.0 && number <= static_cast<double>(std::numeric_limits<qint64>::max())) {
+            if (number >= 0.0 &&
+                number <= static_cast<double>(std::numeric_limits<qint64>::max())) {
                 return static_cast<qint64>(number);
             }
         } else if (value.isString()) {
@@ -216,7 +299,8 @@ QUrl urlValue(const QJsonObject& object, std::initializer_list<const char*> keys
 }
 
 bool isSecureWebUrl(const QUrl& url) {
-    return url.isValid() && url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0 &&
+    return url.isValid() &&
+           url.scheme().compare(QStringLiteral("https"), Qt::CaseInsensitive) == 0 &&
            !url.host().isEmpty();
 }
 
@@ -224,8 +308,7 @@ QJsonObject platformObject(const QJsonObject& root) {
     const QString key = platformKey();
     QStringList candidates{key};
     if (key == QStringLiteral("macos")) {
-        candidates.append({QStringLiteral("osx"), QStringLiteral("mac"),
-                           QStringLiteral("darwin")});
+        candidates.append({QStringLiteral("osx"), QStringLiteral("mac"), QStringLiteral("darwin")});
     }
     candidates.append({QStringLiteral("all"), QStringLiteral("default")});
     for (const QString& candidate : std::as_const(candidates)) {
@@ -271,6 +354,16 @@ bool packageMatchesPlatform(const QString& fileName) {
 #endif
 }
 
+bool isWindowsUpdatePackage(const QString& fileName) {
+#if defined(Q_OS_WIN)
+    return fileName.endsWith(QStringLiteral(".exe"), Qt::CaseInsensitive) &&
+           fileName.contains(QStringLiteral("WinUpdate"), Qt::CaseInsensitive);
+#else
+    Q_UNUSED(fileName)
+    return false;
+#endif
+}
+
 QStringList architectureAliases() {
     const QString architecture = QSysInfo::currentCpuArchitecture().toLower();
     if (architecture == QStringLiteral("x86_64") || architecture == QStringLiteral("amd64")) {
@@ -288,11 +381,11 @@ bool packageMatchesArchitecture(const QString& fileName) {
         return true;
     }
 
-    static const QStringList knownArchitectures{
-        QStringLiteral("x86_64"), QStringLiteral("amd64"), QStringLiteral("x64"),
-        QStringLiteral("aarch64"), QStringLiteral("arm64")};
-    const bool declaresArchitecture = std::ranges::any_of(
-        knownArchitectures, [&name](const QString& architecture) {
+    static const QStringList knownArchitectures{QStringLiteral("x86_64"), QStringLiteral("amd64"),
+                                                QStringLiteral("x64"), QStringLiteral("aarch64"),
+                                                QStringLiteral("arm64")};
+    const bool declaresArchitecture =
+        std::ranges::any_of(knownArchitectures, [&name](const QString& architecture) {
             return name.contains(architecture);
         });
     if (!declaresArchitecture) {
@@ -335,7 +428,7 @@ bool verifyPackage(const QString& path, const UpdateCheckResult& result) {
 }
 
 UpdateCheckResult parseDefinition(const QJsonObject& root, const QString& currentVersion,
-                                  QString* error) {
+                                  QString* error, const QString& language) {
     QJsonObject object = root;
     if (root.value(QStringLiteral("updates")).isObject()) {
         object = platformObject(root.value(QStringLiteral("updates")).toObject());
@@ -358,17 +451,41 @@ UpdateCheckResult parseDefinition(const QJsonObject& root, const QString& curren
     if (result.channel.isEmpty()) {
         result.channel = stringValue(object, {"channel"});
     }
+    result.runtimeVersion = stringValue(object, {"runtime-version", "runtimeVersion"});
+    if (result.runtimeVersion.isEmpty()) {
+        result.runtimeVersion = stringValue(root, {"runtime-version", "runtimeVersion"});
+    }
     result.latestVersion = normalizedVersion(
         stringValue(object, {"latest-version", "latestVersion", "version", "tag_name"}));
     result.downloadUrl = urlValue(object, {"download-url", "downloadUrl", "url"});
-    result.openUrl =
-        urlValue(object, {"open-url", "openUrl", "release-url", "releaseUrl"});
-    result.changelog = stringValue(object, {"changelog", "changes", "notes", "body"});
+    result.openUrl = urlValue(object, {"open-url", "openUrl", "release-url", "releaseUrl"});
+    result.metadataUrl = urlValue(object, {"metadata-url", "metadataUrl"});
+    collectLocalizedChangelogs(root, &result.localizedChangelogs);
+    collectLocalizedChangelogs(object, &result.localizedChangelogs);
+    QString fallbackChangelog = stringValue(object, {"changelog", "changes", "notes", "body"});
+    if (fallbackChangelog.isEmpty()) {
+        fallbackChangelog = stringValue(root, {"changelog", "changes", "notes", "body"});
+    }
+    if (!fallbackChangelog.isEmpty() &&
+        !result.localizedChangelogs.contains(QStringLiteral("default"))) {
+        result.localizedChangelogs.insert(QStringLiteral("default"), fallbackChangelog);
+    }
+    result.changelog =
+        selectLocalizedChangelog(result.localizedChangelogs, language, fallbackChangelog);
     result.fileName = stringValue(object, {"file-name", "fileName", "name"});
     result.sha256 = stringValue(object, {"sha256", "checksum"}).toLower();
     result.packageSize = integerValue(object, {"size", "package-size", "packageSize"});
     result.mandatory =
         boolValue(object, {"mandatory-update", "mandatoryUpdate", "mandatory"}, false);
+
+    const QJsonObject updateObject = object.value(QStringLiteral("update")).toObject();
+    if (!updateObject.isEmpty()) {
+        result.updateDownloadUrl = urlValue(updateObject, {"download-url", "downloadUrl", "url"});
+        result.updateFileName = stringValue(updateObject, {"file-name", "fileName", "name"});
+        result.updateSha256 = stringValue(updateObject, {"sha256", "checksum"}).toLower();
+        result.updatePackageSize =
+            integerValue(updateObject, {"size", "package-size", "packageSize"});
+    }
 
     const SemanticVersion latestVersion = parseSemanticVersion(result.latestVersion);
     if (!latestVersion.valid) {
@@ -389,6 +506,18 @@ UpdateCheckResult parseDefinition(const QJsonObject& root, const QString& curren
         }
         return {};
     }
+    if (result.metadataUrl.isValid() && !isSecureWebUrl(result.metadataUrl)) {
+        if (error) {
+            *error = QObject::tr("The update metadata URL is not secure.");
+        }
+        return {};
+    }
+    if (result.updateDownloadUrl.isValid() && !isSecureWebUrl(result.updateDownloadUrl)) {
+        if (error) {
+            *error = QObject::tr("The executable update URL is not secure.");
+        }
+        return {};
+    }
     if (!result.sha256.isEmpty()) {
         static const QRegularExpression shaPattern(QStringLiteral("^[0-9a-f]{64}$"));
         if (!shaPattern.match(result.sha256).hasMatch()) {
@@ -397,6 +526,23 @@ UpdateCheckResult parseDefinition(const QJsonObject& root, const QString& curren
             }
             return {};
         }
+    }
+    if (!result.updateSha256.isEmpty()) {
+        static const QRegularExpression shaPattern(QStringLiteral("^[0-9a-f]{64}$"));
+        if (!shaPattern.match(result.updateSha256).hasMatch()) {
+            if (error) {
+                *error = QObject::tr("The executable update checksum is invalid.");
+            }
+            return {};
+        }
+    }
+    if (result.updateDownloadUrl.isValid() &&
+        (!isWindowsUpdatePackage(result.updateFileName) || result.updateSha256.size() != 64 ||
+         result.updatePackageSize <= 0)) {
+        if (error) {
+            *error = QObject::tr("The executable update metadata is incomplete.");
+        }
+        return {};
     }
 
     const QString minimumVersion = normalizedVersion(stringValue(
@@ -416,47 +562,67 @@ UpdateCheckResult parseDefinition(const QJsonObject& root, const QString& curren
         }
         result.fileName = fileName;
     }
+    if (result.updateAvailable && result.runtimeVersion == AppUpdater::runtimeVersion() &&
+        result.updateDownloadUrl.isValid()) {
+        result.downloadUrl = result.updateDownloadUrl;
+        result.fileName = result.updateFileName;
+        result.sha256 = result.updateSha256;
+        result.packageSize = result.updatePackageSize;
+        result.lightweightPackage = true;
+    }
     if (!result.openUrl.isValid()) {
         result.openUrl = AppUpdater::defaultProjectUrl();
     }
     return result;
 }
 
+QJsonObject packageDefinitionFromGitHubAsset(const QJsonObject& asset) {
+    QJsonObject package;
+    package.insert(QStringLiteral("download-url"), stringValue(asset, {"browser_download_url"}));
+    package.insert(QStringLiteral("file-name"), stringValue(asset, {"name"}));
+    package.insert(QStringLiteral("size"), asset.value(QStringLiteral("size")));
+    QString digest = stringValue(asset, {"digest"}).toLower();
+    if (digest.startsWith(QStringLiteral("sha256:"))) {
+        digest.remove(0, 7);
+    }
+    package.insert(QStringLiteral("sha256"), digest);
+    return package;
+}
+
 UpdateCheckResult parseGitHubRelease(const QJsonObject& root, const QString& currentVersion,
-                                     QString* error) {
+                                     QString* error, const QString& language) {
     QJsonObject definition;
-    definition.insert(QStringLiteral("version"),
-                      stringValue(root, {"tag_name", "name"}));
+    definition.insert(QStringLiteral("version"), stringValue(root, {"tag_name", "name"}));
     definition.insert(QStringLiteral("release-url"), stringValue(root, {"html_url"}));
     definition.insert(QStringLiteral("changelog"), stringValue(root, {"body"}));
-    definition.insert(QStringLiteral("channel"),
-                      root.value(QStringLiteral("prerelease")).toBool()
-                          ? QStringLiteral("beta")
-                          : QStringLiteral("stable"));
+    definition.insert(QStringLiteral("channel"), root.value(QStringLiteral("prerelease")).toBool()
+                                                     ? QStringLiteral("beta")
+                                                     : QStringLiteral("stable"));
 
     const QJsonArray assets = root.value(QStringLiteral("assets")).toArray();
+    bool packageFound = false;
     for (const QJsonValue& value : assets) {
         const QJsonObject asset = value.toObject();
         const QString name = asset.value(QStringLiteral("name")).toString().trimmed();
-        if (packageTypeSupported(name) && packageMatchesPlatform(name) &&
-            packageMatchesArchitecture(name)) {
-            definition.insert(QStringLiteral("download-url"),
+        if (name.compare(QStringLiteral("updates.json"), Qt::CaseInsensitive) == 0) {
+            definition.insert(QStringLiteral("metadata-url"),
                               stringValue(asset, {"browser_download_url"}));
-            definition.insert(QStringLiteral("file-name"), name);
-            definition.insert(QStringLiteral("size"), asset.value(QStringLiteral("size")));
-            QString digest = stringValue(asset, {"digest"}).toLower();
-            if (digest.startsWith(QStringLiteral("sha256:"))) {
-                digest.remove(0, 7);
+        } else if (isWindowsUpdatePackage(name) && packageMatchesArchitecture(name)) {
+            definition.insert(QStringLiteral("update"), packageDefinitionFromGitHubAsset(asset));
+        } else if (!packageFound && packageTypeSupported(name) && packageMatchesPlatform(name) &&
+                   packageMatchesArchitecture(name)) {
+            const QJsonObject package = packageDefinitionFromGitHubAsset(asset);
+            for (auto it = package.constBegin(); it != package.constEnd(); ++it) {
+                definition.insert(it.key(), it.value());
             }
-            definition.insert(QStringLiteral("sha256"), digest);
-            break;
+            packageFound = true;
         }
     }
-    return parseDefinition(definition, currentVersion, error);
+    return parseDefinition(definition, currentVersion, error, language);
 }
 
-UpdateCheckResult parseGitHubReleaseList(const QJsonArray& releases,
-                                         const QString& currentVersion, QString* error) {
+UpdateCheckResult parseGitHubReleaseList(const QJsonArray& releases, const QString& currentVersion,
+                                         QString* error, const QString& language) {
     UpdateCheckResult bestResult;
     QString lastError;
     const bool includePrereleases =
@@ -471,7 +637,7 @@ UpdateCheckResult parseGitHubReleaseList(const QJsonArray& releases,
 
         QString releaseError;
         const UpdateCheckResult candidate =
-            parseGitHubRelease(release, currentVersion, &releaseError);
+            parseGitHubRelease(release, currentVersion, &releaseError, language);
         if (!releaseError.isEmpty()) {
             lastError = releaseError;
             continue;
@@ -518,12 +684,17 @@ QString AppUpdater::updateChannel() {
     return QStringLiteral(TLM_UPDATE_CHANNEL);
 }
 
+QString AppUpdater::runtimeVersion() {
+    return QStringLiteral(TLM_UPDATE_RUNTIME_VERSION);
+}
+
 int AppUpdater::compareVersions(const QString& left, const QString& right) {
     return compareSemanticVersions(left, right);
 }
 
 UpdateCheckResult AppUpdater::parseUpdatePayload(const QByteArray& payload,
-                                                 const QString& currentVersion, QString* error) {
+                                                 const QString& currentVersion, QString* error,
+                                                 const QString& language) {
     if (error) {
         error->clear();
     }
@@ -538,13 +709,31 @@ UpdateCheckResult AppUpdater::parseUpdatePayload(const QByteArray& payload,
     }
 
     if (document.isArray()) {
-        return parseGitHubReleaseList(document.array(), currentVersion, error);
+        return parseGitHubReleaseList(document.array(), currentVersion, error, language);
     }
 
     const QJsonObject root = document.object();
     return root.contains(QStringLiteral("tag_name"))
-               ? parseGitHubRelease(root, currentVersion, error)
-               : parseDefinition(root, currentVersion, error);
+               ? parseGitHubRelease(root, currentVersion, error, language)
+               : parseDefinition(root, currentVersion, error, language);
+}
+
+void AppUpdater::setLanguage(const QString& language) {
+    const QString resolved = normalizedLanguage(language);
+    if (m_language == resolved) {
+        return;
+    }
+    m_language = resolved;
+    if (m_lastResult.localizedChangelogs.isEmpty()) {
+        return;
+    }
+    const QString changelog = selectLocalizedChangelog(m_lastResult.localizedChangelogs, m_language,
+                                                       m_lastResult.changelog);
+    if (m_lastResult.changelog == changelog) {
+        return;
+    }
+    m_lastResult.changelog = changelog;
+    emit updateDetailsChanged(m_lastResult);
 }
 
 bool AppUpdater::isChecking() const {
@@ -582,22 +771,40 @@ void AppUpdater::checkForUpdates(const QUrl& definitionUrl) {
     request.setTransferTimeout(kManifestTimeoutMs);
 
     m_checkPayload.clear();
+    m_pendingReleaseResult.reset();
     Logger::info(QStringLiteral("app.update.check.start channel=%1 url=\"%2\"")
                      .arg(updateChannel(), url.toString()));
     m_checkReply = m_network.get(request);
-    connect(m_checkReply, &QIODevice::readyRead, this, [this]() {
-        if (!m_checkReply) {
-            return;
-        }
-        m_checkPayload.append(m_checkReply->readAll());
-        if (m_checkPayload.size() > kMaximumManifestBytes) {
-            m_checkReply->setProperty("tlmFailure", tr("The update response is too large."));
-            m_checkReply->abort();
-        }
-    });
+    connect(m_checkReply, &QIODevice::readyRead, this, &AppUpdater::appendCheckData);
     connect(m_checkReply, &QNetworkReply::finished, this, &AppUpdater::finishCheckReply);
     setState(UpdateState::Checking);
     emit checkingStarted(url);
+}
+
+void AppUpdater::cancelCheck() {
+    if (!m_checkReply) {
+        return;
+    }
+    QNetworkReply* reply = m_checkReply;
+    m_checkReply = nullptr;
+    disconnect(reply, nullptr, this, nullptr);
+    reply->abort();
+    reply->deleteLater();
+    m_checkPayload.clear();
+    m_pendingReleaseResult.reset();
+    Logger::info(QStringLiteral("app.update.check.cancelled"));
+    setState(m_hasUpdateAvailable ? UpdateState::Available : UpdateState::Idle);
+}
+
+void AppUpdater::appendCheckData() {
+    if (!m_checkReply) {
+        return;
+    }
+    m_checkPayload.append(m_checkReply->readAll());
+    if (m_checkPayload.size() > kMaximumManifestBytes) {
+        m_checkReply->setProperty("tlmFailure", tr("The update response is too large."));
+        m_checkReply->abort();
+    }
 }
 
 void AppUpdater::startUpdate() {
@@ -633,8 +840,12 @@ void AppUpdater::finishCheckReply() {
         failure = reply->errorString();
     }
     reply->deleteLater();
+    if (failure.isEmpty() && status != 0 && (status < 200 || status >= 300)) {
+        failure = tr("The update server returned HTTP %1.").arg(status);
+    }
 
     if (!failure.isEmpty()) {
+        m_checkPayload.clear();
         Logger::warn(QStringLiteral("app.update.check.failed url=\"%1\" status=%2 error=\"%3\"")
                          .arg(url.toString())
                          .arg(status)
@@ -645,8 +856,8 @@ void AppUpdater::finishCheckReply() {
     }
 
     QString parseError;
-    UpdateCheckResult result =
-        parseUpdatePayload(m_checkPayload, QStringLiteral(TLM_APP_VERSION), &parseError);
+    UpdateCheckResult result = parseUpdatePayload(m_checkPayload, QStringLiteral(TLM_APP_VERSION),
+                                                  &parseError, m_language);
     m_checkPayload.clear();
     if (!parseError.isEmpty()) {
         Logger::warn(QStringLiteral("app.update.check.invalid url=\"%1\" status=%2 error=\"%3\"")
@@ -657,6 +868,119 @@ void AppUpdater::finishCheckReply() {
         emit checkFailed(parseError);
         return;
     }
+
+    if (result.updateAvailable && result.metadataUrl.isValid()) {
+        beginMetadataCheck(result);
+        return;
+    }
+    completeCheck(std::move(result));
+}
+
+void AppUpdater::beginMetadataCheck(const UpdateCheckResult& releaseResult) {
+    m_pendingReleaseResult = releaseResult;
+    m_checkPayload.clear();
+
+    QNetworkRequest request(releaseResult.metadataUrl);
+    request.setHeader(QNetworkRequest::UserAgentHeader,
+                      QStringLiteral("TierListMaker/%1 (%2)")
+                          .arg(QStringLiteral(TLM_APP_VERSION), updateChannel()));
+    request.setRawHeader("Accept", "application/json");
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::NoLessSafeRedirectPolicy);
+    request.setAttribute(QNetworkRequest::CacheLoadControlAttribute,
+                         QNetworkRequest::AlwaysNetwork);
+    request.setTransferTimeout(kManifestTimeoutMs);
+
+    Logger::debug(QStringLiteral("app.update.metadata.start url=\"%1\"")
+                      .arg(releaseResult.metadataUrl.toString()));
+    m_checkReply = m_network.get(request);
+    connect(m_checkReply, &QIODevice::readyRead, this, &AppUpdater::appendCheckData);
+    connect(m_checkReply, &QNetworkReply::finished, this, &AppUpdater::finishMetadataReply);
+}
+
+void AppUpdater::finishMetadataReply() {
+    QNetworkReply* reply = m_checkReply;
+    m_checkReply = nullptr;
+    if (!reply) {
+        return;
+    }
+    if (!m_pendingReleaseResult) {
+        reply->deleteLater();
+        m_checkPayload.clear();
+        return;
+    }
+
+    UpdateCheckResult releaseResult = std::move(*m_pendingReleaseResult);
+    m_pendingReleaseResult.reset();
+    m_checkPayload.append(reply->readAll());
+    const QUrl url = reply->url();
+    const int status = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
+    QString failure = reply->property("tlmFailure").toString();
+    if (failure.isEmpty() && reply->error() != QNetworkReply::NoError) {
+        failure = reply->errorString();
+    }
+    reply->deleteLater();
+    if (failure.isEmpty() && status != 0 && (status < 200 || status >= 300)) {
+        failure = tr("The update server returned HTTP %1.").arg(status);
+    }
+
+    QString parseError;
+    UpdateCheckResult metadataResult;
+    if (failure.isEmpty()) {
+        metadataResult = parseUpdatePayload(m_checkPayload, QStringLiteral(TLM_APP_VERSION),
+                                            &parseError, m_language);
+    }
+    m_checkPayload.clear();
+    if (!failure.isEmpty() || !parseError.isEmpty() ||
+        metadataResult.latestVersion != releaseResult.latestVersion) {
+        const QString reason =
+            !failure.isEmpty()
+                ? failure
+                : (!parseError.isEmpty()
+                       ? parseError
+                       : tr("The update metadata version does not match the release."));
+        // Localized notes are optional. Package selection and verification remain authoritative.
+        Logger::warn(
+            QStringLiteral("app.update.metadata.fallback url=\"%1\" status=%2 error=\"%3\"")
+                .arg(url.toString())
+                .arg(status)
+                .arg(reason));
+        completeCheck(std::move(releaseResult));
+        return;
+    }
+
+    for (auto it = metadataResult.localizedChangelogs.cbegin();
+         it != metadataResult.localizedChangelogs.cend(); ++it) {
+        releaseResult.localizedChangelogs.insert(it.key(), it.value());
+    }
+    releaseResult.changelog = selectLocalizedChangelog(releaseResult.localizedChangelogs,
+                                                       m_language, releaseResult.changelog);
+    releaseResult.mandatory = releaseResult.mandatory || metadataResult.mandatory;
+    releaseResult.runtimeVersion = metadataResult.runtimeVersion;
+
+    const bool matchingUpdateAsset =
+        releaseResult.updateDownloadUrl.isValid() &&
+        releaseResult.updateFileName == metadataResult.updateFileName &&
+        releaseResult.updateSha256 == metadataResult.updateSha256 &&
+        releaseResult.updatePackageSize == metadataResult.updatePackageSize;
+    if (matchingUpdateAsset && releaseResult.runtimeVersion == runtimeVersion()) {
+        releaseResult.downloadUrl = releaseResult.updateDownloadUrl;
+        releaseResult.fileName = releaseResult.updateFileName;
+        releaseResult.sha256 = releaseResult.updateSha256;
+        releaseResult.packageSize = releaseResult.updatePackageSize;
+        releaseResult.lightweightPackage = true;
+        Logger::info(QStringLiteral("app.update.package.select kind=executable runtime=%1")
+                         .arg(releaseResult.runtimeVersion));
+    } else {
+        Logger::info(QStringLiteral("app.update.package.select kind=installer currentRuntime=%1 "
+                                    "requiredRuntime=%2 updateAsset=%3")
+                         .arg(runtimeVersion(), releaseResult.runtimeVersion)
+                         .arg(matchingUpdateAsset));
+    }
+    completeCheck(std::move(releaseResult));
+}
+
+void AppUpdater::completeCheck(UpdateCheckResult result) {
 
     Logger::info(QStringLiteral("app.update.check.finish current=%1 latest=%2 available=%3 "
                                 "mandatory=%4 channel=%5")
@@ -724,7 +1048,8 @@ void AppUpdater::beginDownload() {
     connect(m_downloadReply, &QIODevice::readyRead, this, &AppUpdater::readDownloadData);
     connect(m_downloadReply, &QNetworkReply::downloadProgress, this,
             [this](qint64 received, qint64 total) {
-                const qint64 expected = m_lastResult.packageSize > 0 ? m_lastResult.packageSize : total;
+                const qint64 expected =
+                    m_lastResult.packageSize > 0 ? m_lastResult.packageSize : total;
                 emit downloadProgress(received, expected);
             });
     connect(m_downloadReply, &QNetworkReply::finished, this, &AppUpdater::finishDownloadReply);
@@ -743,7 +1068,8 @@ void AppUpdater::readDownloadData() {
     if (m_downloadedBytes + data.size() > kMaximumPackageBytes ||
         (m_lastResult.packageSize >= 0 &&
          m_downloadedBytes + data.size() > m_lastResult.packageSize)) {
-        m_downloadReply->setProperty("tlmFailure", tr("The update package is larger than expected."));
+        m_downloadReply->setProperty("tlmFailure",
+                                     tr("The update package is larger than expected."));
         m_downloadReply->abort();
         return;
     }
@@ -808,8 +1134,10 @@ void AppUpdater::installDownloadedUpdate() {
     }
 
     setState(UpdateState::Installing);
-    Logger::info(QStringLiteral("app.update.install.start path=\"%1\"")
-                     .arg(m_downloadedPackagePath));
+    Logger::info(QStringLiteral("app.update.install.start kind=%1 path=\"%2\"")
+                     .arg(m_lastResult.lightweightPackage ? QStringLiteral("executable")
+                                                          : QStringLiteral("installer"),
+                          m_downloadedPackagePath));
     if (!QDesktopServices::openUrl(QUrl::fromLocalFile(m_downloadedPackagePath))) {
         const QString reason = tr("The update installer could not be opened.");
         setState(UpdateState::Ready);

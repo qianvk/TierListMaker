@@ -75,6 +75,26 @@ private slots:
 
         settings.setTierListToolTipsEnabled(original);
     }
+
+    void updateChecksAreScheduledPerApplicationVersion() {
+        QStandardPaths::setTestModeEnabled(true);
+        AppSettings settings;
+        const bool original = settings.autoUpdateEnabled();
+        const QDateTime now = QDateTime::currentDateTimeUtc();
+
+        settings.setAutoUpdateEnabled(true);
+        settings.recordSuccessfulUpdateCheck(QStringLiteral("0.2.0-beta.4"), now);
+        QVERIFY(!settings.shouldRunAutoUpdateCheck(QStringLiteral("0.2.0-beta.4"),
+                                                   now.addSecs(60 * 60)));
+        QVERIFY(settings.shouldRunAutoUpdateCheck(QStringLiteral("0.2.0-beta.5"),
+                                                  now.addSecs(60 * 60)));
+        QVERIFY(settings.shouldRunAutoUpdateCheck(QStringLiteral("0.2.0-beta.4"),
+                                                  now.addSecs(25 * 60 * 60)));
+
+        settings.setAutoUpdateEnabled(false);
+        QVERIFY(!settings.shouldRunAutoUpdateCheck(QStringLiteral("0.2.0-beta.5"), now.addDays(2)));
+        settings.setAutoUpdateEnabled(original);
+    }
 };
 
 QTEST_MAIN(tst_ThemeManager)

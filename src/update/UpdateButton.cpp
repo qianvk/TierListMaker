@@ -35,7 +35,7 @@ UpdateButton::UpdateButton(QWidget* parent) : QToolButton(parent), m_attentionAn
         m_attention = 0.0;
         update();
     });
-    refreshIcon();
+    refreshPresentation();
 }
 
 void UpdateButton::setUpdateState(UpdateState state) {
@@ -45,15 +45,23 @@ void UpdateButton::setUpdateState(UpdateState state) {
     const UpdateState previous = m_state;
     m_state = state;
     const bool actionable = state == UpdateState::Available || state == UpdateState::Ready;
-    const bool visible = actionable || state == UpdateState::Downloading ||
-                         state == UpdateState::Installing;
+    const bool visible =
+        actionable || state == UpdateState::Downloading || state == UpdateState::Installing;
     setVisible(visible);
     setEnabled(actionable);
-    refreshIcon();
+    refreshPresentation();
     if (state == UpdateState::Available && previous != UpdateState::Available) {
         playAttentionAnimation();
     }
     update();
+}
+
+void UpdateButton::setInstallText(const QString& text) {
+    if (m_installText == text) {
+        return;
+    }
+    m_installText = text;
+    refreshPresentation();
 }
 
 void UpdateButton::setDownloadProgress(qint64 bytesReceived, qint64 bytesTotal) {
@@ -81,8 +89,7 @@ void UpdateButton::setReducedMotion(bool reduced) {
 
 void UpdateButton::paintEvent(QPaintEvent* event) {
     QToolButton::paintEvent(event);
-    if (m_state != UpdateState::Downloading && m_state != UpdateState::Ready &&
-        m_attention <= 0.0) {
+    if (m_state != UpdateState::Downloading && m_attention <= 0.0) {
         return;
     }
 
@@ -90,29 +97,37 @@ void UpdateButton::paintEvent(QPaintEvent* event) {
     painter.setRenderHint(QPainter::Antialiasing);
     QColor accent = activeThemeTokens().accent;
     if (m_attention > 0.0) {
-        accent.setAlphaF(static_cast<float>(
-            0.18 + 0.48 * std::sin(m_attention * std::numbers::pi)));
+        accent.setAlphaF(
+            static_cast<float>(0.18 + 0.48 * std::sin(m_attention * std::numbers::pi)));
     }
     QPen pen(accent, 2.0, Qt::SolidLine, Qt::RoundCap);
     painter.setPen(pen);
     const QRectF progressRect = QRectF(rect()).adjusted(3.0, 3.0, -3.0, -3.0);
 
     if (m_state == UpdateState::Downloading) {
-        const qreal progress = m_bytesTotal > 0
-                                   ? qBound(0.0, static_cast<qreal>(m_bytesReceived) /
-                                                     static_cast<qreal>(m_bytesTotal),
-                                            1.0)
-                                   : 0.25;
+        const qreal progress =
+            m_bytesTotal > 0
+                ? qBound(0.0,
+                         static_cast<qreal>(m_bytesReceived) / static_cast<qreal>(m_bytesTotal),
+                         1.0)
+                : 0.25;
         painter.drawArc(progressRect, 90 * 16, -qRound(progress * 360.0 * 16.0));
     } else {
         painter.drawEllipse(progressRect);
     }
 }
 
-void UpdateButton::refreshIcon() {
-    const bool ready = m_state == UpdateState::Ready || m_state == UpdateState::Installing;
-    setIcon(vkui::icon(ready ? vkui::VkSymbol::Checkmark : vkui::VkSymbol::Download,
+void UpdateButton::refreshPresentation() {
+    const bool installAction = m_state == UpdateState::Ready || m_state == UpdateState::Installing;
+    setToolButtonStyle(installAction ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+    setText(installAction ? m_installText : QString());
+    const int textWidth = installAction ? fontMetrics().horizontalAdvance(m_installText) : 0;
+    const int width = installAction ? qBound(72, textWidth + iconSize().width() + 30, 116) : 34;
+    setFixedSize(width, 34);
+    setAccessibleName(installAction ? m_installText : toolTip());
+    setIcon(vkui::icon(installAction ? vkui::VkSymbol::Checkmark : vkui::VkSymbol::Download,
                        vkui::VkIconRole::Accent));
+    updateGeometry();
 }
 
 void UpdateButton::playAttentionAnimation() {

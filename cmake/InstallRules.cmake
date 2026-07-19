@@ -105,7 +105,7 @@ if(APPLE)
     set(CPACK_DMG_FORMAT "UDZO")
     set(CPACK_DMG_FILESYSTEM "APFS")
 elseif(WIN32)
-    # NSIS provides a familiar per-user wizard, Start Menu entry, repair-safe upgrades,
+    # NSIS provides a familiar machine-wide wizard, Start Menu entry, repair-safe upgrades,
     # Apps & Features metadata, and an optional launch action without modifying PATH.
     file(TO_NATIVE_PATH
         "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app-icon.ico"
@@ -119,7 +119,9 @@ elseif(WIN32)
 
     set(CPACK_GENERATOR "NSIS")
     set(CPACK_VERBATIM_VARIABLES ON)
-    set(CPACK_NSIS_INSTALL_ROOT "$LOCALAPPDATA")
+    # A machine-wide application belongs under the native 64-bit Program Files directory.
+    # CPack's NSIS template already requests elevation and handles an existing installation.
+    set(CPACK_NSIS_INSTALL_ROOT "$PROGRAMFILES64")
     set(CPACK_NSIS_DISPLAY_NAME "TierListMaker")
     set(CPACK_NSIS_PACKAGE_NAME "TierListMaker")
     set(CPACK_NSIS_MUI_ICON "${_tlm_nsis_icon}")
@@ -133,9 +135,51 @@ elseif(WIN32)
     set(CPACK_NSIS_ENABLE_UNINSTALL_BEFORE_INSTALL ON)
     set(CPACK_NSIS_MODIFY_PATH OFF)
     set(CPACK_NSIS_MANIFEST_DPI_AWARE ON)
+    set(CPACK_NSIS_EXTRA_INSTALL_COMMANDS
+        "WriteRegStr HKLM \"Software\\qianvk\\TierListMaker\" \"RuntimeVersion\" \"${TLM_UPDATE_RUNTIME_VERSION}\"")
     set(CPACK_NSIS_URL_INFO_ABOUT "https://github.com/qianvk/TierListMaker")
     set(CPACK_NSIS_HELP_LINK "https://github.com/qianvk/TierListMaker/issues")
     set(CPACK_NSIS_BRANDING_TEXT "TierListMaker")
+
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(AMD64|amd64|x86_64)$")
+        set(_tlm_update_arch AMD64)
+    elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(ARM64|arm64|aarch64)$")
+        set(_tlm_update_arch ARM64)
+    else()
+        message(FATAL_ERROR "Unsupported Windows update architecture: ${CMAKE_SYSTEM_PROCESSOR}")
+    endif()
+
+    find_program(TLM_MAKENSIS_EXECUTABLE NAMES makensis makensis.exe
+        HINTS "C:/Program Files (x86)/NSIS" "C:/Program Files/NSIS")
+    if(TLM_MAKENSIS_EXECUTABLE)
+        set(TLM_WINDOWS_UPDATE_PACKAGE
+            "${CMAKE_BINARY_DIR}/updates/TierListMaker-${TLM_PACKAGE_VERSION}-WinUpdate-${_tlm_update_arch}.exe")
+        set(_tlm_update_payload "${CMAKE_BINARY_DIR}/updates/payload/TierListMaker.exe")
+        file(TO_NATIVE_PATH "${_tlm_update_payload}" _tlm_update_payload_native)
+        add_custom_command(
+            OUTPUT "${TLM_WINDOWS_UPDATE_PACKAGE}"
+            COMMAND "${CMAKE_COMMAND}" -E make_directory "${CMAKE_BINARY_DIR}/updates/payload"
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+                "$<TARGET_FILE:TierListMaker>" "${_tlm_update_payload}"
+            COMMAND "${TLM_MAKENSIS_EXECUTABLE}"
+                "/INPUTCHARSET" "UTF8"
+                "/DAPP_EXECUTABLE=${_tlm_update_payload_native}"
+                "/DOUTPUT_FILE=${TLM_WINDOWS_UPDATE_PACKAGE}"
+                "/DAPP_VERSION=${TLM_PACKAGE_VERSION}"
+                "/DNUMERIC_VERSION=${TLM_NUMERIC_VERSION}"
+                "/DRUNTIME_VERSION=${TLM_UPDATE_RUNTIME_VERSION}"
+                "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/update.nsi"
+            DEPENDS TierListMaker "${CMAKE_CURRENT_SOURCE_DIR}/packaging/windows/update.nsi"
+            COMMENT "Creating executable-only Windows update package"
+            VERBATIM
+        )
+        add_custom_target(TierListMakerUpdatePackage DEPENDS "${TLM_WINDOWS_UPDATE_PACKAGE}")
+    else()
+        message(STATUS "makensis was not found; the Windows update package target is unavailable")
+    endif()
+
+    file(WRITE "${CMAKE_BINARY_DIR}/TierListMaker-Windows-runtime-version.txt"
+        "${TLM_UPDATE_RUNTIME_VERSION}\n")
 endif()
 
 include(CPack)

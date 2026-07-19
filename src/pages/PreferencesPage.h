@@ -34,6 +34,7 @@ private:
     void updateNavWidth();
     void refreshPreferenceControlStyles();
     void refreshUpdateActions();
+    void refreshUpdatePolicyText();
     void applyUpdateResult(const UpdateCheckResult& result);
     void applyUpdateFailure(const QString& reason);
     QWidget* createGeneralPage();

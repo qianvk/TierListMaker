@@ -1,5 +1,6 @@
 #pragma once
 
+#include <QMap>
 #include <QNetworkAccessManager>
 #include <QObject>
 #include <QPointer>
@@ -7,6 +8,7 @@
 #include <QUrl>
 
 #include <memory>
+#include <optional>
 
 class QCryptographicHash;
 class QNetworkReply;
@@ -30,12 +32,20 @@ struct UpdateCheckResult {
     QString currentVersion;
     QString latestVersion;
     QString channel;
+    QString runtimeVersion;
     QString changelog;
+    QMap<QString, QString> localizedChangelogs;
     QString fileName;
     QString sha256;
     qint64 packageSize{-1};
     QUrl downloadUrl;
     QUrl openUrl;
+    QUrl metadataUrl;
+    QUrl updateDownloadUrl;
+    QString updateFileName;
+    QString updateSha256;
+    qint64 updatePackageSize{-1};
+    bool lightweightPackage{false};
 };
 
 /** Checks release metadata and stages checksum-verified platform installers. */
@@ -49,19 +59,34 @@ public:
     static QUrl defaultUpdateDefinitionUrl();
     static QUrl defaultProjectUrl();
     static QString updateChannel();
+    static QString runtimeVersion();
     static int compareVersions(const QString& left, const QString& right);
     static UpdateCheckResult parseUpdatePayload(const QByteArray& payload,
-                                                const QString& currentVersion, QString* error);
+                                                const QString& currentVersion, QString* error,
+                                                const QString& language = {});
 
     bool isChecking() const;
     bool isDownloading() const;
-    bool hasUpdateAvailable() const { return m_hasUpdateAvailable; }
-    UpdateState state() const { return m_state; }
-    UpdateCheckResult lastResult() const { return m_lastResult; }
-    QString downloadedPackagePath() const { return m_downloadedPackagePath; }
+    bool hasUpdateAvailable() const {
+        return m_hasUpdateAvailable;
+    }
+    UpdateState state() const {
+        return m_state;
+    }
+    UpdateCheckResult lastResult() const {
+        return m_lastResult;
+    }
+    QString downloadedPackagePath() const {
+        return m_downloadedPackagePath;
+    }
+    QString language() const {
+        return m_language;
+    }
 
 public slots:
+    void setLanguage(const QString& language);
     void checkForUpdates(const QUrl& definitionUrl = {});
+    void cancelCheck();
     void startUpdate();
     void openUpdatePage(const tlm::UpdateCheckResult& result = {});
 
@@ -69,6 +94,7 @@ signals:
     void checkingStarted(const QUrl& definitionUrl);
     void updateAvailable(const tlm::UpdateCheckResult& result);
     void noUpdateAvailable(const tlm::UpdateCheckResult& result);
+    void updateDetailsChanged(const tlm::UpdateCheckResult& result);
     void checkFailed(const QString& reason);
     void updateNotificationChanged(bool visible);
     void stateChanged(tlm::UpdateState state);
@@ -77,7 +103,11 @@ signals:
     void updateFailed(const QString& reason);
 
 private:
+    void appendCheckData();
     void finishCheckReply();
+    void beginMetadataCheck(const UpdateCheckResult& releaseResult);
+    void finishMetadataReply();
+    void completeCheck(UpdateCheckResult result);
     void beginDownload();
     void readDownloadData();
     void finishDownloadReply();
@@ -92,7 +122,9 @@ private:
     std::unique_ptr<QSaveFile> m_downloadFile;
     std::unique_ptr<QCryptographicHash> m_downloadHash;
     QByteArray m_checkPayload;
+    std::optional<UpdateCheckResult> m_pendingReleaseResult;
     UpdateCheckResult m_lastResult;
+    QString m_language;
     QString m_downloadedPackagePath;
     qint64 m_downloadedBytes{0};
     UpdateState m_state{UpdateState::Idle};

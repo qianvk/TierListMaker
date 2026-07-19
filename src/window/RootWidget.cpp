@@ -356,20 +356,19 @@ void RootWidget::buildUi(ProjectRepository* repository, RecentProjectsStore* rec
     if (updater) {
         connect(updater, &AppUpdater::stateChanged, this,
                 [this](UpdateState) { refreshUpdateButton(); });
-        connect(updater, &AppUpdater::downloadProgress, this,
-                [this](qint64 received, qint64 total) {
-                    if (!m_updateButton) {
-                        return;
-                    }
-                    m_updateButton->setDownloadProgress(received, total);
-                    if (total > 0) {
-                        const int percent = qBound(
-                            0, qRound(100.0 * static_cast<qreal>(received) /
-                                      static_cast<qreal>(total)),
-                            100);
-                        m_updateButton->setToolTip(tr("Downloading update: %1%").arg(percent));
-                    }
-                });
+        connect(
+            updater, &AppUpdater::downloadProgress, this, [this](qint64 received, qint64 total) {
+                if (!m_updateButton) {
+                    return;
+                }
+                m_updateButton->setDownloadProgress(received, total);
+                if (total > 0) {
+                    const int percent = qBound(
+                        0, qRound(100.0 * static_cast<qreal>(received) / static_cast<qreal>(total)),
+                        100);
+                    m_updateButton->setToolTip(tr("Downloading update: %1%").arg(percent));
+                }
+            });
         refreshUpdateButton();
     }
 
@@ -504,6 +503,7 @@ QFrame* RootWidget::createSidebar(QWidget* parent) {
             [this]() { switchToPage(AppPage::Preferences); });
 
     m_updateButton = new UpdateButton(sidebar);
+    m_updateButton->setInstallText(tr("Install"));
     m_updateButton->setReducedMotion(m_settings && m_settings->reducedMotion());
     connect(m_updateButton, &QToolButton::clicked, this, [this]() {
         if (m_updater) {
@@ -516,6 +516,8 @@ QFrame* RootWidget::createSidebar(QWidget* parent) {
                 m_updateButton->setReducedMotion(m_settings->reducedMotion());
             }
         });
+        connect(m_settings, &AppSettings::autoUpdateEnabledChanged, this,
+                [this](bool) { refreshUpdateButton(); });
     }
 
     auto* footer = new QHBoxLayout;
@@ -849,20 +851,26 @@ void RootWidget::refreshUpdateButton() {
     if (!m_updateButton || !m_updater) {
         return;
     }
+    m_updateButton->setInstallText(tr("Install"));
+    if (m_settings && !m_settings->autoUpdateEnabled()) {
+        m_updateButton->setUpdateState(UpdateState::Idle);
+        m_updateButton->setToolTip(tr("Updates"));
+        return;
+    }
     const UpdateState state = m_updater->state();
     m_updateButton->setUpdateState(state);
     const QString version = m_updater->lastResult().latestVersion;
     switch (state) {
     case UpdateState::Available:
-        m_updateButton->setToolTip(
-            version.isEmpty() ? tr("Download update") : tr("Download update %1").arg(version));
+        m_updateButton->setToolTip(version.isEmpty() ? tr("Download update")
+                                                     : tr("Download update %1").arg(version));
         break;
     case UpdateState::Downloading:
         m_updateButton->setToolTip(tr("Downloading update"));
         break;
     case UpdateState::Ready:
-        m_updateButton->setToolTip(
-            version.isEmpty() ? tr("Install update") : tr("Install update %1").arg(version));
+        m_updateButton->setToolTip(version.isEmpty() ? tr("Install update")
+                                                     : tr("Install update %1").arg(version));
         break;
     case UpdateState::Installing:
         m_updateButton->setToolTip(tr("Opening update installer"));

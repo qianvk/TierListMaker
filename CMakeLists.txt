@@ -13,7 +13,7 @@ endif()
 
 option(TLM_BUILD_TESTS "Build TierListMaker tests" ON)
 option(TLM_WARNINGS_AS_ERRORS "Treat compiler warnings as errors" OFF)
-set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}-beta.4" CACHE STRING
+set(TLM_PACKAGE_VERSION "${PROJECT_VERSION}-beta.5" CACHE STRING
     "Version embedded in the application and platform installers")
 if(NOT TLM_PACKAGE_VERSION MATCHES "^([0-9]+)\\.([0-9]+)\\.([0-9]+)([-+].*)?$")
     message(FATAL_ERROR "TLM_PACKAGE_VERSION must start with a semantic x.y.z version")
@@ -41,6 +41,10 @@ include(ProjectOptions)
 include(CompilerWarnings)
 include(Dependencies)
 include(Version)
+
+# Bump the revision whenever the executable requires a different deployed Qt/plugin payload.
+set(TLM_UPDATE_RUNTIME_VERSION "qt-${Qt6_VERSION}-r1" CACHE STRING
+    "Runtime generation required by executable-only update packages")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "Generate compile_commands.json for clangd" FORCE)
 set(CMAKE_AUTOMOC ON)
@@ -215,6 +219,7 @@ target_compile_definitions(TierListMaker PRIVATE
     TLM_GIT_COMMIT="${TLM_GIT_COMMIT}"
     TLM_UPDATE_CHANNEL="${TLM_UPDATE_CHANNEL}"
     TLM_UPDATE_MANIFEST_URL="${TLM_UPDATE_MANIFEST_URL}"
+    TLM_UPDATE_RUNTIME_VERSION="${TLM_UPDATE_RUNTIME_VERSION}"
 )
 qt_add_translations(TierListMaker
     TS_FILES

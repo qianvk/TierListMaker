@@ -99,38 +99,58 @@
         <translation>图片元数据格式错误。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="344"/>
-        <location filename="../../src/update/AppUpdater.cpp" line="493"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="437"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="659"/>
         <source>No update package is published for this platform.</source>
         <translation>此平台尚未发布更新包。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="376"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="493"/>
         <source>The update response does not contain a valid latest version.</source>
         <translation>更新响应中没有有效的最新版本。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="382"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="499"/>
         <source>The update package URL is not secure.</source>
         <translation>更新包 URL 不安全。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="388"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="505"/>
         <source>The update page URL is not secure.</source>
         <translation>更新页面 URL 不安全。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="396"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="511"/>
+        <source>The update metadata URL is not secure.</source>
+        <translation>更新元数据 URL 不安全。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="517"/>
+        <source>The executable update URL is not secure.</source>
+        <translation>可执行更新包 URL 不安全。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="525"/>
         <source>The update package checksum is invalid.</source>
         <translation>更新包校验和无效。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="413"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="534"/>
+        <source>The executable update checksum is invalid.</source>
+        <translation>可执行更新包校验值无效。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="543"/>
+        <source>The executable update metadata is incomplete.</source>
+        <translation>可执行更新包元数据不完整。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="559"/>
         <source>The update package type is not supported on this platform.</source>
         <translation>此平台不支持该更新包类型。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="535"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="706"/>
         <source>The update response is not valid JSON.</source>
         <translation>更新响应不是有效的 JSON。</translation>
     </message>
@@ -271,47 +291,54 @@
 <context>
     <name>tlm::AppUpdater</name>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="566"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="755"/>
         <source>The update definition URL is not secure.</source>
         <translation>更新定义 URL 不安全。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="594"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="805"/>
         <source>The update response is too large.</source>
         <translation>更新响应过大。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="699"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1023"/>
         <source>The update cache directory could not be created.</source>
         <translation>无法创建更新缓存目录。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="746"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1072"/>
         <source>The update package is larger than expected.</source>
         <translation>更新包大于预期大小。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="774"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="844"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="924"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1100"/>
         <source>The update server returned HTTP %1.</source>
         <translation>更新服务器返回了 HTTP %1。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="778"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="941"/>
+        <source>The update metadata version does not match the release.</source>
+        <translation>更新元数据版本与发布版本不匹配。</translation>
+    </message>
+    <message>
+        <location filename="../../src/update/AppUpdater.cpp" line="1104"/>
         <source>The downloaded update package has an unexpected size.</source>
         <translation>下载的更新包大小与预期不符。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="782"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1108"/>
         <source>The downloaded update package failed checksum verification.</source>
         <translation>下载的更新包未通过校验和验证。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="806"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1132"/>
         <source>The staged update package is no longer valid.</source>
         <translation>已暂存的更新包不再有效。</translation>
     </message>
     <message>
-        <location filename="../../src/update/AppUpdater.cpp" line="814"/>
+        <location filename="../../src/update/AppUpdater.cpp" line="1142"/>
         <source>The update installer could not be opened.</source>
         <translation>无法打开更新安装程序。</translation>
     </message>
@@ -849,8 +876,8 @@
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="296"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="575"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="302"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
         <source>General</source>
         <translation>通用</translation>
     </message>
@@ -860,8 +887,8 @@
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="298"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="649"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="304"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="658"/>
         <source>About</source>
         <translation>关于</translation>
     </message>
@@ -874,21 +901,21 @@
         <translation type="vanished">简体中文</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="433"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="452"/>
         <source>Language</source>
         <translation>语言</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="421"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="455"/>
         <source>System</source>
         <translation>跟随系统</translation>
     </message>
     <message>
         <location filename="../../src/pages/PreferencesPage.cpp" line="196"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="297"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="573"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="587"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="303"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="585"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="599"/>
         <source>Updates</source>
         <translation>更新</translation>
     </message>
@@ -900,7 +927,7 @@
 %1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="255"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="256"/>
         <source>Downloading update %1: %2%</source>
         <translation>正在下载更新 %1：%2%</translation>
     </message>
@@ -910,45 +937,45 @@
         <translation>更新 %1 已可安装。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="378"/>
         <source>Install Update</source>
         <translation>安装更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="371"/>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="609"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="378"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="618"/>
         <source>Download Update</source>
         <translation>下载更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="387"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="406"/>
         <source>Version %1 is available. Current version: %2%3</source>
         <translation>发现新版本 %1。当前版本：%2%3</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="394"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="413"/>
         <source>TierListMaker is up to date. Current version: %1</source>
         <translation>TierListMaker 已是最新版本。当前版本：%1</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="403"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="422"/>
         <source>Update check failed: %1
 The project may not have published update metadata yet.</source>
         <translation>检查更新失败：%1
 项目可能还没有发布更新元数据。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="455"/>
         <source>Light</source>
         <translation>浅色</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="436"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="455"/>
         <source>Dark</source>
         <translation>深色</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="440"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
         <source>Appearance</source>
         <translation>外观</translation>
     </message>
@@ -969,107 +996,116 @@ The project may not have published update metadata yet.</source>
         <translation type="vanished">图片导入方式</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="443"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="462"/>
         <source>None</source>
         <translation>无</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="444"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="463"/>
         <source>Image</source>
         <translation>自身图片</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="454"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="471"/>
         <source>Preview background</source>
         <translation>预览背景</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="457"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="474"/>
         <source>Open Gallery Overview</source>
         <translation>打开图库总览</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="459"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="476"/>
         <source>Open Tier Overview</source>
         <translation>打开 tier 总览</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="461"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="478"/>
         <source>Do Nothing</source>
         <translation>不执行操作</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="477"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="494"/>
         <source>Empty tier area double-click</source>
         <translation>Tier 空白区域双击</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="488"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="505"/>
         <source>Empty tier area long press</source>
         <translation>Tier 空白区域长按</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="491"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="508"/>
         <source>Show tier list tooltips</source>
         <translation>显示分级列表操作提示</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="496"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="512"/>
         <source>Tier list tooltips</source>
         <translation>分级列表操作提示</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="499"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="515"/>
         <source>Enable autosave</source>
         <translation>启用自动保存</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="501"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="517"/>
         <source>Save behavior</source>
         <translation>保存行为</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="505"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="521"/>
         <source> min</source>
         <translation> 分钟</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="510"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="526"/>
         <source>Autosave interval</source>
         <translation>自动保存间隔</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="525"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="541"/>
         <source>Default project folder</source>
         <translation>默认项目文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="528"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="544"/>
         <source>Choose</source>
         <translation>选择</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="555"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="571"/>
         <source>Default Project Folder</source>
         <translation>默认项目文件夹</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="565"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="581"/>
         <source>Enable automatic update checks</source>
         <translation>启用自动检查更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="596"/>
-        <source>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</source>
-        <translation>点击“立即检查”时会执行手动检查。启用自动检查后，最多每天检查一次。不会自动下载或执行任何更新。</translation>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="394"/>
+        <source>Automatic update checks are off. You can still check manually; no update is downloaded or installed without your action.</source>
+        <translation>自动检查更新已关闭。您仍可手动检查；未经您的操作，不会下载或安装任何更新。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="606"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="396"/>
+        <source>Automatic checks run at most once per day. No update is downloaded or installed without your action.</source>
+        <translation>每天最多自动检查一次。未经您的操作，不会下载或安装任何更新。</translation>
+    </message>
+    <message>
+        <source>Manual checks run when you click Check Now. Automatic checks run at most once per day when enabled. No update is downloaded or executed automatically.</source>
+        <translation type="vanished">点击“立即检查”时会执行手动检查。启用自动检查后，最多每天检查一次。不会自动下载或执行任何更新。</translation>
+    </message>
+    <message>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="615"/>
         <source>Check Now</source>
         <translation>立即检查</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="651"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="660"/>
         <source>TierListMaker
 Version: %1
 License: MIT
@@ -1156,7 +1192,7 @@ https://github.com/qianvk/TierListMaker</translation>
         <translation type="vanished">TierListMaker 不上传用户数据，默认不包含遥测。</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="589"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="601"/>
         <source>Update definition:
 %1</source>
         <translation>更新定义：
@@ -1171,7 +1207,7 @@ https://github.com/qianvk/TierListMaker</translation>
         <translation type="vanished">检查更新</translation>
     </message>
     <message>
-        <location filename="../../src/pages/PreferencesPage.cpp" line="611"/>
+        <location filename="../../src/pages/PreferencesPage.cpp" line="620"/>
         <source>Open Release Page</source>
         <translation>打开发布页</translation>
     </message>
@@ -1642,76 +1678,83 @@ https://github.com/qianvk/vkframeless</translation>
     <message>
         <location filename="../../src/window/RootWidget.cpp" line="323"/>
         <location filename="../../src/window/RootWidget.cpp" line="352"/>
-        <location filename="../../src/window/RootWidget.cpp" line="448"/>
-        <location filename="../../src/window/RootWidget.cpp" line="571"/>
-        <location filename="../../src/window/RootWidget.cpp" line="707"/>
+        <location filename="../../src/window/RootWidget.cpp" line="447"/>
+        <location filename="../../src/window/RootWidget.cpp" line="573"/>
+        <location filename="../../src/window/RootWidget.cpp" line="709"/>
         <source>Collapse sidebar</source>
         <translation>折叠侧边栏</translation>
     </message>
     <message>
         <location filename="../../src/window/RootWidget.cpp" line="328"/>
-        <location filename="../../src/window/RootWidget.cpp" line="447"/>
-        <location filename="../../src/window/RootWidget.cpp" line="571"/>
-        <location filename="../../src/window/RootWidget.cpp" line="706"/>
+        <location filename="../../src/window/RootWidget.cpp" line="446"/>
+        <location filename="../../src/window/RootWidget.cpp" line="573"/>
+        <location filename="../../src/window/RootWidget.cpp" line="708"/>
         <source>Show sidebar</source>
         <translation>显示侧边栏</translation>
     </message>
     <message>
         <location filename="../../src/window/RootWidget.cpp" line="341"/>
-        <location filename="../../src/window/RootWidget.cpp" line="451"/>
+        <location filename="../../src/window/RootWidget.cpp" line="450"/>
         <source>New</source>
         <translation>新建</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="370"/>
+        <location filename="../../src/window/RootWidget.cpp" line="369"/>
         <source>Downloading update: %1%</source>
         <translation>正在下载更新：%1%</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="454"/>
-        <location filename="../../src/window/RootWidget.cpp" line="498"/>
-        <location filename="../../src/window/RootWidget.cpp" line="884"/>
-        <location filename="../../src/window/RootWidget.cpp" line="1031"/>
+        <location filename="../../src/window/RootWidget.cpp" line="453"/>
+        <location filename="../../src/window/RootWidget.cpp" line="497"/>
+        <location filename="../../src/window/RootWidget.cpp" line="892"/>
+        <location filename="../../src/window/RootWidget.cpp" line="1039"/>
         <source>Preferences</source>
         <translation>偏好设置</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <location filename="../../src/window/RootWidget.cpp" line="506"/>
+        <location filename="../../src/window/RootWidget.cpp" line="854"/>
+        <source>Install</source>
+        <translation>安装</translation>
+    </message>
+    <message>
+        <location filename="../../src/window/RootWidget.cpp" line="865"/>
         <source>Download update</source>
         <translation>下载更新</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="858"/>
+        <location filename="../../src/window/RootWidget.cpp" line="866"/>
         <source>Download update %1</source>
         <translation>下载更新 %1</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="861"/>
+        <location filename="../../src/window/RootWidget.cpp" line="869"/>
         <source>Downloading update</source>
         <translation>正在下载更新</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <location filename="../../src/window/RootWidget.cpp" line="872"/>
         <source>Install update</source>
         <translation>安装更新</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="865"/>
+        <location filename="../../src/window/RootWidget.cpp" line="873"/>
         <source>Install update %1</source>
         <translation>安装更新 %1</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="868"/>
+        <location filename="../../src/window/RootWidget.cpp" line="876"/>
         <source>Opening update installer</source>
         <translation>正在打开更新安装程序</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="871"/>
+        <location filename="../../src/window/RootWidget.cpp" line="857"/>
+        <location filename="../../src/window/RootWidget.cpp" line="879"/>
         <source>Updates</source>
         <translation>更新</translation>
     </message>
     <message>
-        <location filename="../../src/window/RootWidget.cpp" line="1025"/>
+        <location filename="../../src/window/RootWidget.cpp" line="1033"/>
         <source>Projects</source>
         <translation>项目</translation>
     </message>
